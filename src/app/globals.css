@@ -1,0 +1,170 @@
+/* Importar Roboto de Google Fonts */
+@import url('https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,100;0,300;0,400;0,500;0,700;0,900;1,100;1,300;1,400;1,500;1,700;1,900&display=swap');
+
+@import "tailwindcss";
+
+/* Colores oficiales del gobierno */
+:root {
+  --gov-green: #006F4B;
+  --gov-yellow: #FDBA38;
+  --gov-green-light: #008F5B;
+  --gov-green-dark: #005A3D;
+  --gov-yellow-light: #FEC44E;
+  --gov-yellow-dark: #F4A623;
+}
+
+/* Declaraciones de fuentes locales */
+@font-face {
+  font-family: 'Rutan';
+  src: url('/fonts/Rutan/rutan-thin.otf') format('opentype'),
+       url('/fonts/Rutan/rutan-thin.ttf') format('truetype');
+  font-weight: 100;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Rutan';
+  src: url('/fonts/Rutan/rutan-light.otf') format('opentype'),
+       url('/fonts/Rutan/rutan-light.ttf') format('truetype');
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Rutan';
+  src: url('/fonts/Rutan/rutan.otf') format('opentype'),
+       url('/fonts/Rutan/rutan.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Rutan';
+  src: url('/fonts/Rutan/rutan-medium.otf') format('opentype'),
+       url('/fonts/Rutan/rutan-medium.ttf') format('truetype');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Rutan';
+  src: url('/fonts/Rutan/rutan-demibold.otf') format('opentype'),
+       url('/fonts/Rutan/rutan-demibold.ttf') format('truetype');
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Rutan';
+  src: url('/fonts/Rutan/rutan-bold.otf') format('opentype'),
+       url('/fonts/Rutan/rutan-bold.ttf') format('truetype');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Rutan';
+  src: url('/fonts/Rutan/rutan-black.otf') format('opentype'),
+       url('/fonts/Rutan/rutan-black.ttf') format('truetype');
+  font-weight: 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Estilos personalizados */
+@layer base {
+  html {
+    font-family: 'Roboto', 'Inter', 'Rutan', system-ui, sans-serif;
+  }
+  
+  body {
+    @apply bg-gray-50 text-gray-900;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply px-6 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors;
+  }
+  
+  .btn-secondary {
+    @apply px-6 py-3 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors;
+  }
+  
+  .form-input {
+    @apply w-full px-4 py-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent;
+  }
+  
+  .form-input-error {
+    @apply w-full px-4 py-3 border border-red-500 rounded-md focus:ring-2 focus:ring-red-500 focus:border-transparent;
+  }
+
+  /* Optimizaciones móviles */
+  .mobile-optimized {
+    @apply text-base;
+    -webkit-text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .mobile-input {
+    @apply text-base;
+    font-size: 16px; /* Evita zoom en iOS */
+    -webkit-appearance: none;
+    border-radius: 0.375rem;
+  }
+
+  .mobile-button {
+    @apply text-base;
+    min-height: 44px; /* Tamaño mínimo para touch */
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .mobile-card {
+    @apply rounded-lg shadow-md;
+    margin: 0 1rem;
+  }
+
+  /* Optimizaciones específicas para iOS */
+  .ios-optimized {
+    -webkit-transform: translateZ(0);
+    -webkit-backface-visibility: hidden;
+    -webkit-perspective: 1000;
+  }
+
+  .progress-circle {
+    -webkit-transform: translateZ(0);
+    -webkit-backface-visibility: hidden;
+    border-radius: 50%;
+  }
+
+  @media (max-width: 640px) {
+    .mobile-card {
+      margin: 0 0.5rem;
+    }
+  }
+}
+
+@layer utilities {
+  .text-shadow {
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  }
+  
+  /* Clases de fuente */
+  .font-roboto {
+    font-family: 'Roboto', sans-serif;
+  }
+  
+  .font-rutan {
+    font-family: 'Rutan', sans-serif;
+  }
+  
+  .font-inter {
+    font-family: 'Inter', sans-serif;
+  }
+}
