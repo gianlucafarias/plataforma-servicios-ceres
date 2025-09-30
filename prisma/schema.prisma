@@ -1,0 +1,170 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                 String              @id @default(uuid())
+  email              String              @unique
+  name               String?
+  phone              String?
+  emailVerifiedAt    DateTime?
+  role               UserRole            @default(professional)
+  verified           Boolean             @default(false)
+  createdAt          DateTime            @default(now())
+  password           String
+  updatedAt          DateTime            @updatedAt
+  birthDate          DateTime?
+  firstName          String
+  lastName           String
+  location           String?
+  contactRequests    ContactRequest[]
+  professional       Professional?
+  reviews            Review[]
+  verificationTokens VerificationToken[]
+
+  @@map("users")
+}
+
+model CategoryGroup {
+  id         String     @id
+  name       String
+  slug       String     @unique
+  categories Category[]
+
+  @@map("category_groups")
+}
+
+model Category {
+  id               String        @id @default(uuid())
+  name             String
+  description      String
+  icon             String?
+  slug             String        @unique
+  active           Boolean       @default(true)
+  backgroundUrl    String?
+  groupId          String
+  parentCategoryId String?
+  group            CategoryGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  parent           Category?     @relation("CategoryToParent", fields: [parentCategoryId], references: [id])
+  children         Category[]    @relation("CategoryToParent")
+  services         Service[]
+
+  @@map("categories")
+}
+
+model Professional {
+  id                String             @id @default(uuid())
+  userId            String             @unique
+  bio               String
+  experienceYears   Int?               @default(0)
+  verified          Boolean            @default(false)
+  status            ProfessionalStatus @default(pending)
+  rating            Float?             @default(0)
+  reviewCount       Int?               @default(0)
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  whatsapp          String?
+  instagram         String?
+  facebook          String?
+  location          String?
+  schedule          Json?
+  specialties       String[]
+  professionalGroup CategoryGroupId?
+  CV                String?
+  ProfilePicture    String?
+  linkedin          String?
+  portfolio         String?
+  website           String?
+  serviceLocations  String[]           @default([])
+  contactRequests   ContactRequest[]
+  user              User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reviews           Review[]
+  services          Service[]
+
+  @@map("professionals")
+}
+
+model Service {
+  id              String           @id @default(uuid())
+  professionalId  String
+  categoryId      String
+  categoryGroup   CategoryGroupId?
+  title           String
+  description     String
+  priceRange      String           @default("")
+  available       Boolean          @default(true)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  contactRequests ContactRequest[]
+  category        Category         @relation(fields: [categoryId], references: [id])
+  professional    Professional     @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+
+  @@map("services")
+}
+
+model Review {
+  id             String       @id @default(uuid())
+  professionalId String
+  userId         String
+  rating         Int
+  comment        String
+  createdAt      DateTime     @default(now())
+  professional   Professional @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("reviews")
+}
+
+model ContactRequest {
+  id             String               @id @default(uuid())
+  professionalId String
+  userId         String
+  serviceId      String?
+  message        String
+  status         ContactRequestStatus @default(pending)
+  createdAt      DateTime             @default(now())
+  professional   Professional         @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+  service        Service?             @relation(fields: [serviceId], references: [id])
+  user           User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("contact_requests")
+}
+
+model VerificationToken {
+  id        String   @id @default(uuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("verification_tokens")
+}
+
+enum UserRole {
+  citizen
+  professional
+  admin
+}
+
+enum ProfessionalStatus {
+  pending
+  active
+  suspended
+}
+
+enum CategoryGroupId {
+  oficios
+  profesiones
+}
+
+enum ContactRequestStatus {
+  pending
+  contacted
+  closed
+}
