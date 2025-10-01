@@ -1,0 +1,32 @@
+name: Test Task
+description: Crear/actualizar pruebas
+title: "[test]: "
+labels: ["testing"]
+body:
+  - type: input
+    id: area
+    attributes: { label: Área, placeholder: "UI | API | Infra" }
+  - type: dropdown
+    id: tipo
+    attributes:
+      label: Tipo de prueba
+      options: ["Unit", "Integration", "E2E"]
+  - type: textarea
+    id: objetivo
+    attributes: { label: Objetivo, description: "Qué valida exactamente" }
+  - type: textarea
+    id: archivos
+    attributes: { label: Archivos clave, placeholder: "ruta/a.tsx, ruta/b.ts" }
+  - type: textarea
+    id: criterios
+    attributes:
+      label: Criterios de aceptación
+      description: "Casos OK, 400, 404, edge cases, mensajes UI, etc."
+  - type: checkboxes
+    id: done
+    attributes:
+      label: Definition of Done
+      options:
+        - label: Tests pasando localmente
+        - label: Cobertura tocó archivos clave
+        - label: CI verde
