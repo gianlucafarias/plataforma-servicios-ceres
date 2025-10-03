@@ -1,6 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { Service } from '@/types';
+import { loadServices } from './loadServices';
 
 type Filters = {
   q?: string;
@@ -19,26 +20,17 @@ export function useServices(filters: Filters = {}) {
   const [totalPages, setTotalPages] = useState(1);
 
   useEffect(() => {
-    const load = async () => {
+    const run = async () => {
       setLoading(true);
       setError(null);
       try {
-        const params = new URLSearchParams();
-        if (filters.q) params.set('q', filters.q);
-        if (filters.grupo) params.set('grupo', filters.grupo);
-        if (filters.categoria) params.set('categoria', filters.categoria);
-        if (filters.location) params.set('location', filters.location);
-        params.set('limit', String(filters.limit ?? 20));
-        params.set('page', String(filters.page ?? 1));
-
-        const res = await fetch(`/api/services?${params.toString()}`);
-        const json = await res.json();
-        if (json.success) {
-          setServices(json.data);
-          setTotal(json.pagination?.total ?? json.data.length);
-          setTotalPages(json.pagination?.totalPages ?? 1);
+        const result = await loadServices(filters);
+        if (result.success) {
+          setServices(result.data);
+          setTotal(result.total);
+          setTotalPages(result.totalPages);
         } else {
-          setError(json.message || 'No se pudieron cargar los servicios');
+          setError(result.message || 'No se pudieron cargar los servicios');
         }
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Error al obtener servicios');
@@ -46,8 +38,8 @@ export function useServices(filters: Filters = {}) {
         setLoading(false);
       }
     };
-    load();
-  }, [filters.q, filters.grupo, filters.categoria, filters.location, filters.page, filters.limit]);
+    run();
+  }, [filters]);
 
   return { services, loading, error, total, totalPages };
 }
