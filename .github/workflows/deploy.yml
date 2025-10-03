@@ -17,12 +17,14 @@ jobs:
           key: ${{ secrets.VPS_SSH_KEY }}
           port: ${{ secrets.VPS_PORT }}
           script: |
+            set -e
             cd /var/www/plataforma-servicios-ceres
-            git pull
-            npm ci --omit=dev
+            git fetch origin main && git reset --hard origin/main
+            npm ci
             npx prisma migrate deploy
             npm run build
-            pm2 restart ceres-web || pm2 start ecosystem.config.js --only ceres-web
+            npm prune --omit=dev
+            pm2 restart plataforma-servicios-ceres || pm2 start ecosystem.config.js --only plataforma-servicios-ceres
             pm2 save
 
 
