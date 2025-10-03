@@ -53,13 +53,15 @@ describe('GET /api/professional/[id]', () => {
 
   it('404 cuando no existe', async () => {
     hoisted.prismaMock.professional.findUnique.mockResolvedValueOnce(null)
-    const res = await GET_DETAIL(makeRequest('http://localhost/api/professional/xxx'), { params: Promise.resolve({ id: 'xxx' }) })
+    const mockParams = Promise.resolve({ id: 'xxx' })
+    const res = await GET_DETAIL(makeRequest('http://localhost/api/professional/xxx'), { params: mockParams })
     expect(res.status).toBe(404)
   })
 
   it('200 devuelve profesional', async () => {
     hoisted.prismaMock.professional.findUnique.mockResolvedValueOnce({ id: 'p1' })
-    const res = await GET_DETAIL(makeRequest('http://localhost/api/professional/p1'), { params: Promise.resolve({ id: 'p1' }) })
+    const mockParams = Promise.resolve({ id: 'p1' })
+    const res = await GET_DETAIL(makeRequest('http://localhost/api/professional/p1'), { params: mockParams })
     expect(res.status).toBe(200)
     const json = await res.json()
     expect(json.success).toBe(true)
