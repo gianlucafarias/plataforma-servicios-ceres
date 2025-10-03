@@ -47,7 +47,7 @@ describe('POST /api/auth/register', () => {
 
     const req = makeRequest({
       email: 'dup@acme.com',
-      password: 'Passw0rd!',
+      password: 'example-password',
       firstName: 'John',
       lastName: 'Doe'
     })
@@ -62,24 +62,35 @@ describe('POST /api/auth/register', () => {
     vi.stubEnv('NODE_ENV', 'development')
     hoisted.prismaMock.user.findUnique.mockResolvedValueOnce(null)
 
-    // simular $transaction ejecutando el callback con un tx parcial
-    hoisted.prismaMock.$transaction.mockImplementationOnce(async (cb: any) => {
-      const tx = {
-        user: {
-          create: vi.fn().mockResolvedValue({ id: 'u1', email: 'ok@acme.com', firstName: 'Jane', lastName: 'Doe', password: 'hashed' })
-        },
-        categoryGroup: { upsert: vi.fn() },
-        category: { findUnique: vi.fn(), create: vi.fn() },
-        professional: { create: vi.fn() },
-        verificationToken: { create: vi.fn().mockResolvedValue({ id: 't1' }) }
+    hoisted.prismaMock.$transaction.mockImplementationOnce(
+      async (
+        cb: (tx: {
+          user: { create: (...a: unknown[]) => Promise<unknown> };
+          categoryGroup: { upsert: (...a: unknown[]) => Promise<unknown> };
+          category: {
+            findUnique: (...a: unknown[]) => Promise<unknown>;
+            create: (...a: unknown[]) => Promise<unknown>;
+          };
+          professional: { create: (...a: unknown[]) => Promise<unknown> };
+          verificationToken: { create: (...a: unknown[]) => Promise<unknown> };
+        }) => Promise<unknown>
+      ) => {
+        const tx = {
+          user: { create: vi.fn() },
+          categoryGroup: { upsert: vi.fn() },
+          category: { findUnique: vi.fn(), create: vi.fn() },
+          professional: { create: vi.fn() },
+          verificationToken: { create: vi.fn() },
+        } as Parameters<typeof cb>[0];
+    
+        const result = await cb(tx);
+        return result;
       }
-      const result = await cb(tx)
-      return result
-    })
+    );
 
     const req = makeRequest({
       email: 'ok@acme.com',
-      password: 'Passw0rd!',
+      password: 'example-password',
       firstName: 'Jane',
       lastName: 'Doe'
     })

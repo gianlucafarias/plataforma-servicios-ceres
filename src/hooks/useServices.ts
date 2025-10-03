@@ -39,7 +39,7 @@ export function useServices(filters: Filters = {}) {
       }
     };
     run();
-  }, [filters.q, filters.grupo, filters.categoria, filters.location, filters.page, filters.limit]);
+  }, [filters]);
 
   return { services, loading, error, total, totalPages };
 }

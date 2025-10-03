@@ -50,7 +50,20 @@ describe('POST /api/auth/verify', () => {
   it('200 marca verificado y elimina token', async () => {
     hoisted.prismaMock.user.findUnique.mockResolvedValueOnce({ id: 'u1' })
     hoisted.prismaMock.verificationToken.findFirst.mockResolvedValueOnce({ id: 't1', expiresAt: new Date(Date.now() + 1000 * 60), token: 't', userId: 'u1' })
-    hoisted.prismaMock.$transaction.mockImplementationOnce(async (cb: any) => cb({ user: hoisted.prismaMock.user, verificationToken: hoisted.prismaMock.verificationToken }))
+    hoisted.prismaMock.$transaction.mockImplementationOnce(
+      async (
+        cb: (tx: {
+          user: { update: (...a: unknown[]) => Promise<unknown> }
+          verificationToken: { delete: (...a: unknown[]) => Promise<unknown> }
+        }) => Promise<unknown>
+      ) => {
+        const tx = {
+          user: hoisted.prismaMock.user,
+          verificationToken: hoisted.prismaMock.verificationToken,
+        } as Parameters<typeof cb>[0]
+        return cb(tx)
+      }
+    )
     const res = await POST(makeRequest({ token: 't', email: 'x@x.com' }))
     expect(res.status).toBe(200)
     const json = await res.json()
