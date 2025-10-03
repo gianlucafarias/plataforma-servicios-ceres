@@ -66,7 +66,7 @@ describe('POST /api/auth/register', () => {
       async (
         cb: (tx: {
           user: { create: (...a: unknown[]) => Promise<unknown> };
-          categoryGroup: { upsert: (...a: unknown[]) => Promise<unknown> };
+          categoryGroup: { upsert: (...a: unknown[]) => Promise<{ id: string }> };
           category: {
             findUnique: (...a: unknown[]) => Promise<unknown>;
             create: (...a: unknown[]) => Promise<unknown>;
@@ -76,8 +76,8 @@ describe('POST /api/auth/register', () => {
         }) => Promise<unknown>
       ) => {
         const tx = {
-          user: { create: vi.fn() },
-          categoryGroup: { upsert: vi.fn() },
+          user: { create: vi.fn().mockResolvedValue({ id: 'u1', email: 'ok@acme.com', firstName: 'Jane', lastName: 'Doe', password: 'hashed' }) },
+          categoryGroup: { upsert: vi.fn().mockResolvedValue({ id: 'oficios' }) },
           category: { findUnique: vi.fn(), create: vi.fn() },
           professional: { create: vi.fn() },
           verificationToken: { create: vi.fn() },
@@ -90,9 +90,10 @@ describe('POST /api/auth/register', () => {
 
     const req = makeRequest({
       email: 'ok@acme.com',
-      password: 'example-password',
+      password: 'example-password-123',
       firstName: 'Jane',
-      lastName: 'Doe'
+      lastName: 'Doe',
+      professionalGroup: 'oficios'
     })
 
     const res = await POST(req)
