@@ -662,8 +662,9 @@ export default function SettingsPage() {
                             const result = await response.json();
                             if (result.success) {
                               handleInputChange('picture', result.filename);
+                              toast.success('Imagen subida correctamente');
                             } else {
-                              toast.error('Error al subir la imagen');
+                              toast.error(result.error || 'Error al subir la imagen');
                             }
                           } catch (error) {
                             console.error('Error uploading file:', error);
@@ -674,7 +675,7 @@ export default function SettingsPage() {
                       className="pl-10"
                     />
                   </div>
-                  <p className="text-xs text-muted-foreground">JPG, PNG o GIF (máx. 5MB)</p>
+                  <p className="text-xs text-muted-foreground">PNG, JPG, JPEG, WEBP (máx. 10MB)</p>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="cv">CV (Curriculum Vitae)</Label>
@@ -699,8 +700,9 @@ export default function SettingsPage() {
                             const result = await response.json();
                             if (result.success) {
                               handleInputChange('cv', result.filename);
+                              toast.success('CV subido correctamente');
                             } else {
-                              toast.error('Error al subir el CV');
+                              toast.error(result.error || 'Error al subir el CV');
                             }
                           } catch (error) {
                             console.error('Error uploading file:', error);
@@ -711,7 +713,7 @@ export default function SettingsPage() {
                       className="pl-10"
                     />
                   </div>
-                  <p className="text-xs text-muted-foreground">Solo archivos PDF (máx. 10MB)</p>
+                  <p className="text-xs text-muted-foreground">PDF, DOC, DOCX, JPG, PNG (máx. 15MB)</p>
                 </div>
               </div>
 

@@ -24,6 +24,7 @@ import { createBullBoard } from '@bull-board/api';
 import { BullMQAdapter } from '@bull-board/api/bullMQAdapter';
 import { ExpressAdapter } from '@bull-board/express';
 import { emailQueue, slackQueue, maintenanceQueue, filesQueue } from '../src/lib/queues';
+import 'dotenv/config';
 
 const app = express();
 const PORT = process.env.QUEUES_UI_PORT || 3050;

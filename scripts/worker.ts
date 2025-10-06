@@ -16,6 +16,8 @@ import { redisConnection } from '../src/lib/redis';
 import { sendVerificationEmail, sendWelcomeEmail } from '../src/jobs/email.worker';
 import { postToSlack } from '../src/jobs/slack.worker';
 import { scheduleMaintenance } from '../src/jobs/maintenance.worker';
+import { optimizeProfileImage, validateCV } from '../src/jobs/files.worker';
+import 'dotenv/config';
 
 const base = redisConnection();
 
@@ -75,6 +77,28 @@ slackWorker.on('failed', (job, err) => {
 });
 
 // ========================================
+// FILES WORKER
+// ========================================
+const filesWorker = new Worker('files', async (job) => {
+  console.log(`[files.worker] Processing job ${job.id} (${job.name})`);
+  if (job.name === 'optimize-profile-image') {
+    await optimizeProfileImage(job.data);
+  } else if (job.name === 'validate-cv') {
+    await validateCV(job.data);
+  } else {
+    console.warn(`[files.worker] Unknown job type: ${job.name}`);
+  }
+}, { ...base, concurrency: 2 });
+
+filesWorker.on('completed', (job) => {
+  console.log(`[files.worker] ✓ Job ${job.id} completado`);
+});
+
+filesWorker.on('failed', (job, err) => {
+  console.error(`[files.worker] ✗ Job ${job?.id} falló:`, err.message);
+});
+
+// ========================================
 // QUEUE EVENTS - DLQ (Dead Letter Queue)
 // ========================================
 const emailEvents = new QueueEvents('email', base);
@@ -96,6 +120,14 @@ slackEvents.on('failed', async ({ jobId, failedReason }) => {
   // No enviar a Slack para evitar loops
 });
 
+const filesEvents = new QueueEvents('files', base);
+filesEvents.on('failed', async ({ jobId, failedReason }) => {
+  console.error(`[DLQ] Files job ${jobId} falló:`, failedReason);
+  await postToSlack({
+    text: `🔥 DLQ Files: Job ${jobId} agotó reintentos\n${failedReason}`
+  });
+});
+
 // ========================================
 // CRONS DE MANTENIMIENTO
 // ========================================
@@ -115,8 +147,10 @@ const shutdown = async (signal: string) => {
   await Promise.all([
     emailWorker.close(),
     slackWorker.close(),
+    filesWorker.close(),
     emailEvents.close(),
     slackEvents.close(),
+    filesEvents.close(),
   ]);
   
   console.log('[worker] Workers cerrados exitosamente');
