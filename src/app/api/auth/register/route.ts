@@ -3,8 +3,8 @@ import { type User as PrismaUser, type Professional as PrismaProfessional } from
 import type { CategoryGroup } from '@/types';
 import bcrypt from 'bcryptjs';
 import { prisma } from '@/lib/prisma';
-import { sendMail } from '@/lib/mail';
 import { generateRandomToken } from '@/lib/utils';
+import { enqueueEmailVerify } from '@/jobs/email.producer';
 
 
 export async function POST(request: NextRequest) {
@@ -190,34 +190,33 @@ export async function POST(request: NextRequest) {
     const { password: _dbPassword, ...userWithoutPassword } = result.user as PrismaUser;
     void _dbPassword;
 
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || process.env.VERCEL_URL || ''
-    const origin = baseUrl.startsWith('http') ? baseUrl : `https://${baseUrl}`
-    const verifyUrl = `${origin}/auth/verify?token=${encodeURIComponent(result.token)}&email=${encodeURIComponent(userWithoutPassword.email)}`
-
-    // Enviar correo de verificación (no bloquear respuesta si falla)
+    // Encolar correo de verificación (procesamiento asíncrono)
+    // El worker se encargará de enviarlo con retries automáticos
     try {
-      await sendMail({
-        to: userWithoutPassword.email,
-        subject: 'Confirmá tu cuenta - Plataforma de Servicios Ceres',
-        html: `
-          <p>Hola ${userWithoutPassword.firstName},</p>
-          <p>Gracias por registrarte en la <strong>Plataforma de Servicios Ceres</strong>.</p>
-          <p>Para activar tu cuenta, hacé clic en el siguiente enlace:</p>
-          <p><a href="${verifyUrl}">Confirmar mi cuenta</a></p>
-          <p>Este enlace vence en 24 horas.</p>
-          <p>Si no fuiste vos, ignorá este correo.</p>
-        `,
-        text: `Hola ${userWithoutPassword.firstName}, confirmá tu cuenta ingresando a: ${verifyUrl}`,
-      })
+      await enqueueEmailVerify({
+        userId: userWithoutPassword.id,
+        token: result.token,
+        email: userWithoutPassword.email,
+        firstName: userWithoutPassword.firstName || undefined,
+      });
     } catch (e) {
-      console.error('Error enviando correo de verificación:', e)
-      // En desarrollo, imprimir el enlace para permitir la verificación manual
+      console.error('Error encolando correo de verificación:', e);
+      // En desarrollo, imprimir info de debug
       if (process.env.NODE_ENV !== 'production') {
-        console.log('Verification URL (dev):', verifyUrl)
+        const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || process.env.VERCEL_URL || '';
+        const origin = baseUrl.startsWith('http') ? baseUrl : `https://${baseUrl}`;
+        const verifyUrl = `${origin}/auth/verify?token=${encodeURIComponent(result.token)}&email=${encodeURIComponent(userWithoutPassword.email)}`;
+        console.log('Verification URL (dev):', verifyUrl);
       }
     }
 
-    const devVerifyUrl = process.env.NODE_ENV !== 'production' ? verifyUrl : undefined
+    const devVerifyUrl = process.env.NODE_ENV !== 'production' 
+      ? (() => {
+          const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || process.env.VERCEL_URL || '';
+          const origin = baseUrl.startsWith('http') ? baseUrl : `https://${baseUrl}`;
+          return `${origin}/auth/verify?token=${encodeURIComponent(result.token)}&email=${encodeURIComponent(userWithoutPassword.email)}`;
+        })()
+      : undefined
 
     return NextResponse.json({
       message: 'Usuario registrado. Te enviamos un correo para confirmar la cuenta.',
