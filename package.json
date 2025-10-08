@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build && tsup scripts --format cjs --dts --out-dir dist/scripts",
+    "build": "next build && tsup",
     "start": "next start",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "eslint .",
