@@ -15,7 +15,7 @@ import { Worker, QueueEvents } from 'bullmq';
 import { redisConnection } from '../src/lib/redis';
 import { sendVerificationEmail, sendWelcomeEmail } from '../src/jobs/email.worker';
 import { postToSlack } from '../src/jobs/slack.worker';
-import { scheduleMaintenance } from '../src/jobs/maintenance.worker';
+import { scheduleMaintenance, createMaintenanceWorker } from '../src/jobs/maintenance.worker';
 import { optimizeProfileImage, validateCV } from '../src/jobs/files.worker';
 import 'dotenv/config';
 
@@ -102,7 +102,7 @@ filesWorker.on('failed', (job, err) => {
 // QUEUE EVENTS - DLQ (Dead Letter Queue)
 // ========================================
 const emailEvents = new QueueEvents('email', base);
-emailEvents.on('failed', async ({ jobId, failedReason, prev }) => {
+emailEvents.on('failed', async ({ jobId, failedReason }) => {
   // Detectar si agotó todos los reintentos (DLQ)
   const isDLQ = failedReason && failedReason.includes('exceeded');
   
@@ -129,6 +129,19 @@ filesEvents.on('failed', async ({ jobId, failedReason }) => {
 });
 
 // ========================================
+// MAINTENANCE WORKER
+// ========================================
+const maintenanceWorker = createMaintenanceWorker(base);
+
+maintenanceWorker.on('completed', (job) => {
+  console.log(`[maintenance.worker] ✓ Job ${job.id} completado`);
+});
+
+maintenanceWorker.on('failed', (job, err) => {
+  console.error(`[maintenance.worker] ✗ Job ${job?.id} falló:`, err.message);
+});
+
+// ========================================
 // CRONS DE MANTENIMIENTO
 // ========================================
 scheduleMaintenance(base)
@@ -148,6 +161,7 @@ const shutdown = async (signal: string) => {
     emailWorker.close(),
     slackWorker.close(),
     filesWorker.close(),
+    maintenanceWorker.close(),
     emailEvents.close(),
     slackEvents.close(),
     filesEvents.close(),

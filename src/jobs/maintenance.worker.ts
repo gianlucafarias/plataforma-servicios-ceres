@@ -1,4 +1,4 @@
-import { Queue, Worker } from 'bullmq';
+import { ConnectionOptions, Queue, Worker } from 'bullmq';
 import { prisma } from '@/lib/prisma';
 import { enqueueSlackAlert } from './slack.producer';
 
@@ -11,12 +11,17 @@ import { enqueueSlackAlert } from './slack.producer';
  * - Otros crons de mantenimiento
  */
 
+interface RedisConfig {
+  connection: ConnectionOptions;
+  prefix: string;
+}
+
 /**
  * Configura los crons de mantenimiento como repeatable jobs
  * 
  * @param base - Configuración de conexión Redis
  */
-export async function scheduleMaintenance(base: any) {
+export async function scheduleMaintenance(base: RedisConfig) {
   const q = new Queue('maintenance', base);
 
   // Limpieza de tokens de verificación vencidos cada hora
@@ -39,17 +44,23 @@ export async function scheduleMaintenance(base: any) {
     removeOnComplete: true,
   });
 
-  // Iniciar worker de maintenance
-  new Worker('maintenance', async (job) => {
+  console.log('[maintenance.worker] Crons de mantenimiento programados');
+}
+
+
+/**
+ * Inicializa el worker de maintenance (llamar desde scripts/worker.ts)
+ */
+export function createMaintenanceWorker(base: RedisConfig) {
+  return new Worker('maintenance', async (job) => {
     if (job.name === 'clean-verification-tokens') {
       await cleanExpiredVerificationTokens();
     } else if (job.name === 'daily-report') {
       await generateDailyReport();
     }
   }, { ...base, concurrency: 1 });
-
-  console.log('[maintenance.worker] Crons de mantenimiento programados');
 }
+
 
 /**
  * Limpia tokens de verificación vencidos
