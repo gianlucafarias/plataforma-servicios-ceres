@@ -18,13 +18,14 @@ export function useServices(filters: Filters = {}) {
   const [error, setError] = useState<string | null>(null);
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
+  const { q, grupo, categoria, location, page, limit } = filters;
 
   useEffect(() => {
     const run = async () => {
       setLoading(true);
       setError(null);
       try {
-        const result = await loadServices(filters);
+        const result = await loadServices({ q, grupo, categoria, location, page, limit });
         if (result.success) {
           setServices(result.data);
           setTotal(result.total);
@@ -39,7 +40,7 @@ export function useServices(filters: Filters = {}) {
       }
     };
     run();
-  }, [filters]);
+  }, [q, grupo, categoria, location, page, limit]);
 
   return { services, loading, error, total, totalPages };
 }

@@ -894,8 +894,13 @@ export default function RegistroPage() {
                       const result = await response.json();
                       if (result.success) {
                         handleInputChange('picture', result.filename);
+                        setErrors(prev => {
+                          const newErrors = {...prev};
+                          delete newErrors.picture;
+                          return newErrors;
+                        });
                       } else {
-                        setErrors(prev => ({ ...prev, picture: 'Error al subir la imagen' }));
+                        setErrors(prev => ({ ...prev, picture: result.error || 'Error al subir la imagen' }));
                       }
                     } catch (error) {
                       console.error('Error uploading file:', error);
@@ -906,7 +911,8 @@ export default function RegistroPage() {
                 className="pl-10 rounded-lg border-2 focus:ring-4 focus:ring-green-100 focus:border-[#006F4B] transition-all duration-200 border-gray-200"
               />
             </div>
-            <p className="text-xs text-gray-500 mt-1">JPG, PNG o GIF (máx. 5MB)</p>
+            <p className="text-xs text-gray-500 mt-1">PNG, JPG, JPEG, WEBP (máx. 10MB)</p>
+            {errors.picture && <p className="text-xs text-red-600 mt-1">{errors.picture}</p>}
           </div>
 
           <div>
@@ -934,8 +940,13 @@ export default function RegistroPage() {
                       const result = await response.json();
                       if (result.success) {
                         handleInputChange('cv', result.filename);
+                        setErrors(prev => {
+                          const newErrors = {...prev};
+                          delete newErrors.cv;
+                          return newErrors;
+                        });
                       } else {
-                        setErrors(prev => ({ ...prev, cv: 'Error al subir el CV' }));
+                        setErrors(prev => ({ ...prev, cv: result.error || 'Error al subir el CV' }));
                       }
                     } catch (error) {
                       console.error('Error uploading file:', error);
@@ -946,7 +957,8 @@ export default function RegistroPage() {
                 className="pl-10 rounded-lg border-2 focus:ring-4 focus:ring-green-100 focus:border-[#006F4B] transition-all duration-200 border-gray-200"
               />
             </div>
-            <p className="text-xs text-gray-500 mt-1">Solo archivos PDF (máx. 10MB)</p>
+            <p className="text-xs text-gray-500 mt-1">PDF, DOC, DOCX, JPG, PNG (máx. 15MB)</p>
+            {errors.cv && <p className="text-xs text-red-600 mt-1">{errors.cv}</p>}
           </div>
         </div>
       </div>

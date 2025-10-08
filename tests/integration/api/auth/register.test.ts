@@ -13,6 +13,10 @@ const hoisted = vi.hoisted(() => {
 })
 vi.mock('@/lib/prisma', () => ({ prisma: hoisted.prismaMock }))
 vi.mock('@/lib/mail', () => ({ sendMail: vi.fn().mockResolvedValue(undefined) }))
+vi.mock('@/jobs/email.producer', () => ({ 
+  enqueueEmailVerify: vi.fn().mockResolvedValue(undefined),
+  enqueueEmailWelcome: vi.fn().mockResolvedValue(undefined)
+}))
 
 function makeRequest(body: unknown) {
   const url = 'http://localhost/api/auth/register'
