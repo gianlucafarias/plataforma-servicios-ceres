@@ -7,13 +7,10 @@ export async function GET() {
   try {
     const session = await getServerSession(authOptions);
     
-    console.log('Session en /api/professional/me:', session);
-    
     if (!session?.user?.id) {
       return NextResponse.json({ 
         success: false, 
-        error: 'unauthorized',
-        debug: { session }
+        error: 'unauthorized'
       }, { status: 401 });
     }
 
@@ -29,19 +26,16 @@ export async function GET() {
       },
     });
 
-    console.log('Professional encontrado:', professional);
-
     return NextResponse.json({ 
       success: true, 
-      data: professional,
-      debug: { userId: session.user.id }
+      data: professional
     });
   } catch (error) {
     console.error('Error en /api/professional/me:', error);
     return NextResponse.json({ 
       success: false, 
       error: 'server_error',
-      message: error instanceof Error ? error.message : 'Error desconocido'
+      message: 'Error al obtener perfil profesional'
     }, { status: 500 });
   }
 }

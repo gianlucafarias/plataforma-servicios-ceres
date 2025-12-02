@@ -8,6 +8,7 @@ declare module "next-auth" {
   interface User {
     firstName?: string
     lastName?: string
+    
   }
   
   interface Session {
@@ -77,7 +78,7 @@ export const authOptions: AuthOptions = {
             }
         })
     ],
-    debug: true,
+    debug: process.env.NODE_ENV === 'development',
     pages: {
         signIn: '/auth/login',
         error: '/auth/error',

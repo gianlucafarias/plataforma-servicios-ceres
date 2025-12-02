@@ -9,9 +9,12 @@ const hoisted = vi.hoisted(() => ({
 }))
 
 vi.mock('@/hooks/useAuth', () => ({ useAuth: () => ({ login: hoisted.loginMock }) }))
-vi.mock('next/navigation', async (orig) => {
-  const actual = await orig()
-  return { ...actual, useRouter: () => ({ push: hoisted.pushMock }) }
+vi.mock('next/navigation', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('next/navigation')>()
+  return { 
+    ...actual, 
+    useRouter: () => ({ push: hoisted.pushMock }),
+  }
 })
 
 // NOTA: Tests temporalmente deshabilitados debido a incompatibilidad de @testing-library/react con React 19

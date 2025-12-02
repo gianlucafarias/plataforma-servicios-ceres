@@ -16,8 +16,6 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error("Error en check-email (GET):", error);
     return NextResponse.json({ error: "Error del servidor" }, { status: 500 });
-  } finally {
-    await prisma.$disconnect();
   }
 }
 
@@ -34,7 +32,5 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error("Error en check-email (POST):", error);
     return NextResponse.json({ error: "Error del servidor" }, { status: 500 });
-  } finally {
-    await prisma.$disconnect();
   }
 }
