@@ -64,13 +64,13 @@ export function ReviewSection({ reviews, averageRating, totalReviews }: ReviewSe
                       {stars}
                     </span>
                     <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
-                    <div className="flex-1 bg-gray-200 rounded-full h-2">
+                    <div className="flex-1 bg-gray-100 rounded-full h-1.5 overflow-hidden">
                       <div
-                        className="bg-yellow-400 h-2 rounded-full transition-all duration-300"
+                        className="bg-yellow-400 h-full rounded-full transition-all duration-500 ease-out"
                         style={{ width: `${percentage}%` }}
                       />
                     </div>
-                    <span className="text-sm text-gray-600 w-8">
+                    <span className="text-sm text-gray-600 w-8 text-right">
                       {count}
                     </span>
                   </div>
@@ -102,11 +102,11 @@ export function ReviewSection({ reviews, averageRating, totalReviews }: ReviewSe
         ) : (
           <div className="space-y-4">
             {reviews.map((review) => (
-              <Card key={review.id} className="rounded-2xl border border-gray-100">
+              <Card key={review.id} className="rounded-2xl border border-gray-100 hover:shadow-[0_4px_20px_rgb(0,0,0,0.03)] transition-all duration-300">
                 <CardContent className="p-6">
                   <div className="flex items-start space-x-4">
-                    <Avatar className="h-10 w-10">
-                      <AvatarFallback className="bg-gray-100 text-gray-600">
+                    <Avatar className="h-10 w-10 border border-gray-100">
+                      <AvatarFallback className="bg-gradient-to-br from-gray-50 to-gray-100 text-gray-600 font-medium text-sm">
                         {review.user?.name?.split(' ').map(n => n[0]).join('').toUpperCase() || 'U'}
                       </AvatarFallback>
                     </Avatar>

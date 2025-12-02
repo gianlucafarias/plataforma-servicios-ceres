@@ -225,26 +225,28 @@ export default async function ProfessionalDetailPage({ params }: { params: Promi
                 <div className="bg-gradient-to-br from-[var(--gov-green)]/5 to-[var(--gov-yellow)]/10 p-4 sm:p-6 lg:p-8 pb-8 sm:pb-10 mb-5">
                   <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-10 items-start">
                     <div className="lg:col-span-2">
-                      <div className="flex flex-row items-start gap-4 sm:gap-8">
-                        <ProfessionalAvatar
-                          name={professional.user.name}
-                          profilePicture={professional.socialNetworks.profilePicture}
-                          className="h-20 w-20 sm:h-24 sm:w-24 lg:h-28 lg:w-28 mx-auto sm:mx-0 flex-shrink-0"
-                        />
-                        <div className="flex-1 min-w-0 sm:ml-2 mt-1 sm:mt-0">
+                      <div className="flex flex-row items-start gap-5 sm:gap-8">
+                        <div className="relative group">
+                          <ProfessionalAvatar
+                            name={professional.user.name}
+                            profilePicture={professional.socialNetworks.profilePicture}
+                            className="h-24 w-24 sm:h-28 sm:w-28 lg:h-32 lg:w-32 mx-auto sm:mx-0 flex-shrink-0 ring-4 ring-white shadow-lg transition-transform duration-300 group-hover:scale-105"
+                          />
+                        </div>
+                        <div className="flex-1 min-w-0 sm:ml-2 mt-1 sm:mt-2">
                           <div className="flex items-start justify-between">
                             <div className="text-left w-full">
                               <div className="flex flex-row items-center gap-2 sm:gap-3">
-                                <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 font-rutan mb-1 sm:mb-0">
+                                <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 font-rutan mb-1 sm:mb-0 tracking-tight">
                                   {professional.user.name}
                                 </h1>
                                 {professional.verified && (
-                                  <Image src="/verificado.png" alt="Verified" width={18} height={18} />
+                                  <Image src="/verificado.png" alt="Verified" width={20} height={20} className="drop-shadow-sm" />
                                 )}
                               </div>
                               {professional.services[0]?.category?.name && (
-                                <div className="mt-2">
-                                  <Badge variant="outline" className="rounded-xl text-xs bg-white">
+                                <div className="mt-3">
+                                  <Badge variant="secondary" className="rounded-full text-xs bg-white/80 backdrop-blur-sm text-gray-700 border border-white/50 shadow-sm px-3 py-1">
                                     {professional.services[0]?.category?.name}
                                   </Badge>
                                 </div>
@@ -303,7 +305,7 @@ export default async function ProfessionalDetailPage({ params }: { params: Promi
                           href={`https://wa.me/${professional.user.whatsapp}?text=Hola ${professional.user.name}, vi tu perfil en Servicios Ceres y me interesa contactarte.`}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="flex-1 bg-gradient-to-r from-green-500 to-green-600 text-white py-4 px-6 rounded-xl font-semibold hover:from-green-600 hover:to-green-700 focus:ring-4 focus:ring-green-100 focus:ring-offset-2 transition-all duration-200 transform flex items-center justify-center"
+                          className="flex-1 bg-[#25D366] hover:bg-[#20BD5C] text-white py-3.5 px-6 rounded-full font-medium hover:shadow-lg hover:shadow-green-500/20 transition-all duration-200 transform hover:-translate-y-0.5 flex items-center justify-center shadow-md shadow-green-500/10"
                         >
                           <span className="hidden sm:inline">Contactar por WhatsApp</span>
                           <span className="sm:hidden">WhatsApp</span>
@@ -311,7 +313,7 @@ export default async function ProfessionalDetailPage({ params }: { params: Promi
                         </a>
                         <a
                           href={`tel:${professional.user.phone}`}
-                          className="w-14 h-14 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-all duration-200 flex items-center justify-center"
+                          className="w-14 h-14 bg-white border border-gray-200 text-gray-700 rounded-full hover:bg-gray-50 hover:border-gray-300 transition-all duration-200 flex items-center justify-center shadow-sm hover:shadow-md"
                           title="Llamar por teléfono"
                         >
                           <Phone className="h-5 w-5" />
@@ -335,19 +337,23 @@ export default async function ProfessionalDetailPage({ params }: { params: Promi
 					<h3 className="text-lg font-semibold text-gray-900 mb-3 font-rutan text-left">Servicios ofrecidos</h3>
 					<div className="space-y-3">
 					  {professional.services.map((service, index) => (
-						<Card key={index} className="rounded-xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow">
-						  <CardContent className="p-2">
+						<Card key={index} className="rounded-2xl border border-gray-100 bg-white hover:border-green-100 hover:shadow-sm transition-all duration-200">
+						  <CardContent className="p-4">
 							<div className="flex items-start gap-3">
-							  <CheckCircle className="h-5 w-5 text-green-600 flex-shrink-0 mt-0.5" />
+							  <div className="mt-0.5 bg-green-50 p-1.5 rounded-full">
+							    <CheckCircle className="h-4 w-4 text-[var(--gov-green)]" />
+							  </div>
 							  <div className="flex-1 min-w-0">
 								<div className="flex items-start justify-between gap-3">
 								  <p className="text-sm sm:text-base font-medium text-gray-900 break-words">{service.title}</p>
 								  {service.priceRange && (
-									<span className="text-xs sm:text-sm text-gray-500 whitespace-nowrap">{service.priceRange}</span>
+									<Badge variant="secondary" className="text-xs font-normal bg-gray-50 text-gray-600 border-gray-100 whitespace-nowrap rounded-full">
+									  {service.priceRange}
+									</Badge>
 								  )}
 								</div>
 								{service.description && (
-								  <p className="text-xs sm:text-sm text-gray-600 mt-1">
+								  <p className="text-xs sm:text-sm text-gray-500 mt-1.5 leading-relaxed">
 									{service.description}
 								  </p>
 								)}
@@ -362,14 +368,14 @@ export default async function ProfessionalDetailPage({ params }: { params: Promi
 				  {/* Sección de cobertura de servicios */}
 				  <div className="mt-8">
 					<h3 className="text-lg font-semibold text-gray-900 mb-4 font-rutan text-left">Ofrece sus servicios en:</h3>
-					<Card className="rounded-2xl p-6">
-					  <CardContent className="p-2">
+					<Card className="rounded-2xl p-6 border-gray-100 shadow-none bg-gray-50/50">
+					  <CardContent className="p-0">
             <div className="flex items-start gap-3">
 						<div className="flex-1">
 						  {/* Ubicación principal */}
-						  <div className="mb-3">
-							<span className="inline-flex items-center gap-2 bg-green-100 text-green-800 px-3 py-2 rounded-full text-sm font-medium">
-							  <MapPin className="h-4 w-4" />
+						  <div className="mb-4">
+							<span className="inline-flex items-center gap-2 bg-white border border-gray-200 text-gray-700 px-4 py-2 rounded-full text-sm font-medium shadow-sm">
+							  <MapPin className="h-4 w-4 text-[var(--gov-green)]" />
 							  {professional.location ? getLocations().find(l => l.id === professional.location)?.name || professional.location : 'No especificada'}
 							</span>
 						  </div>
@@ -377,11 +383,11 @@ export default async function ProfessionalDetailPage({ params }: { params: Promi
 						  {/* Cobertura de servicios */}
 						  {professional.serviceLocations && professional.serviceLocations.length > 0 ? (
 							<div>
-							  <p className="text-sm text-gray-600 mb-2">También atiende en:</p>
+							  <p className="text-sm text-gray-500 mb-3 font-medium">También atiende en:</p>
 							  <div className="flex flex-wrap gap-2">
 								{professional.serviceLocations.includes('all-region') ? (
-								  <span className="inline-flex items-center gap-2 bg-gradient-to-r from-green-500 to-green-600 text-white px-4 py-2 rounded-full text-sm font-semibold shadow-md">
-									<MapPin className="h-4 w-4" />
+								  <span className="inline-flex items-center gap-2 bg-green-600 text-white px-4 py-1.5 rounded-full text-sm font-medium shadow-sm shadow-green-200">
+									<MapPin className="h-3.5 w-3.5" />
 								Toda la región
 								  </span>
 								) : (
@@ -390,8 +396,8 @@ export default async function ProfessionalDetailPage({ params }: { params: Promi
 									.map((locationId) => {
 									  const location = getLocations().find(l => l.id === locationId);
 									  return location ? (
-										<span key={locationId} className="inline-flex items-center gap-2 bg-blue-100 text-blue-800 px-3 py-2 rounded-full text-sm font-medium">
-										  <MapPin className="h-4 w-4" />
+										<span key={locationId} className="inline-flex items-center gap-2 bg-white border border-blue-100 text-blue-700 px-3 py-1.5 rounded-full text-sm font-medium">
+										  <MapPin className="h-3.5 w-3.5 text-blue-500" />
 										  {location.name}
 										</span>
 									  ) : null;
@@ -418,13 +424,17 @@ export default async function ProfessionalDetailPage({ params }: { params: Promi
                   
                       <h3 className="font-semibold text-gray-900 mb-3 text-left">Información de contacto</h3>
                       <div className="space-y-2 text-sm">
-                        <div className="flex items-center justify-start gap-2 text-gray-700 rounded-xl border border-gray-100 bg-gray-50 px-3 py-2">
-                          <Phone className="h-4 w-4 flex-shrink-0 text-[#006F4B]" />
-                          <span className="break-all">{professional.user.phone}</span>
+                        <div className="flex items-center justify-start gap-3 text-gray-700 rounded-2xl border border-gray-100 bg-white p-3 shadow-sm">
+                          <div className="bg-green-50 p-2 rounded-full">
+                            <Phone className="h-4 w-4 text-[#006F4B]" />
+                          </div>
+                          <span className="break-all font-medium">{professional.user.phone}</span>
                         </div>
-                        <div className="flex items-center justify-start gap-2 text-gray-700 rounded-xl border border-gray-100 bg-gray-50 px-3 py-2">
-                          <Mail className="h-4 w-4 flex-shrink-0 text-[#006F4B]" />
-                          <span className="break-all text-xs sm:text-sm">{professional.user.email}</span>
+                        <div className="flex items-center justify-start gap-3 text-gray-700 rounded-2xl border border-gray-100 bg-white p-3 shadow-sm">
+                          <div className="bg-green-50 p-2 rounded-full">
+                            <Mail className="h-4 w-4 text-[#006F4B]" />
+                          </div>
+                          <span className="break-all text-xs sm:text-sm font-medium">{professional.user.email}</span>
                         </div>
                       </div>
 
@@ -487,11 +497,11 @@ export default async function ProfessionalDetailPage({ params }: { params: Promi
                               href={`https://instagram.com/${professional.socialNetworks.instagram.replace('@', '')}`}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="flex items-center gap-2 text-gray-700 rounded-xl border border-gray-100 bg-gray-50 px-3 py-2 hover:bg-pink-50 transition-colors justify-center lg:justify-start"
+                              className="flex items-center gap-2 text-gray-700 rounded-full border border-gray-200 bg-white px-4 py-2 hover:bg-pink-50 hover:border-pink-200 hover:text-pink-700 transition-all justify-center lg:justify-start shadow-sm"
                             >
                               <Instagram className="h-4 w-4 text-pink-600" />
-                              <span className="text-sm">{professional.socialNetworks.instagram}</span>
-                              <ExternalLink className="h-3 w-3" />
+                              <span className="text-sm font-medium">{professional.socialNetworks.instagram}</span>
+                              <ExternalLink className="h-3 w-3 opacity-50" />
                             </a>
                           )}
                           {professional.socialNetworks.facebook && (
@@ -499,11 +509,11 @@ export default async function ProfessionalDetailPage({ params }: { params: Promi
                               href={`https://facebook.com/${professional.socialNetworks.facebook}`}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="flex items-center gap-2 text-gray-700 rounded-xl border border-gray-100 bg-gray-50 px-3 py-2 hover:bg-blue-50 transition-colors justify-center lg:justify-start"
+                              className="flex items-center gap-2 text-gray-700 rounded-full border border-gray-200 bg-white px-4 py-2 hover:bg-blue-50 hover:border-blue-200 hover:text-blue-700 transition-all justify-center lg:justify-start shadow-sm"
                             >
                               <Facebook className="h-4 w-4 text-blue-600" />
-                              <span className="text-sm">{professional.socialNetworks.facebook}</span>
-                              <ExternalLink className="h-3 w-3" />
+                              <span className="text-sm font-medium">{professional.socialNetworks.facebook}</span>
+                              <ExternalLink className="h-3 w-3 opacity-50" />
                             </a>
                           )}
                           {professional.socialNetworks.linkedin && (
@@ -511,11 +521,11 @@ export default async function ProfessionalDetailPage({ params }: { params: Promi
                               href={`https://linkedin.com/in/${professional.socialNetworks.linkedin.replace('/in/', '').replace('/', '')}`}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="flex items-center gap-2 text-gray-700 rounded-xl border border-gray-100 bg-gray-50 px-3 py-2 hover:bg-blue-50 transition-colors justify-center lg:justify-start"
+                              className="flex items-center gap-2 text-gray-700 rounded-full border border-gray-200 bg-white px-4 py-2 hover:bg-blue-50 hover:border-blue-200 hover:text-blue-700 transition-all justify-center lg:justify-start shadow-sm"
                             >
                               <Linkedin className="h-4 w-4 text-blue-700" />
-                              <span className="text-sm">LinkedIn</span>
-                              <ExternalLink className="h-3 w-3" />
+                              <span className="text-sm font-medium">LinkedIn</span>
+                              <ExternalLink className="h-3 w-3 opacity-50" />
                             </a>
                           )}
                           {professional.socialNetworks.website && (
@@ -523,11 +533,11 @@ export default async function ProfessionalDetailPage({ params }: { params: Promi
                               href={professional.socialNetworks.website}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="flex items-center gap-2 text-gray-700 rounded-xl border border-gray-100 bg-gray-50 px-3 py-2 hover:bg-green-50 transition-colors justify-center lg:justify-start"
+                              className="flex items-center gap-2 text-gray-700 rounded-full border border-gray-200 bg-white px-4 py-2 hover:bg-green-50 hover:border-green-200 hover:text-green-700 transition-all justify-center lg:justify-start shadow-sm"
                             >
                               <Globe className="h-4 w-4 text-[#006F4B]" />
-                              <span className="text-sm">Sitio web</span>
-                              <ExternalLink className="h-3 w-3" />
+                              <span className="text-sm font-medium">Sitio web</span>
+                              <ExternalLink className="h-3 w-3 opacity-50" />
                             </a>
                           )}
                           {professional.socialNetworks.portfolio && (
@@ -535,11 +545,11 @@ export default async function ProfessionalDetailPage({ params }: { params: Promi
                               href={professional.socialNetworks.portfolio}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="flex items-center gap-2 text-gray-700 rounded-xl border border-gray-100 bg-gray-50 px-3 py-2 hover:bg-purple-50 transition-colors justify-center lg:justify-start"
+                              className="flex items-center gap-2 text-gray-700 rounded-full border border-gray-200 bg-white px-4 py-2 hover:bg-purple-50 hover:border-purple-200 hover:text-purple-700 transition-all justify-center lg:justify-start shadow-sm"
                             >
                               <Globe className="h-4 w-4 text-purple-600" />
-                              <span className="text-sm">Portfolio</span>
-                              <ExternalLink className="h-3 w-3" />
+                              <span className="text-sm font-medium">Portfolio</span>
+                              <ExternalLink className="h-3 w-3 opacity-50" />
                             </a>
                           )}
                           {professional.socialNetworks.cv && (
@@ -547,11 +557,11 @@ export default async function ProfessionalDetailPage({ params }: { params: Promi
                               href={`/uploads/profiles/${professional.socialNetworks.cv}`}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="flex items-center gap-2 text-gray-700 rounded-xl border border-gray-100 bg-gray-50 px-3 py-2 hover:bg-blue-50 transition-colors justify-center lg:justify-start cursor-pointer"
+                              className="flex items-center gap-2 text-gray-700 rounded-full border border-gray-200 bg-white px-4 py-2 hover:bg-blue-50 hover:border-blue-200 hover:text-blue-700 transition-all justify-center lg:justify-start cursor-pointer shadow-sm"
                             >
                               <FileText className="h-4 w-4 text-blue-600" />
-                              <span className="text-sm">Ver CV</span>
-                              <ExternalLink className="h-3 w-3" />
+                              <span className="text-sm font-medium">Ver CV</span>
+                              <ExternalLink className="h-3 w-3 opacity-50" />
                             </a>
                           )}
                         </div>

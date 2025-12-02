@@ -117,6 +117,7 @@
 @layer base {
   html {
     font-family: 'Roboto', 'Inter', 'Rutan', system-ui, sans-serif;
+    scroll-behavior: smooth;
   }
 
   body {

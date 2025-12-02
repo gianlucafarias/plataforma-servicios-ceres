@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useMemo } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Search, List, Grid, ChevronLeft, ChevronRight } from "lucide-react";
+import { Search, List, Grid, ChevronLeft, ChevronRight, X } from "lucide-react";
 import { useServices } from "@/hooks/useServices";
 import { ServiceCard } from "@/components/features/ServiceCard";
 import { AREAS_OFICIOS, SUBCATEGORIES_OFICIOS, SUBCATEGORIES_PROFESIONES, LOCATIONS } from "@/lib/taxonomy";
@@ -224,8 +224,20 @@ const filters = {
                         placeholder="Nombre, especialidad, servicios..."
                         value={barSearchQuery}
                         onChange={handleSearchChange}
-                        className="pl-10 h-9 rounded-lg border-gray-300 focus:border-[#006F4B] focus:ring-2 focus:ring-[#006F4B]/20 transition-all duration-200"
+                        className="pl-10 pr-10 h-9 rounded-lg border-gray-300 focus:border-[#006F4B] focus:ring-2 focus:ring-[#006F4B]/20 transition-all duration-200"
                       />
+                      {barSearchQuery && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setBarSearchQuery("");
+                            setSearchTerm("");
+                          }}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      )}
                     </div>
                   </div>
 
@@ -337,9 +349,27 @@ const filters = {
               </Button>
             </div>
           ) : services.length === 0 ? (
-            <div className="text-center py-12">
-              <p className="text-gray-500 text-lg">No se encontraron servicios.</p>
-              <p className="text-gray-400 text-sm mt-2">Intenta ajustar tus filtros de búsqueda.</p>
+            <div className="col-span-full flex flex-col items-center justify-center py-16 text-center">
+              <div className="bg-gray-100 p-4 rounded-full mb-4">
+                <Search className="h-8 w-8 text-gray-400" />
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900">No encontramos resultados</h3>
+              <p className="text-muted-foreground max-w-md mt-2 mb-6">
+                No hay servicios que coincidan con tu búsqueda. 
+                Intenta con términos más generales o limpia los filtros.
+              </p>
+              <Button 
+                variant="outline" 
+                onClick={() => {
+                  setSearchTerm("");
+                  setBarSearchQuery("");
+                  setSelectedCategory("all");
+                  setSelectedGroup("all");
+                  setSelectedLocation("all");
+                }}
+              >
+                Limpiar todos los filtros
+              </Button>
             </div>
           ) : (
             <div className={

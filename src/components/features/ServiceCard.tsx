@@ -67,19 +67,19 @@ function ServiceCardComponent({ service }: ServiceCardProps) {
   const displayBio = professional.bio || service.description;
 
   return (
-    <Card className="group hover:shadow-xl transition-all duration-300 rounded-2xl border border-gray-100">
+    <Card className="group hover:shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:border-green-100/50 transition-all duration-300 rounded-2xl border border-gray-100 bg-white">
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between">
           <div className="flex items-center space-x-3">
             <ProfessionalAvatar
               name={professional.user.name}
               profilePicture={professional.ProfilePicture || undefined}
-              className="h-10 w-10 flex-shrink-0"
+              className="h-12 w-12 flex-shrink-0 ring-2 ring-white shadow-sm"
             />
             <div>
             <div className="flex items-center space-x-1">
 
-              <h3 className="font-semibold text-lg">{professional.user.name}</h3>
+              <h3 className="font-semibold text-lg text-gray-900 group-hover:text-[var(--gov-green)] transition-colors">{professional.user.name}</h3>
                
                 {professional.verified && (
                  <Image src="/verificado.png" alt="Verified" width={16} height={16} className="ml-1"/>
@@ -87,34 +87,34 @@ function ServiceCardComponent({ service }: ServiceCardProps) {
               </div>
             </div>
           </div>
-          <Badge variant="outline" className="text-xs rounded-xl border-gray-200 text-gray-700">
-          <MapPin className="h-3 w-3" />
+          <Badge variant="secondary" className="text-xs rounded-full bg-gray-50 text-gray-600 border border-gray-100 font-normal px-3">
+          <MapPin className="h-3 w-3 mr-1" />
           <span className="capitalize">{professional.location ?? 'Ceres'}</span>
           </Badge>
         </div>
       </CardHeader>
 
-      <CardContent className="space-y-3">
+      <CardContent className="space-y-4">
         <div className="min-h-[2.5rem] flex items-start">
-          <p className="text-sm text-muted-foreground line-clamp-2">
+          <p className="text-sm text-gray-600 line-clamp-2 leading-relaxed">
             {displayBio}
           </p>
         </div>
 
-        <div className="min-h-[1.5rem] flex flex-wrap gap-1">
+        <div className="min-h-[1.5rem] flex flex-wrap gap-1.5">
           {serviceBadges.visible.map((label, index) => (
-            <Badge key={index} variant="outline" className="text-xs rounded-xl border-gray-200 text-gray-700">
+            <Badge key={index} variant="outline" className="text-xs rounded-full border-gray-200 text-gray-600 bg-transparent px-3 py-0.5 font-normal hover:border-[var(--gov-green)]/30 hover:bg-green-50/30 transition-colors">
               {label}
             </Badge>
           ))}
           {serviceBadges.remaining > 0 && (
-            <Badge variant="outline" className="text-xs rounded-xl border-gray-200 text-gray-700">
-              +{serviceBadges.remaining} más
+            <Badge variant="outline" className="text-xs rounded-full border-gray-200 text-gray-500 px-2 font-normal">
+              +{serviceBadges.remaining}
             </Badge>
           )}
         </div>
 
-        <div className="min-h-[3rem] flex items-center justify-between pt-2 gap-2 sm:gap-3">
+        <div className="min-h-[3rem] flex items-center justify-between pt-2 gap-2 sm:gap-3 border-t border-gray-50 mt-2">
           <div className="flex items-center">
             <AvailabilityBadge 
               schedule={professional.schedule} 
@@ -127,7 +127,7 @@ function ServiceCardComponent({ service }: ServiceCardProps) {
           <div className="flex flex-wrap justify-end gap-2 sm:gap-2">
             <Link 
               href={`/profesionales/${professional.id}`}
-              className="bg-gray-100 text-gray-700 px-3 py-2 sm:px-4 rounded-lg hover:bg-gray-200 font-medium text-sm transition-all duration-200 flex items-center"
+              className="bg-white border border-gray-200 text-gray-700 px-4 py-2 rounded-full hover:bg-gray-50 hover:border-gray-300 font-medium text-sm transition-all duration-200 flex items-center shadow-sm"
             >
               Ver Perfil
             </Link>
@@ -135,7 +135,7 @@ function ServiceCardComponent({ service }: ServiceCardProps) {
               href={`${WHATSAPP_BASE}${WHATSAPP_MESSAGE}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="bg-gradient-to-r from-green-500 to-green-600 text-white px-3 py-2 sm:px-4 rounded-lg font-medium text-sm hover:from-green-600 hover:to-green-700 transition-all duration-200 flex items-center"
+              className="bg-[#25D366] hover:bg-[#20BD5C] text-white px-4 py-2 rounded-full font-medium text-sm transition-all duration-200 flex items-center shadow-sm hover:shadow-md hover:-translate-y-0.5"
             >
               <WhatsAppIcon className="h-4 w-4 " />
               

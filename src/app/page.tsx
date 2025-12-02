@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { CategoryCarousel } from "@/components/features/CategoryCarousel";
 import { ServiceCard } from "@/components/features/ServiceCard";
 import { SearchSuggestions } from "@/components/features/SearchSuggestions";
-import { Search, ArrowRight, Shield, Rocket, CheckCircle2, UserPlus, LayoutGrid, MessageCircle, MapPin } from "lucide-react";
+import { Search, ArrowRight, Shield, Rocket, CheckCircle2, UserPlus, LayoutGrid, MessageCircle, MapPin, X } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 import { SUBCATEGORIES_PROFESIONES, AREAS_OFICIOS, SUBCATEGORIES_OFICIOS } from "@/lib/taxonomy";
@@ -11,9 +11,11 @@ import { Card } from "@/components/ui/card";
 import { useState, useEffect } from "react";
 import { CategorySuggest } from "@/components/features/CategorySuggest";
 import { useFeaturedServices } from "@/hooks/useFeaturedCategories";
+import { useRouter } from "next/navigation";
 
 
 export default function Home() {
+  const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
   const [showSuggestions, setShowSuggestions] = useState(false)
   const [mounted, setMounted] = useState(false);
@@ -43,7 +45,7 @@ export default function Home() {
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (searchQuery.trim()) {
-      window.location.href = `/servicios?q=${encodeURIComponent(searchQuery.trim())}`;
+      router.push(`/servicios?q=${encodeURIComponent(searchQuery.trim())}`);
     }
   };
 
@@ -124,21 +126,33 @@ export default function Home() {
             >
               <label htmlFor="q" className="sr-only">Buscar servicios</label>
               <ArrowRight className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground pointer-events-none" aria-hidden="true" />
-              <input
-                id="q"
-                name="q"
-                type="search"
-                value={searchQuery}
-                onChange={handleSearchChange}
-                onFocus={() => setShowSuggestions(searchQuery.length > 0)}
-                placeholder="¿Qué servicio necesitas? Ej: plomero, electricista..."
-                aria-label="¿Qué servicio necesitas?"
-                autoComplete="off"
-                className="w-full rounded-2xl border-2 border-gray-200 bg-background pl-12 pr-28 py-4 text-lg ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-green-100 focus-visible:border-[#006F4B] transition-all duration-200"
-              />
-              <button type="submit" aria-label="Buscar" className="cursor-pointer absolute right-2 top-1/2 -translate-y-1/2 bg-[#008255] text-white px-6 py-3 rounded-xl font-semibold hover:bg-[#008F4B] focus:ring-4 focus:ring-green-100 focus:ring-offset-2 transition-all duration-200 shadow-lg hover:shadow-xl">
-                <Search />
-              </button>
+              <div className="relative flex-1">
+                <input
+                  id="q"
+                  name="q"
+                  type="search"
+                  value={searchQuery}
+                  onChange={handleSearchChange}
+                  onFocus={() => setShowSuggestions(searchQuery.length > 0)}
+                  placeholder="¿Qué servicio necesitas? Ej: plomero, electricista..."
+                  aria-label="¿Qué servicio necesitas?"
+                  autoComplete="off"
+                  className="w-full rounded-2xl border-2 border-gray-200 bg-background pl-12 pr-28 py-4 text-lg ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-green-100 focus-visible:border-[#006F4B] transition-all duration-200"
+                />
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => { setSearchQuery(""); setShowSuggestions(false); }}
+                    className="absolute right-28 top-1/2 -translate-y-1/2 p-2 text-gray-400 hover:text-gray-600 transition-colors z-10"
+                    aria-label="Borrar búsqueda"
+                  >
+                    <X className="h-5 w-5" />
+                  </button>
+                )}
+                <button type="submit" aria-label="Buscar" className="cursor-pointer absolute right-2 top-1/2 -translate-y-1/2 bg-[#008255] text-white px-6 py-3 rounded-xl font-semibold hover:bg-[#008F4B] focus:ring-4 focus:ring-green-100 focus:ring-offset-2 transition-all duration-200 shadow-lg hover:shadow-xl z-20">
+                  <Search />
+                </button>
+              </div>
               
               <SearchSuggestions
                 query={searchQuery}
@@ -176,51 +190,54 @@ export default function Home() {
       <section className="py-12 bg-[var(--gov-green)]">
         <div className="container mx-auto px-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-8 text-white">
-            <div className="text-center">
-              <div className="flex justify-center mb-2">
-                <Shield className="h-8 w-8 text-white" />
+            <div className="text-center group hover:-translate-y-1 transition-transform duration-300">
+              <div className="flex justify-center mb-4">
+                <div className="h-16 w-16 rounded-2xl bg-white/10 flex items-center justify-center group-hover:bg-white/20 transition-colors backdrop-blur-sm">
+                  <Shield className="h-8 w-8 text-white" />
+                </div>
               </div>
-              <div className="text-lg font-semibold">Desarrollo local</div>
-              <div className="text-sm opacity-90">Iniciativa del Gobierno de la Ciudad de Ceres</div>
+              <div className="text-lg font-semibold mb-2">Desarrollo local</div>
+              <div className="text-sm opacity-90 leading-relaxed">Iniciativa del Gobierno de la Ciudad de Ceres</div>
             </div>
 
-            <div className="text-center">
-              <div className="flex justify-center mb-2">
-                <Rocket className="h-8 w-8 text-white" />
+            <div className="text-center group hover:-translate-y-1 transition-transform duration-300">
+              <div className="flex justify-center mb-4">
+                <div className="h-16 w-16 rounded-2xl bg-white/10 flex items-center justify-center group-hover:bg-white/20 transition-colors backdrop-blur-sm">
+                  <Rocket className="h-8 w-8 text-white" />
+                </div>
               </div>
-              <div className="text-lg font-semibold">Rápido y simple</div>
-              <div className="text-sm opacity-90">Buscá, elegí y coordiná en minutos</div>
+              <div className="text-lg font-semibold mb-2">Rápido y simple</div>
+              <div className="text-sm opacity-90 leading-relaxed">Buscá, elegí y coordiná en minutos</div>
             </div>
 
-            <div className="text-center">
-              <div className="flex justify-center mb-2">
-                <MessageCircle className="h-8 w-8 text-white" />
+            <div className="text-center group hover:-translate-y-1 transition-transform duration-300">
+              <div className="flex justify-center mb-4">
+                <div className="h-16 w-16 rounded-2xl bg-white/10 flex items-center justify-center group-hover:bg-white/20 transition-colors backdrop-blur-sm">
+                  <MessageCircle className="h-8 w-8 text-white" />
+                </div>
               </div>
-              <div className="text-lg font-semibold">Contacto directo</div>
-              <div className="text-sm opacity-90">Coordiná por WhatsApp o teléfono</div>
+              <div className="text-lg font-semibold mb-2">Contacto directo</div>
+              <div className="text-sm opacity-90 leading-relaxed">Coordiná por WhatsApp o teléfono</div>
             </div>
             
-            <div className="text-center">
-              <div className="flex justify-center mb-2">
-                <MapPin className="h-8 w-8 text-white" />
+            <div className="text-center group hover:-translate-y-1 transition-transform duration-300">
+              <div className="flex justify-center mb-4">
+                <div className="h-16 w-16 rounded-2xl bg-white/10 flex items-center justify-center group-hover:bg-white/20 transition-colors backdrop-blur-sm">
+                  <MapPin className="h-8 w-8 text-white" />
+                </div>
               </div>
-              <div className="text-lg font-semibold">Enfocado en la región</div>
-              <div className="text-sm opacity-90">Profesionales de Ceres y la zona</div>
+              <div className="text-lg font-semibold mb-2">Enfocado en la región</div>
+              <div className="text-sm opacity-90 leading-relaxed">Profesionales de Ceres y la zona</div>
             </div>
           </div>
         </div>
       </section>
 
       {/* Categorías populares */}
-      <section className="relative py-20 overflow-hidden bg-gradient-to-br from-[var(--gov-green)]/5 to-[var(--gov-yellow)]/10">
-        {/* Decoración de fondo */}
-        <div className="pointer-events-none absolute inset-0 opacity-70">
-          <div className="absolute -top-24 -left-24 h-72 w-72 rounded-full bg-[var(--gov-green)]/10 blur-3xl" />
-          <div className="absolute -bottom-24 -right-24 h-72 w-72 rounded-full bg-[var(--gov-yellow)]/20 blur-3xl" />
-        </div>
+      <section className="relative py-20 overflow-hidden bg-[#FFFBF5] border-t border-gray-200/50">
         <div className="container mx-auto px-4 relative">
           <div className="text-center mb-12">
-            <div className="inline-flex items-center gap-2 rounded-full border border-green-100 bg-green-50 px-3 py-1 text-sm text-[var(--gov-green)] mb-3">
+            <div className="inline-flex items-center gap-2 rounded-full border border-green-200 bg-white px-3 py-1 text-sm text-[var(--gov-green)] mb-4 shadow-sm">
               <LayoutGrid className="h-4 w-4" />
               Explora por categoría
             </div>
@@ -250,7 +267,7 @@ export default function Home() {
       </section>
 
       {/* Profesionales destacados */}
-      <section className="py-16 bg-white">
+      <section className="py-16 bg-[#FFFBF5] border-t border-gray-200/50">
         <div className="container mx-auto px-4">
           <div className="text-center mb-12">
             <h2 className="text-3xl lg:text-4xl font-rutan font-bold mb-4">
@@ -273,7 +290,7 @@ export default function Home() {
                       alt={p.name}
                       fill
                       sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-                      className="object-cover"
+                      className="object-cover transition-transform duration-500 group-hover:scale-105"
                       priority={false}
                       placeholder="blur"
                       blurDataURL="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMSIgaGVpZ2h0PSIxIiBmaWxsPSIjRTlGNkYwIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciLz4="
@@ -306,7 +323,7 @@ export default function Home() {
 
 
  {/* Servicios destacados */}
- <section className="py-16 bg-muted/30">
+ <section className="py-16 bg-[#FFFBF5] border-t border-gray-200/50">
         <div className="container mx-auto px-4">
           <div className="text-center mb-12">
             <h2 className="text-3xl lg:text-4xl font-rutan font-bold mb-4">
@@ -365,78 +382,75 @@ export default function Home() {
       </section>
 
       {/* CTA para profesionales */}
-      <section className="relative py-20 lg:py-28 overflow-hidden bg-gradient-to-br from-[var(--gov-green)]/5 to-[var(--gov-yellow)]/10">
-        {/* Decoración de fondo */}
-        <div className="pointer-events-none absolute inset-0 opacity-60">
-          <div className="absolute -top-24 -left-24 h-72 w-72 rounded-full bg-[var(--gov-green)]/10 blur-3xl" />
-          <div className="absolute -bottom-24 -right-24 h-72 w-72 rounded-full bg-[var(--gov-yellow)]/20 blur-3xl" />
-        </div>
+      <section className="relative py-20 lg:py-28 overflow-hidden bg-[#FFFBF5] border-t border-gray-200/50">
         <div className="container mx-auto px-2 sm:px-4 lg:px-8">
-          <div className="relative w-full max-w-[1400px] mx-auto rounded-3xl border border-gray-100 bg-white/70 supports-[backdrop-filter]:bg-white/60 backdrop-blur shadow-xl overflow-hidden">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-0">
+          <div className="relative w-full max-w-[1400px] mx-auto rounded-3xl bg-[#006F4B] shadow-2xl overflow-hidden">
+            {/* Decoración de fondo sutil */}
+            <div className="absolute inset-0 opacity-10 bg-center [mask-image:linear-gradient(180deg,white,rgba(255,255,255,0))]" />
+            
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-0 relative z-10">
               {/* Columna izquierda */}
               <div className="flex flex-col justify-center items-center lg:items-start text-center lg:text-left p-8 lg:p-14 xl:p-16">
-                <div className="inline-flex items-center gap-2 rounded-full border border-green-100 bg-green-50 px-3 py-1 text-sm text-[var(--gov-green)] w-fit mb-4 mx-auto lg:mx-0">
+                <div className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-sm text-white w-fit mb-4 mx-auto lg:mx-0 backdrop-blur-sm">
                   <Rocket className="h-4 w-4" />
                   Crece en Ceres
                 </div>
-                <h2 className="text-3xl lg:text-4xl font-rutan font-bold mb-4">
+                <h2 className="text-3xl lg:text-4xl font-rutan font-bold mb-4 text-white">
                    ¿Querés publicar tus servicios?
                 </h2>
                 
 
-                <div className="space-y-4 mb-8">
-                  <div className="flex items-start justify-center lg:justify-start gap-3">
-                    <div className="mt-1 grid place-items-center h-9 w-9 rounded-xl bg-[var(--gov-green)]/10 text-[var(--gov-green)]">
+                <div className="space-y-6 mb-8 w-full max-w-md">
+                  <div className="flex items-start justify-center lg:justify-start gap-4 group">
+                    <div className="mt-1 grid place-items-center h-10 w-10 rounded-xl bg-white/10 text-white group-hover:bg-white group-hover:text-[#006F4B] transition-colors">
                       <UserPlus className="h-5 w-5" />
                     </div>
                     <div>
-                      <p className="font-medium leading-tight">Registro</p>
-                      <p className="text-sm text-muted-foreground">Creá tu perfil y agregá tus servicios. Recordá que toda la información tiene que ser verídica y demostrable</p>
+                      <p className="font-medium leading-tight text-white text-lg">Registro</p>
+                      <p className="text-sm text-green-100/80 mt-1">Creá tu perfil y agregá tus servicios. Recordá que toda la información tiene que ser verídica y demostrable</p>
                     </div>
                   </div>
-                  <div className="flex items-start justify-center lg:justify-start gap-3">
-                    <div className="mt-1 grid place-items-center h-9 w-9 rounded-xl bg-[var(--gov-green)]/10 text-[var(--gov-green)]">
+                  <div className="flex items-start justify-center lg:justify-start gap-4 group">
+                    <div className="mt-1 grid place-items-center h-10 w-10 rounded-xl bg-white/10 text-white group-hover:bg-white group-hover:text-[#006F4B] transition-colors">
                       <CheckCircle2 className="h-5 w-5" />
                     </div>
                     <div>
-                      <p className="font-medium leading-tight">Verificación</p>
-                      <p className="text-sm text-muted-foreground">Para mayor seguridad, nuestro equipo validará tu información</p>
+                      <p className="font-medium leading-tight text-white text-lg">Verificación</p>
+                      <p className="text-sm text-green-100/80 mt-1">Para mayor seguridad, nuestro equipo validará tu información</p>
                     </div>
                   </div>
-                  <div className="flex items-start justify-center lg:justify-start gap-3">
-                    <div className="mt-1 grid place-items-center h-9 w-9 rounded-xl bg-[var(--gov-green)]/10 text-[var(--gov-green)]">
+                  <div className="flex items-start justify-center lg:justify-start gap-4 group">
+                    <div className="mt-1 grid place-items-center h-10 w-10 rounded-xl bg-white/10 text-white group-hover:bg-white group-hover:text-[#006F4B] transition-colors">
                       <Rocket className="h-5 w-5" />
                     </div>
                     <div>
-                      <p className="font-medium leading-tight">¡Listo!</p>
-                      <p className="text-sm text-muted-foreground">Ya estás listo para comenzar a recibir y gestionar solicitudes</p>
+                      <p className="font-medium leading-tight text-white text-lg">¡Listo!</p>
+                      <p className="text-sm text-green-100/80 mt-1">Ya estás listo para comenzar a recibir y gestionar solicitudes</p>
                     </div>
                   </div>
                 </div>
 
                 <Button
                   size="lg"
-                  className="bg-gradient-to-r from-[#006F4B] to-[#008F5B] text-white shadow-lg hover:shadow-xl hover:from-[#008F5B] hover:to-[#006F4B]"
+                  className="bg-white hover:bg-gray-50 text-[#006F4B] shadow-lg hover:shadow-xl font-semibold px-8 py-3 rounded-xl h-auto transition-all duration-200"
                   asChild
                 >
-                  <Link href="/auth/registro" className="inline-flex items-center">
+                  <Link href="/auth/registro" className="inline-flex items-center gap-2">
                     Crea tu perfil gratis
-                    <ArrowRight className="ml-2 h-4 w-4" />
+                    <ArrowRight className="h-4 w-4" />
                   </Link>
                 </Button>
               </div>
               {/* Columna derecha (imagen) - oculta en mobile */}
-              <div className="relative hidden lg:block">
-                <div className="relative w-full h-[280px] lg:h-full min-h-[380px]">
-                  <Image
-                    src="/servicios/instalacion-aires.jpg"
-                    alt="Profesional trabajando"
-                    fill
-                    className="object-cover"
-                    priority
-                  />
-                </div>
+              <div className="relative hidden lg:block h-full min-h-[500px]">
+                <div className="absolute inset-0 bg-gradient-to-r from-[#006F4B] to-transparent z-10" />
+                <Image
+                  src="/servicios/instalacion-aires.jpg"
+                  alt="Profesional trabajando"
+                  fill
+                  className="object-cover"
+                  priority
+                />
               </div>
             </div>
           </div>

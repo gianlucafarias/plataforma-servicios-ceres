@@ -33,14 +33,14 @@ function CategoryCardComponent({ category, priority = false }: CategoryCardProps
             priority={priority}
             // Ancho estimado por breakpoint (coincide con basis del carrusel)
             sizes="(max-width: 640px) 240px, (max-width: 768px) 260px, (max-width: 1024px) 280px, 380px"
-            className={`object-cover transition-opacity duration-300 ${loaded ? "opacity-100" : "opacity-0"}`}
+            className={`object-cover transition-all duration-500 group-hover:scale-105 ${loaded ? "opacity-100" : "opacity-0"}`}
             onLoad={handleLoad}
           />
         )}
 
         {/* Overlay de gradiente institucional */}
         <div
-          className={`absolute inset-0 bg-gradient-to-b from-[var(--gov-green)]/10 via-[var(--gov-green)]/50 to-[#008F5B]/90 transition-opacity duration-300 group-hover:from-[var(--gov-green)]/80 group-hover:via-[var(--gov-green)]/60 group-hover:to-[#008F5B]/80 ${
+          className={`absolute inset-0 bg-gradient-to-b from-transparent via-black/10 to-[var(--gov-green)]/90 transition-all duration-500 group-hover:via-[var(--gov-green)]/40 group-hover:to-[var(--gov-green)] ${
             loaded ? "opacity-100" : "opacity-0"
           }`}
         />
