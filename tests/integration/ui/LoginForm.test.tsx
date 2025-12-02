@@ -10,7 +10,7 @@ const hoisted = vi.hoisted(() => ({
 
 vi.mock('@/hooks/useAuth', () => ({ useAuth: () => ({ login: hoisted.loginMock }) }))
 vi.mock('next/navigation', async (orig) => {
-  const actual = await orig()
+  const actual = await orig() as Record<string, unknown>
   return { ...actual, useRouter: () => ({ push: hoisted.pushMock }) }
 })
 

@@ -1,7 +1,7 @@
 import { Card } from "@/components/ui/card";
 import Link from "next/link";
 import { Area } from "@/lib/taxonomy";
-import { useState } from "react";
+import { useState, memo, useCallback } from "react";
 import Image from "next/image";
 
 interface CategoryCardProps {
@@ -11,8 +11,12 @@ interface CategoryCardProps {
   priority?: boolean;
 }
 
-export function CategoryCard({ category, priority = false }: CategoryCardProps) {
+function CategoryCardComponent({ category, priority = false }: CategoryCardProps) {
   const [loaded, setLoaded] = useState(false);
+
+  const handleLoad = useCallback(() => {
+    setLoaded(true);
+  }, []);
 
   return (
     <Link href={`/servicios?grupo=${category.group}&categoria=${category.slug}`} className="block h-full">
@@ -30,7 +34,7 @@ export function CategoryCard({ category, priority = false }: CategoryCardProps) 
             // Ancho estimado por breakpoint (coincide con basis del carrusel)
             sizes="(max-width: 640px) 240px, (max-width: 768px) 260px, (max-width: 1024px) 280px, 380px"
             className={`object-cover transition-opacity duration-300 ${loaded ? "opacity-100" : "opacity-0"}`}
-            onLoad={() => setLoaded(true)}
+            onLoad={handleLoad}
           />
         )}
 
@@ -55,3 +59,5 @@ export function CategoryCard({ category, priority = false }: CategoryCardProps) 
     </Link>
   );
 }
+
+export const CategoryCard = memo(CategoryCardComponent);

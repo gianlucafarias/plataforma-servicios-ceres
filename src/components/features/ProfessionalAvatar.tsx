@@ -2,7 +2,7 @@
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import Image from "next/image";
-import { useState } from "react";
+import { useState, useMemo, useCallback, memo } from "react";
 
 interface ProfessionalAvatarProps {
   name: string;
@@ -10,11 +10,19 @@ interface ProfessionalAvatarProps {
   className?: string;
 }
 
-export function ProfessionalAvatar({ name, profilePicture, className }: ProfessionalAvatarProps) {
+function ProfessionalAvatarComponent({ name, profilePicture, className }: ProfessionalAvatarProps) {
   const [imageError, setImageError] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
 
-  const initials = name.split(' ').map(n => n[0]).join('').toUpperCase();
+  // Memoizar cálculo de iniciales
+  const initials = useMemo(() => 
+    name.split(' ').map(n => n[0]).join('').toUpperCase(),
+    [name]
+  );
+
+  // Memoizar handlers
+  const handleError = useCallback(() => setImageError(true), []);
+  const handleLoad = useCallback(() => setImageLoaded(true), []);
 
   if (profilePicture && !imageError) {
     return (
@@ -37,8 +45,8 @@ export function ProfessionalAvatar({ name, profilePicture, className }: Professi
             className={`w-full h-full object-cover transition-opacity duration-300 ${
               imageLoaded ? 'opacity-100' : 'opacity-0'
             }`}
-            onError={() => setImageError(true)}
-            onLoad={() => setImageLoaded(true)}
+            onError={handleError}
+            onLoad={handleLoad}
           />
         </div>
       </Avatar>
@@ -53,3 +61,5 @@ export function ProfessionalAvatar({ name, profilePicture, className }: Professi
     </Avatar>
   );
 }
+
+export const ProfessionalAvatar = memo(ProfessionalAvatarComponent);

@@ -5,7 +5,7 @@ import { MapPin } from "lucide-react";
 import Link from "next/link";
 import WhatsAppIcon from "../ui/whatsapp";
 import Image from "next/image";
-import { useEffect, useState } from "react";
+import { useMemo, memo } from "react";
 import { AvailabilityBadge } from "./AvailabilityBadge";
 import { ProfessionalAvatar } from "./ProfessionalAvatar";
 
@@ -25,6 +25,7 @@ interface ServiceCardProps {
       reviewCount: number;
       verified: boolean;
       ProfilePicture?: string | null;
+      bio?: string;
       services?: {
         id: string;
         title: string;
@@ -43,39 +44,28 @@ interface ServiceCardProps {
   };
 }
 
-export function ServiceCard({ service }: ServiceCardProps) {
-  const { professional } = service;
-  const [professionalServiceTitles, setProfessionalServiceTitles] = useState<string[]>([]);
-  const [professionalBio, setProfessionalBio] = useState<string>("");
-  const [professionalSchedule, setProfessionalSchedule] = useState<Record<string, unknown> | null>(null);
+// Constante para WhatsApp (evita recrear string en cada render)
+const WHATSAPP_MESSAGE = encodeURIComponent("Hola, vi tu perfil en Servicios Ceres y me interesa contactarte.");
+const WHATSAPP_BASE = "https://wa.me/+5403491456789?text=";
 
-  useEffect(() => {
-    let cancelled = false;
-    const load = async () => {
-      // Si ya nos pasaron servicios desde el padre (p.ej. lista filtrada), evitamos el fetch
-      if (Array.isArray(professional.services) && professional.services.length > 0) {
-        setProfessionalServiceTitles(professional.services.map(s => s.title).filter(Boolean));
-        return;
-      }
-      try {
-        const res = await fetch(`/api/professional/${professional.id}`);
-        if (!res.ok) return;
-        const json = await res.json();
-        if (!json?.success) return;
-        const titles: string[] = (json.data?.services ?? []).map((s: { title?: string }) => s.title).filter(Boolean);
-        if (!cancelled) {
-          setProfessionalServiceTitles(titles);
-          setProfessionalBio(json.data?.bio ?? "");
-          setProfessionalSchedule(json.data?.schedule ?? null);
-        }
-      } catch {
-        // ignorar errores de red en card
-      }
-    };
-    load();
-    return () => { cancelled = true; };
-  }, [professional.id, professional.services]);
-  
+function ServiceCardComponent({ service }: ServiceCardProps) {
+  const { professional } = service;
+
+  // Memoizar cálculo de badges de servicios
+  const serviceBadges = useMemo(() => {
+    const fromProp = Array.isArray(professional.services) && professional.services.length > 0
+      ? professional.services.map(s => s.title).filter(Boolean)
+      : [];
+    const fallbackFromCategory = (service.category.services ?? []).map(cs => cs.name);
+    const items = fromProp.length > 0 ? fromProp : fallbackFromCategory;
+    const visible = items.slice(0, 3);
+    const remaining = Math.max(items.length - 3, 0);
+    return { visible, remaining };
+  }, [professional.services, service.category.services]);
+
+  // Usar bio del professional si viene, sino description del service
+  const displayBio = professional.bio || service.description;
+
   return (
     <Card className="group hover:shadow-xl transition-all duration-300 rounded-2xl border border-gray-100">
       <CardHeader className="pb-3">
@@ -99,7 +89,7 @@ export function ServiceCard({ service }: ServiceCardProps) {
           </div>
           <Badge variant="outline" className="text-xs rounded-xl border-gray-200 text-gray-700">
           <MapPin className="h-3 w-3" />
-          <span className="capitalize">{professional.location ?? 'Ceressss'}</span>
+          <span className="capitalize">{professional.location ?? 'Ceres'}</span>
           </Badge>
         </div>
       </CardHeader>
@@ -107,41 +97,27 @@ export function ServiceCard({ service }: ServiceCardProps) {
       <CardContent className="space-y-3">
         <div className="min-h-[2.5rem] flex items-start">
           <p className="text-sm text-muted-foreground line-clamp-2">
-            {professionalBio || service.description}
+            {displayBio}
           </p>
         </div>
 
         <div className="min-h-[1.5rem] flex flex-wrap gap-1">
-                        {(() => {
-                          const fromProp = Array.isArray(professional.services) && professional.services.length > 0
-                            ? professional.services.map(s => ({ label: s.title }))
-                            : [];
-                          const fromProfessional = professionalServiceTitles.map(label => ({ label }));
-                          const fallbackFromCategory = (service.category.services ?? []).map(cs => ({ label: cs.name }));
-                          const items = fromProp.length > 0 ? fromProp : (fromProfessional.length > 0 ? fromProfessional : fallbackFromCategory);
-                          const visible = items.slice(0, 3);
-                          const remaining = Math.max(items.length - 3, 0);
-                          return (
-                            <>
-                              {visible.map((item, index) => (
-                                <Badge key={index} variant="outline" className="text-xs rounded-xl border-gray-200 text-gray-700">
-                                  {item.label}
-                                </Badge>
-                              ))}
-                              {remaining > 0 && (
-                                <Badge variant="outline" className="text-xs rounded-xl border-gray-200 text-gray-700">
-                                  +{remaining} más
-                                </Badge>
-                              )}
-                            </>
-                          );
-                        })()}
-                      </div>
+          {serviceBadges.visible.map((label, index) => (
+            <Badge key={index} variant="outline" className="text-xs rounded-xl border-gray-200 text-gray-700">
+              {label}
+            </Badge>
+          ))}
+          {serviceBadges.remaining > 0 && (
+            <Badge variant="outline" className="text-xs rounded-xl border-gray-200 text-gray-700">
+              +{serviceBadges.remaining} más
+            </Badge>
+          )}
+        </div>
 
         <div className="min-h-[3rem] flex items-center justify-between pt-2 gap-2 sm:gap-3">
           <div className="flex items-center">
             <AvailabilityBadge 
-              schedule={professionalSchedule || professional.schedule} 
+              schedule={professional.schedule} 
               variant="compact"
               showIcon={true}
               showReason={true}
@@ -156,7 +132,7 @@ export function ServiceCard({ service }: ServiceCardProps) {
               Ver Perfil
             </Link>
             <a
-              href={`https://wa.me/+5403491456789?text=Hola, vi tu perfil en Servicios Ceres y me interesa contactarte.`}
+              href={`${WHATSAPP_BASE}${WHATSAPP_MESSAGE}`}
               target="_blank"
               rel="noopener noreferrer"
               className="bg-gradient-to-r from-green-500 to-green-600 text-white px-3 py-2 sm:px-4 rounded-lg font-medium text-sm hover:from-green-600 hover:to-green-700 transition-all duration-200 flex items-center"
@@ -170,3 +146,6 @@ export function ServiceCard({ service }: ServiceCardProps) {
     </Card>
   );
 }
+
+// Exportar con React.memo para evitar re-renders innecesarios
+export const ServiceCard = memo(ServiceCardComponent);
