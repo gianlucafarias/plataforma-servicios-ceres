@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { cn, generateRandomToken } from '@/lib/utils';
+import { cn } from '@/lib/utils';
+import { generateRandomToken } from '@/lib/tokens';
 
 describe('utils', () => {
   describe('cn', () => {

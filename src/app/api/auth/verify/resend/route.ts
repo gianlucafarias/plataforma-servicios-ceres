@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { generateRandomToken } from '@/lib/utils'
+import { generateRandomToken } from '@/lib/tokens'
 import { sendMail } from '@/lib/mail'
 
 export async function POST(request: NextRequest) {

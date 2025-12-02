@@ -3,7 +3,7 @@ import { type User as PrismaUser, type Professional as PrismaProfessional } from
 import type { CategoryGroup } from '@/types';
 import bcrypt from 'bcryptjs';
 import { prisma } from '@/lib/prisma';
-import { generateRandomToken } from '@/lib/utils';
+import { generateRandomToken } from '@/lib/tokens';
 import { enqueueEmailVerify } from '@/jobs/email.producer';
 
 
