@@ -9,6 +9,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      
       - name: Deploy to VPS via SSH
         uses: appleboy/ssh-action@v1.0.3
         with:
@@ -18,16 +19,148 @@ jobs:
           port: ${{ secrets.VPS_PORT }}
           script: |
             set -e
+            echo "🚀 Iniciando deploy..."
+            
             cd /var/www/plataforma-servicios-ceres
+            
+            # Detectar IP del gateway de Docker para Redis
+            DOCKER_GATEWAY_IP=$(docker network inspect bridge --format '{{range .IPAM.Config}}{{.Gateway}}{{end}}' 2>/dev/null || echo "172.17.0.1")
+            echo "🔍 Gateway de Docker: $DOCKER_GATEWAY_IP"
+            
+            # Si existe un .env, hacer backup
+            if [ -f .env ]; then
+              echo "📋 Backup del .env existente..."
+              cp .env .env.backup.$(date +%Y%m%d_%H%M%S)
+            fi
+            
+            # Función para actualizar o agregar variable en .env
+            update_env_var() {
+              local key=$1
+              local value=$2
+              if [ -f .env ] && grep -q "^${key}=" .env; then
+                sed -i "s|^${key}=.*|${key}=${value}|" .env
+              else
+                echo "${key}=${value}" >> .env
+              fi
+            }
+            
+            # Actualizar variables desde GitHub Secrets (solo las que están definidas)
+            echo "📝 Actualizando .env desde GitHub Secrets..."
+            
+            # Database (SOLO DATABASE_URL)
+            [ -n "${{ secrets.DATABASE_URL }}" ] && update_env_var "DATABASE_URL" "${{ secrets.DATABASE_URL }}"
+            
+            # NextAuth
+            [ -n "${{ secrets.NEXTAUTH_URL }}" ] && update_env_var "NEXTAUTH_URL" "${{ secrets.NEXTAUTH_URL }}"
+            [ -n "${{ secrets.NEXTAUTH_SECRET }}" ] && update_env_var "NEXTAUTH_SECRET" "${{ secrets.NEXTAUTH_SECRET }}"
+            
+            # SMTP
+            [ -n "${{ secrets.SMTP_HOST }}" ] && update_env_var "SMTP_HOST" "${{ secrets.SMTP_HOST }}"
+            [ -n "${{ secrets.SMTP_PORT }}" ] && update_env_var "SMTP_PORT" "${{ secrets.SMTP_PORT }}"
+            [ -n "${{ secrets.SMTP_USER }}" ] && update_env_var "SMTP_USER" "${{ secrets.SMTP_USER }}"
+            [ -n "${{ secrets.SMTP_PASS }}" ] && update_env_var "SMTP_PASS" "${{ secrets.SMTP_PASS }}"
+            [ -n "${{ secrets.SMTP_FROM }}" ] && update_env_var "SMTP_FROM" "${{ secrets.SMTP_FROM }}"
+            [ -n "${{ secrets.SMTP_DEBUG }}" ] && update_env_var "SMTP_DEBUG" "${{ secrets.SMTP_DEBUG }}"
+            
+            # Public URL
+            [ -n "${{ secrets.NEXT_PUBLIC_BASE_URL }}" ] && update_env_var "NEXT_PUBLIC_BASE_URL" "${{ secrets.NEXT_PUBLIC_BASE_URL }}"
+            
+            # Redis (si no está en Secrets, usar la detectada solo si no existe en .env)
+            if [ -n "${{ secrets.REDIS_URL }}" ]; then
+              update_env_var "REDIS_URL" "${{ secrets.REDIS_URL }}"
+            elif [ ! -f .env ] || ! grep -q "^REDIS_URL=" .env; then
+              update_env_var "REDIS_URL" "redis://${DOCKER_GATEWAY_IP}:6379/5"
+            fi
+            [ -n "${{ secrets.REDIS_PREFIX }}" ] && update_env_var "REDIS_PREFIX" "${{ secrets.REDIS_PREFIX }}"
+            
+            # Timezone
+            [ -n "${{ secrets.TZ }}" ] && update_env_var "TZ" "${{ secrets.TZ }}"
+            
+            # Slack
+            [ -n "${{ secrets.SLACK_WEBHOOK_URL }}" ] && update_env_var "SLACK_WEBHOOK_URL" "${{ secrets.SLACK_WEBHOOK_URL }}"
+            
+            # Queues UI
+            [ -n "${{ secrets.QUEUES_UI_PASS }}" ] && update_env_var "QUEUES_UI_PASS" "${{ secrets.QUEUES_UI_PASS }}"
+            
+            # Admin API
+            [ -n "${{ secrets.ADMIN_API_KEY }}" ] && update_env_var "ADMIN_API_KEY" "${{ secrets.ADMIN_API_KEY }}"
+            
+            # Node Environment
+            [ -n "${{ secrets.NODE_ENV }}" ] && update_env_var "NODE_ENV" "${{ secrets.NODE_ENV }}"
+            
+            # Google OAuth
+            [ -n "${{ secrets.GOOGLE_CLIENT_ID }}" ] && update_env_var "GOOGLE_CLIENT_ID" "${{ secrets.GOOGLE_CLIENT_ID }}"
+            [ -n "${{ secrets.GOOGLE_CLIENT_SECRET }}" ] && update_env_var "GOOGLE_CLIENT_SECRET" "${{ secrets.GOOGLE_CLIENT_SECRET }}"
+            
+            # Facebook OAuth
+            [ -n "${{ secrets.FACEBOOK_CLIENT_ID }}" ] && update_env_var "FACEBOOK_CLIENT_ID" "${{ secrets.FACEBOOK_CLIENT_ID }}"
+            [ -n "${{ secrets.FACEBOOK_CLIENT_SECRET }}" ] && update_env_var "FACEBOOK_CLIENT_SECRET" "${{ secrets.FACEBOOK_CLIENT_SECRET }}"
+            
+            # Pull cambios
+            echo "📥 Obteniendo cambios de Git..."
             git fetch origin main && git reset --hard origin/main
-            npm ci
-            npx prisma migrate deploy
-            npm run build
-            npm prune --omit=dev
-            # PM2 está corriendo como usuario admin, usar sudo -u admin
-            sudo pm2 reload ecosystem.config.js --only plataforma-servicios-ceres --update-env || sudo pm2 start ecosystem.config.js --only plataforma-servicios-ceres
-            sudo pm2 describe ceres-worker > /dev/null 2>&1 && sudo pm2 reload ecosystem.config.js --only ceres-worker || sudo pm2 start ecosystem.config.js --only ceres-worker
-            sudo pm2 describe ceres-queues-ui > /dev/null 2>&1 && sudo pm2 reload ecosystem.config.js --only ceres-queues-ui || sudo pm2 start ecosystem.config.js --only ceres-queues-ui
-            sudo pm2 save
-            # Recargar Nginx (sin downtime)
-            sudo nginx -t && sudo systemctl reload nginx || echo "⚠️ Nginx reload skipped"
+            
+            # Instalar Docker si no está instalado
+            if ! command -v docker &> /dev/null; then
+              echo "🐳 Instalando Docker..."
+              curl -fsSL https://get.docker.com -o get-docker.sh
+              sh get-docker.sh
+              sudo usermod -aG docker $USER
+              rm get-docker.sh
+            fi
+            
+            # Instalar Docker Compose si no está instalado
+            if ! command -v docker-compose &> /dev/null && ! docker compose version &> /dev/null; then
+              echo "🐳 Instalando Docker Compose..."
+              sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+              sudo chmod +x /usr/local/bin/docker-compose
+            fi
+            
+            # Verificar que Redis esté accesible
+            echo "🔍 Verificando Redis..."
+            if docker run --rm --network host redis:7-alpine redis-cli -h localhost -p 6379 -n 5 PING 2>/dev/null | grep -q PONG; then
+              echo "✅ Redis accesible desde Docker"
+            else
+              echo "⚠️ Advertencia: No se pudo verificar Redis desde contenedor"
+            fi
+            
+            # Detener PM2 si está corriendo (migración)
+            if command -v pm2 &> /dev/null; then
+              echo "🛑 Deteniendo PM2..."
+              sudo pm2 stop all 2>/dev/null || true
+              sudo pm2 delete all 2>/dev/null || true
+            fi
+            
+            # Construir y levantar servicios Docker (sin postgres, usando DATABASE_URL externo)
+            echo "🔨 Construyendo imágenes Docker..."
+            docker compose build --no-cache
+            
+            echo "🚀 Levantando servicios..."
+            docker compose up -d --remove-orphans app worker queues-ui
+            
+            # Ejecutar migraciones
+            echo "🗄️ Ejecutando migraciones de base de datos..."
+            docker compose run --rm app npx prisma migrate deploy
+            
+            # Verificar que los contenedores estén corriendo
+            echo "✅ Verificando contenedores..."
+            docker compose ps
+            
+            # Verificar health check
+            echo "🏥 Verificando health check..."
+            sleep 5
+            if curl -f http://localhost:3012/api/health > /dev/null 2>&1; then
+              echo "✅ Health check OK"
+            else
+              echo "⚠️ Health check falló (puede ser normal si la app aún está iniciando)"
+            fi
+            
+            # Recargar Apache/Nginx
+            echo "🔄 Recargando web server..."
+            sudo systemctl reload apache2 2>/dev/null || sudo systemctl reload nginx 2>/dev/null || echo "⚠️ Web server reload skipped"
+            
+            # Limpiar imágenes antiguas
+            echo "🧹 Limpiando imágenes antiguas..."
+            docker image prune -f > /dev/null 2>&1 || true
+            
+            echo "✅ Deploy completado exitosamente!"
