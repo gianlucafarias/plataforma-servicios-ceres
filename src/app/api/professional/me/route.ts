@@ -19,8 +19,46 @@ export async function GET() {
 
     const professional = await prisma.professional.findUnique({
       where: { userId: session.user.id },
-      include: {
-        user: { select: { firstName: true, lastName: true, email: true, phone: true, verified: true, birthDate: true, location: true } },
+      select: {
+        id: true,
+        status: true,
+        bio: true,
+        experienceYears: true,
+        verified: true,
+        rating: true,
+        reviewCount: true,
+        specialties: true,
+        professionalGroup: true,
+        whatsapp: true,
+        instagram: true,
+        facebook: true,
+        linkedin: true,
+        website: true,
+        portfolio: true,
+        CV: true,
+        ProfilePicture: true,
+        location: true,
+        serviceLocations: true,
+        hasPhysicalStore: true,
+        physicalStoreAddress: true,
+        schedule: true,
+        user: { 
+          select: { 
+            firstName: true, 
+            lastName: true, 
+            email: true, 
+            phone: true, 
+            verified: true, 
+            birthDate: true, 
+            location: true,
+            password: true, // Para determinar si tiene password
+            accounts: {
+              select: {
+                provider: true
+              }
+            }
+          } 
+        },
         services: {
           include: {
             category: { select: { name: true } },
@@ -31,9 +69,42 @@ export async function GET() {
 
     console.log('Professional encontrado:', professional);
 
+    if (!professional) {
+      return NextResponse.json({ 
+        success: false, 
+        error: 'not_found',
+        message: 'Profesional no encontrado'
+      }, { status: 404 });
+    }
+
+    // Determinar tipo de registro
+    let registrationType: 'email' | 'google' | 'facebook' = 'email';
+    if (professional.user.accounts && professional.user.accounts.length > 0) {
+      // Si tiene cuentas OAuth, usar la primera
+      const provider = professional.user.accounts[0]?.provider;
+      if (provider === 'google') {
+        registrationType = 'google';
+      } else if (provider === 'facebook') {
+        registrationType = 'facebook';
+      }
+    }
+
+    // Remover password y accounts de la respuesta por seguridad
+    const { ...userData } = professional.user;
+
+    // Serializar birthDate correctamente si existe
+    const serializedUserData = {
+      ...userData,
+      birthDate: userData.birthDate ? userData.birthDate.toISOString() : null,
+    };
+
     return NextResponse.json({ 
       success: true, 
-      data: professional,
+      data: {
+        ...professional,
+        user: serializedUserData,
+        registrationType
+      },
       debug: { userId: session.user.id }
     });
   } catch (error) {
@@ -78,6 +149,8 @@ export async function PUT(request: Request) {
       cv,
       picture,
       serviceLocations,
+      hasPhysicalStore,
+      physicalStoreAddress,
       schedule
     } = body;
 
@@ -121,6 +194,8 @@ export async function PUT(request: Request) {
         CV: cv,
         ProfilePicture: picture,
         serviceLocations: serviceLocations || [],
+        hasPhysicalStore: hasPhysicalStore || false,
+        physicalStoreAddress: hasPhysicalStore ? physicalStoreAddress : null,
         schedule: schedule || null, // Guardar horarios como JSON
         updatedAt: new Date()
       },

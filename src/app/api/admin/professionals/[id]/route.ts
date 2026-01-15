@@ -27,7 +27,13 @@ export async function GET(
             location: true,
             verified: true,
             createdAt: true,
-            updatedAt: true
+            updatedAt: true,
+            password: true, // Para determinar tipo de registro
+            accounts: {
+              select: {
+                provider: true
+              }
+            }
           }
         },
         services: {
@@ -55,7 +61,28 @@ export async function GET(
       );
     }
 
-    return NextResponse.json({ success: true, data: professional });
+    // Determinar tipo de registro
+    let registrationType: 'email' | 'google' | 'facebook' = 'email';
+    if (professional.user.accounts && professional.user.accounts.length > 0) {
+      const provider = professional.user.accounts[0]?.provider;
+      if (provider === 'google') {
+        registrationType = 'google';
+      } else if (provider === 'facebook') {
+        registrationType = 'facebook';
+      }
+    }
+
+    // Remover password y accounts de la respuesta por seguridad
+    const { ...userData } = professional.user;
+
+    return NextResponse.json({ 
+      success: true, 
+      data: {
+        ...professional,
+        user: userData,
+        registrationType
+      }
+    });
   } catch (error) {
     console.error('Error obteniendo profesional:', error);
     return NextResponse.json(

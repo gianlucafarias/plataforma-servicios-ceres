@@ -93,8 +93,6 @@ export async function GET(request: NextRequest) {
         active: cat.active,
         subcategoryCount: cat._count.children,
         professionalCount: cat._count.services,
-        createdAt: (cat as typeof cat & { createdAt: Date; updatedAt: Date }).createdAt.toISOString(),
-        updatedAt: (cat as typeof cat & { createdAt: Date; updatedAt: Date }).updatedAt.toISOString()
       }));
 
       return NextResponse.json({ success: true, data });
@@ -111,8 +109,6 @@ export async function GET(request: NextRequest) {
         description: area.description,
         active: area.active,
         subcategoryCount: area._count.children,
-        createdAt: (area as typeof area & { createdAt: Date; updatedAt: Date }).createdAt.toISOString(),
-        updatedAt: (area as typeof area & { createdAt: Date; updatedAt: Date }).updatedAt.toISOString()
       })),
       subcategoriesOficios: subcatOficios.map(sub => ({
         id: sub.id,
@@ -125,8 +121,6 @@ export async function GET(request: NextRequest) {
         description: sub.description,
         active: sub.active,
         professionalCount: sub._count.services,
-        createdAt: (sub as typeof sub & { createdAt: Date; updatedAt: Date }).createdAt.toISOString(),
-        updatedAt: (sub as typeof sub & { createdAt: Date; updatedAt: Date }).updatedAt.toISOString()
       })),
       subcategoriesProfesiones: subcatProfesiones.map(sub => ({
         id: sub.id,
@@ -139,8 +133,6 @@ export async function GET(request: NextRequest) {
         description: sub.description,
         active: sub.active,
         professionalCount: sub._count.services,
-        createdAt: (sub as typeof sub & { createdAt: Date; updatedAt: Date }).createdAt.toISOString(),
-        updatedAt: (sub as typeof sub & { createdAt: Date; updatedAt: Date }).updatedAt.toISOString()
       })),
       stats: {
         totalAreas: areas.length,

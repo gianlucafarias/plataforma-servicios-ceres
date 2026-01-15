@@ -489,7 +489,7 @@ var require_cli_options = __commonJS({
 });
 
 // scripts/worker.ts
-var import_bullmq3 = require("bullmq");
+var import_bullmq2 = require("bullmq");
 
 // src/lib/redis.ts
 function redisConnection() {
@@ -640,36 +640,16 @@ async function postToSlack(data) {
 }
 
 // src/jobs/maintenance.worker.ts
-var import_bullmq2 = require("bullmq");
-
-// src/lib/queues.ts
 var import_bullmq = require("bullmq");
-var base = redisConnection();
-var emailQueue = new import_bullmq.Queue("email", base);
-var slackQueue = new import_bullmq.Queue("slack", base);
-var maintenanceQueue = new import_bullmq.Queue("maintenance", base);
-var filesQueue = new import_bullmq.Queue("files", base);
 
 // src/jobs/slack.producer.ts
-async function enqueueSlackAlert(key, text) {
-  return slackQueue.add(
-    "alert",
-    { text },
-    {
-      jobId: `slack:${key}`,
-      // Idempotente: mismo key no duplica alertas
-      attempts: 3,
-      backoff: { type: "fixed", delay: 2e3 },
-      // 2s entre reintentos
-      removeOnComplete: true
-      // No necesitamos historial de alertas exitosas
-    }
-  );
+async function enqueueSlackAlert(_key, _text) {
+  return null;
 }
 
 // src/jobs/maintenance.worker.ts
-async function scheduleMaintenance(base3) {
-  const q = new import_bullmq2.Queue("maintenance", base3);
+async function scheduleMaintenance(base2) {
+  const q = new import_bullmq.Queue("maintenance", base2);
   await q.add("clean-verification-tokens", {}, {
     jobId: "maintenance:clean-verification-tokens",
     repeat: {
@@ -690,14 +670,14 @@ async function scheduleMaintenance(base3) {
   });
   console.log("[maintenance.worker] Crons de mantenimiento programados");
 }
-function createMaintenanceWorker(base3) {
-  return new import_bullmq2.Worker("maintenance", async (job) => {
+function createMaintenanceWorker(base2) {
+  return new import_bullmq.Worker("maintenance", async (job) => {
     if (job.name === "clean-verification-tokens") {
       await cleanExpiredVerificationTokens();
     } else if (job.name === "daily-report") {
       await generateDailyReport();
     }
-  }, __spreadProps(__spreadValues({}, base3), { concurrency: 1 }));
+  }, __spreadProps(__spreadValues({}, base2), { concurrency: 1 }));
 }
 async function cleanExpiredVerificationTokens() {
   const result = await prisma.verificationToken.deleteMany({
@@ -786,11 +766,11 @@ async function validateCV(data) {
 })();
 
 // scripts/worker.ts
-var base2 = redisConnection();
+var base = redisConnection();
 console.log("[worker] Inicializando workers...");
 console.log("[worker] Redis:", process.env.REDIS_URL);
-console.log("[worker] Prefix:", base2.prefix);
-var emailWorker = new import_bullmq3.Worker("email", async (job) => {
+console.log("[worker] Prefix:", base.prefix);
+var emailWorker = new import_bullmq2.Worker("email", async (job) => {
   console.log(`[email.worker] Processing job ${job.id} (${job.name})`);
   if (job.name === "verify") {
     await sendVerificationEmail(job.data);
@@ -799,7 +779,7 @@ var emailWorker = new import_bullmq3.Worker("email", async (job) => {
   } else {
     console.warn(`[email.worker] Unknown job type: ${job.name}`);
   }
-}, __spreadProps(__spreadValues({}, base2), {
+}, __spreadProps(__spreadValues({}, base), {
   concurrency: 5
   // Procesa hasta 5 emails simultáneos
 }));
@@ -809,14 +789,14 @@ emailWorker.on("completed", (job) => {
 emailWorker.on("failed", (job, err) => {
   console.error(`[email.worker] \u2717 Job ${job == null ? void 0 : job.id} fall\xF3:`, err.message);
 });
-var slackWorker = new import_bullmq3.Worker("slack", async (job) => {
+var slackWorker = new import_bullmq2.Worker("slack", async (job) => {
   console.log(`[slack.worker] Processing job ${job.id} (${job.name})`);
   if (job.name === "alert") {
     await postToSlack(job.data);
   } else {
     console.warn(`[slack.worker] Unknown job type: ${job.name}`);
   }
-}, __spreadProps(__spreadValues({}, base2), {
+}, __spreadProps(__spreadValues({}, base), {
   concurrency: 10
   // Alta concurrencia para alertas
 }));
@@ -826,7 +806,7 @@ slackWorker.on("completed", (job) => {
 slackWorker.on("failed", (job, err) => {
   console.error(`[slack.worker] \u2717 Job ${job == null ? void 0 : job.id} fall\xF3:`, err.message);
 });
-var filesWorker = new import_bullmq3.Worker("files", async (job) => {
+var filesWorker = new import_bullmq2.Worker("files", async (job) => {
   console.log(`[files.worker] Processing job ${job.id} (${job.name})`);
   if (job.name === "optimize-profile-image") {
     await optimizeProfileImage(job.data);
@@ -835,14 +815,14 @@ var filesWorker = new import_bullmq3.Worker("files", async (job) => {
   } else {
     console.warn(`[files.worker] Unknown job type: ${job.name}`);
   }
-}, __spreadProps(__spreadValues({}, base2), { concurrency: 2 }));
+}, __spreadProps(__spreadValues({}, base), { concurrency: 2 }));
 filesWorker.on("completed", (job) => {
   console.log(`[files.worker] \u2713 Job ${job.id} completado`);
 });
 filesWorker.on("failed", (job, err) => {
   console.error(`[files.worker] \u2717 Job ${job == null ? void 0 : job.id} fall\xF3:`, err.message);
 });
-var emailEvents = new import_bullmq3.QueueEvents("email", base2);
+var emailEvents = new import_bullmq2.QueueEvents("email", base);
 emailEvents.on("failed", async ({ jobId, failedReason }) => {
   const isDLQ = failedReason && failedReason.includes("exceeded");
   if (isDLQ) {
@@ -853,11 +833,11 @@ ${failedReason}`
     });
   }
 });
-var slackEvents = new import_bullmq3.QueueEvents("slack", base2);
+var slackEvents = new import_bullmq2.QueueEvents("slack", base);
 slackEvents.on("failed", async ({ jobId, failedReason }) => {
   console.error(`[DLQ] Slack job ${jobId} fall\xF3:`, failedReason);
 });
-var filesEvents = new import_bullmq3.QueueEvents("files", base2);
+var filesEvents = new import_bullmq2.QueueEvents("files", base);
 filesEvents.on("failed", async ({ jobId, failedReason }) => {
   console.error(`[DLQ] Files job ${jobId} fall\xF3:`, failedReason);
   await postToSlack({
@@ -865,14 +845,14 @@ filesEvents.on("failed", async ({ jobId, failedReason }) => {
 ${failedReason}`
   });
 });
-var maintenanceWorker = createMaintenanceWorker(base2);
+var maintenanceWorker = createMaintenanceWorker(base);
 maintenanceWorker.on("completed", (job) => {
   console.log(`[maintenance.worker] \u2713 Job ${job.id} completado`);
 });
 maintenanceWorker.on("failed", (job, err) => {
   console.error(`[maintenance.worker] \u2717 Job ${job == null ? void 0 : job.id} fall\xF3:`, err.message);
 });
-scheduleMaintenance(base2).then(() => console.log("[worker] \u2713 Crons de mantenimiento programados")).catch((err) => {
+scheduleMaintenance(base).then(() => console.log("[worker] \u2713 Crons de mantenimiento programados")).catch((err) => {
   console.error("[worker] Error programando crons:", err);
   process.exit(1);
 });

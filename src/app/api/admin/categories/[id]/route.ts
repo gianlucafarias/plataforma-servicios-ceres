@@ -57,8 +57,6 @@ export async function GET(
       image: category.backgroundUrl,
       description: category.description,
       active: category.active,
-      createdAt: (category as typeof category & { createdAt: Date; updatedAt: Date }).createdAt.toISOString(),
-      updatedAt: (category as typeof category & { createdAt: Date; updatedAt: Date }).updatedAt.toISOString(),
       parent: category.parent,
       subcategories: category.children,
       professionals: category.services.map((s) => s.professional),

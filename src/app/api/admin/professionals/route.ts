@@ -50,7 +50,13 @@ export async function GET(request: NextRequest) {
               email: true,
               phone: true,
               verified: true,
-              createdAt: true
+              createdAt: true,
+              password: true, // Para determinar tipo de registro
+              accounts: {
+                select: {
+                  provider: true
+                }
+              }
             }
           },
           services: {
@@ -66,38 +72,52 @@ export async function GET(request: NextRequest) {
       })
     ]);
 
-    const data = professionals.map((p) => ({
-      id: p.id,
-      userId: p.userId,
-      name: `${p.user.firstName} ${p.user.lastName}`.trim(),
-      email: p.user.email,
-      phone: p.user.phone,
-      bio: p.bio,
-      status: p.status,
-      verified: p.verified,
-      professionalGroup: p.professionalGroup,
-      experienceYears: p.experienceYears,
-      rating: p.rating,
-      reviewCount: p.reviewCount,
-      serviceCount: p._count.services,
-      location: p.location,
-      serviceLocations: p.serviceLocations,
-      ProfilePicture: p.ProfilePicture,
-      whatsapp: p.whatsapp,
-      instagram: p.instagram,
-      facebook: p.facebook,
-      linkedin: p.linkedin,
-      website: p.website,
-      portfolio: p.portfolio,
-      CV: p.CV,
-      createdAt: p.createdAt,
-      updatedAt: p.updatedAt,
-      services: p.services.map(s => ({
-        id: s.id,
-        title: s.title,
-        category: s.category.name
-      }))
-    }));
+    const data = professionals.map((p) => {
+      // Determinar tipo de registro
+      let registrationType: 'email' | 'google' | 'facebook' = 'email';
+      if (p.user.accounts && p.user.accounts.length > 0) {
+        const provider = p.user.accounts[0]?.provider;
+        if (provider === 'google') {
+          registrationType = 'google';
+        } else if (provider === 'facebook') {
+          registrationType = 'facebook';
+        }
+      }
+
+      return {
+        id: p.id,
+        userId: p.userId,
+        name: `${p.user.firstName} ${p.user.lastName}`.trim(),
+        email: p.user.email,
+        phone: p.user.phone,
+        bio: p.bio,
+        status: p.status,
+        verified: p.verified,
+        professionalGroup: p.professionalGroup,
+        experienceYears: p.experienceYears,
+        rating: p.rating,
+        reviewCount: p.reviewCount,
+        serviceCount: p._count.services,
+        location: p.location,
+        serviceLocations: p.serviceLocations,
+        ProfilePicture: p.ProfilePicture,
+        whatsapp: p.whatsapp,
+        instagram: p.instagram,
+        facebook: p.facebook,
+        linkedin: p.linkedin,
+        website: p.website,
+        portfolio: p.portfolio,
+        CV: p.CV,
+        createdAt: p.createdAt,
+        updatedAt: p.updatedAt,
+        registrationType, // Tipo de registro agregado
+        services: p.services.map(s => ({
+          id: s.id,
+          title: s.title,
+          category: s.category.name
+        }))
+      };
+    });
 
     return NextResponse.json({
       success: true,

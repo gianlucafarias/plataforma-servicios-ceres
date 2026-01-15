@@ -1,5 +1,5 @@
-/* Importar Roboto de Google Fonts */
-@import url('https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,100;0,300;0,400;0,500;0,700;0,900;1,100;1,300;1,400;1,500;1,700;1,900&display=swap');
+/* Importar Inter de Google Fonts */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
 
 @import "tailwindcss";
 
@@ -16,6 +16,15 @@
   --gov-yellow-light: #FEC44E;
   --gov-yellow-dark: #F4A623;
   --radius: 0.625rem;
+  /* Nuevos colores del diseño */
+  --primary: #006A55;
+  --secondary: #F59E0B;
+  --background-light: #F9FAFB;
+  --background-dark: #111827;
+  --surface-light: #FFFFFF;
+  --surface-dark: #1F2937;
+  --subtle-light: #E5E7EB;
+  --subtle-dark: #374151;
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
   --card: oklch(1 0 0);
@@ -116,7 +125,7 @@
 /* Estilos personalizados */
 @layer base {
   html {
-    font-family: 'Roboto', 'Inter', 'Rutan', system-ui, sans-serif;
+    font-family: 'Inter', system-ui, sans-serif;
     scroll-behavior: smooth;
   }
 
@@ -229,14 +238,6 @@
   }
 
   /* Clases de fuente */
-  .font-roboto {
-    font-family: 'Roboto', sans-serif;
-  }
-
-  .font-rutan {
-    font-family: 'Rutan', sans-serif;
-  }
-
   .font-inter {
     font-family: 'Inter', sans-serif;
   }
@@ -244,6 +245,21 @@
   /* Ocultar scrollbar en contenedores con overflow-x/overflow-y */
   .no-scrollbar::-webkit-scrollbar { display: none; }
   .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+  .scrollbar-hide::-webkit-scrollbar { display: none; }
+  .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+  .custom-scroll::-webkit-scrollbar {
+    width: 6px;
+  }
+  .custom-scroll::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .custom-scroll::-webkit-scrollbar-thumb {
+    background-color: #CBD5E1;
+    border-radius: 20px;
+  }
+  .dark .custom-scroll::-webkit-scrollbar-thumb {
+    background-color: #4B5563;
+  }
 
   /* Mejora superposición de cards en carrusel */
   .carousel-3d {
@@ -346,4 +362,13 @@
   body {
     @apply bg-background text-foreground;
   }
+}
+
+/* Estilos mínimos para react-easy-crop: respetar comportamiento por defecto
+   y solo asegurar fondo oscuro detrás de la imagen */
+.reactEasyCrop_Container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  background: #000;
 }

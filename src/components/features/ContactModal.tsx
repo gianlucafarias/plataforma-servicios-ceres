@@ -42,7 +42,7 @@ export function ContactModal({ professionalName, serviceName }: ContactModalProp
   return (
     <Dialog>
       <DialogTrigger asChild>
-        <button className="bg-gradient-to-r from-[#006F4B] to-[#008F5B] text-white px-6 py-3 rounded-xl font-semibold hover:from-[#008F5B] hover:to-[#006F4B] focus:ring-4 focus:ring-green-100 focus:ring-offset-2 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 flex items-center">
+        <button className="bg-gradient-to-r from-[#006F4B] to-[#008F5B] text-white px-6 py-3 rounded-xl font-semibold hover:from-[#008F5B] hover:to-[#006F4B] focus:ring-4 focus:ring-green-100 focus:ring-offset-2 transition-all duration-200 shadow-lg hover:shadow-xl  flex items-center">
           <Phone className="h-4 w-4 mr-2" />
           Contactar Profesional
         </button>
@@ -148,7 +148,7 @@ export function ContactModal({ professionalName, serviceName }: ContactModalProp
             
             <button
               type="submit"
-              className="flex-1 bg-gradient-to-r from-[#006F4B] to-[#008F5B] text-white py-3 px-4 rounded-xl font-semibold hover:from-[#008F5B] hover:to-[#006F4B] focus:ring-4 focus:ring-green-100 focus:ring-offset-2 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 flex items-center justify-center"
+              className="flex-1 bg-gradient-to-r from-[#006F4B] to-[#008F5B] text-white py-3 px-4 rounded-xl font-semibold hover:from-[#008F5B] hover:to-[#006F4B] focus:ring-4 focus:ring-green-100 focus:ring-offset-2 transition-all duration-200 shadow-lg hover:shadow-xl  flex items-center justify-center"
             >
               <Send className="h-4 w-4 mr-2" />
               Enviar Mensaje

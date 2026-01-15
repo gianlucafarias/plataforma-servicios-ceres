@@ -2,7 +2,6 @@
 
 import { Subcategory } from "@/lib/taxonomy"
 import { useMemo, useCallback, memo } from "react";
-import { Badge } from "@/components/ui/badge";
 
 interface CategorySuggestProps {
     handleSuggestionClick: (suggestionName: string) => void;
@@ -65,14 +64,13 @@ function CategorySuggestComponent({ handleSuggestionClick, randomSuggestionsNumb
     return (
       <div className="flex flex-wrap gap-2 items-center justify-center">
         {list.map((s) => (
-          <Badge 
-            key={s.slug} 
-            variant="outline"
+          <button
+            key={s.slug}
             onClick={() => onBadgeClick(s.name)}
-            className="items-center gap-2 bg-white/90 text-black/80 px-3 text-sm font-medium py-1 rounded-full border-1 border-gray-300 cursor-pointer hover:border-gray-900 hover:shadow-md transition-all duration-200"
+            className="px-4 py-1.5 bg-white dark:bg-gray-700 rounded-full text-gray-600 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 shadow-sm border border-gray-200 dark:border-gray-600 transition-all text-sm"
           >
             {s.name}
-          </Badge>
+          </button>
         ))}
       </div>
     );
