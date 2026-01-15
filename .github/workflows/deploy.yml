@@ -25,9 +25,9 @@ jobs:
             npm run build
             npm prune --omit=dev
             # PM2 está corriendo como usuario admin, usar sudo -u admin
-            sudo pm2 reload ecosystem.config.js --only plataforma-servicios-ceres --update-env || sudo -u admin pm2 start ecosystem.config.js --only plataforma-servicios-ceres
-            sudo pm2 describe ceres-worker > /dev/null 2>&1 && sudo -u admin pm2 reload ecosystem.config.js --only ceres-worker || sudo -u admin pm2 start ecosystem.config.js --only ceres-worker
-            sudo pm2 describe ceres-queues-ui > /dev/null 2>&1 && sudo -u admin pm2 reload ecosystem.config.js --only ceres-queues-ui || sudo -u admin pm2 start ecosystem.config.js --only ceres-queues-ui
+            sudo pm2 reload ecosystem.config.js --only plataforma-servicios-ceres --update-env || sudo pm2 start ecosystem.config.js --only plataforma-servicios-ceres
+            sudo pm2 describe ceres-worker > /dev/null 2>&1 && sudo pm2 reload ecosystem.config.js --only ceres-worker || sudo pm2 start ecosystem.config.js --only ceres-worker
+            sudo pm2 describe ceres-queues-ui > /dev/null 2>&1 && sudo pm2 reload ecosystem.config.js --only ceres-queues-ui || sudo pm2 start ecosystem.config.js --only ceres-queues-ui
             sudo pm2 save
             # Recargar Nginx (sin downtime)
             sudo nginx -t && sudo systemctl reload nginx || echo "⚠️ Nginx reload skipped"
