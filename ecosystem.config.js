@@ -1,3 +1,10 @@
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '.env') });
+
+// Cargar todas las variables de entorno del .env
+const envVars = process.env;
+
+
 module.exports = {
     apps: [
       {
@@ -7,7 +14,9 @@ module.exports = {
         cwd: '/var/www/plataforma-servicios-ceres',
         env_file: '/var/www/plataforma-servicios-ceres/.env',
         env: {
-          NODE_ENV: 'production', PORT: 3012
+          ...envVars,
+          NODE_ENV: 'production',
+          PORT: 3012
         },
         instances: 'max',
         exec_mode: 'cluster',
@@ -24,7 +33,8 @@ module.exports = {
         cwd: '/var/www/plataforma-servicios-ceres',
         env_file: '/var/www/plataforma-servicios-ceres/.env',
         env: {
-          NODE_ENV: 'production'
+          ...envVars,
+          NODE_ENV: 'production',
         },
         instances: 1,
         exec_mode: 'fork',
@@ -41,7 +51,8 @@ module.exports = {
         cwd: '/var/www/plataforma-servicios-ceres',
         env_file: '/var/www/plataforma-servicios-ceres/.env',
         env: {
-          NODE_ENV: 'production'
+          ...envVars,
+          NODE_ENV: 'production',
         },
         instances: 1,
         exec_mode: 'fork',
