@@ -1,7 +1,6 @@
-import { Card } from "@/components/ui/card";
 import Link from "next/link";
 import { Area } from "@/lib/taxonomy";
-import { useState } from "react";
+import { useState, memo, useCallback } from "react";
 import Image from "next/image";
 
 interface CategoryCardProps {
@@ -11,14 +10,18 @@ interface CategoryCardProps {
   priority?: boolean;
 }
 
-export function CategoryCard({ category, priority = false }: CategoryCardProps) {
+function CategoryCardComponent({ category, priority = false }: CategoryCardProps) {
   const [loaded, setLoaded] = useState(false);
 
+  const handleLoad = useCallback(() => {
+    setLoaded(true);
+  }, []);
+
   return (
-    <Link href={`/servicios?grupo=${category.group}&categoria=${category.slug}`} className="block h-full">
-      <Card className="group relative h-full flex items-center justify-center text-center rounded-2xl border border-transparent text-white hover:brightness-110 transition-transform duration-300 ease-out cursor-pointer p-0 transform-gpu will-change-transform ring-1 ring-transparent hover:ring-white/20 hover:z-30 overflow-hidden">
+    <Link href={`/servicios?grupo=${category.group}&categoria=${category.slug}`} className="block h-full group">
+      <div className="relative h-full rounded-2xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300">
         {/* Skeleton mientras carga */}
-        {!loaded && <div className="absolute inset-0 bg-gray-200 animate-pulse" />}
+        {!loaded && <div className="absolute inset-0 bg-gray-200 dark:bg-gray-700 animate-pulse" />}
 
         {/* Imagen de fondo con next/image */}
         {category.image && (
@@ -27,31 +30,27 @@ export function CategoryCard({ category, priority = false }: CategoryCardProps) 
             alt={category.name}
             fill
             priority={priority}
-            // Ancho estimado por breakpoint (coincide con basis del carrusel)
-            sizes="(max-width: 640px) 240px, (max-width: 768px) 260px, (max-width: 1024px) 280px, 380px"
-            className={`object-cover transition-opacity duration-300 ${loaded ? "opacity-100" : "opacity-0"}`}
-            onLoad={() => setLoaded(true)}
+            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 20vw"
+            className={`object-cover transition-transform duration-500 group-hover:scale-105 ${loaded ? "opacity-100" : "opacity-0"}`}
+            onLoad={handleLoad}
           />
         )}
 
-        {/* Overlay de gradiente institucional */}
+        {/* Overlay de gradiente */}
         <div
-          className={`absolute inset-0 bg-gradient-to-b from-[var(--gov-green)]/10 via-[var(--gov-green)]/50 to-[#008F5B]/90 transition-opacity duration-300 group-hover:from-[var(--gov-green)]/80 group-hover:via-[var(--gov-green)]/60 group-hover:to-[#008F5B]/80 ${
+          className={`absolute inset-0 bg-gradient-to-t from-black/80 to-transparent flex items-end p-6 transition-all duration-500 ${
             loaded ? "opacity-100" : "opacity-0"
           }`}
-        />
-
-        {/* Contenido */}
-        <div className="relative z-10 flex flex-col items-center justify-center h-full p-8">
-          {!loaded ? (
-            <div className="w-24 h-8 rounded animate-pulse" />
-          ) : (
-            <div className="text-2xl lg:text-2xl font-rutan font-semibold drop-shadow-sm">
+        >
+          {loaded && (
+            <h5 className="text-white font-bold text-lg leading-tight">
               {category.name}
-            </div>
+            </h5>
           )}
         </div>
-      </Card>
+      </div>
     </Link>
   );
 }
+
+export const CategoryCard = memo(CategoryCardComponent);

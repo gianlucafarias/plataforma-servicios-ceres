@@ -2,7 +2,7 @@
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import Image from "next/image";
-import { useState } from "react";
+import { useState, useMemo, useCallback, memo, useEffect } from "react";
 
 interface ProfessionalAvatarProps {
   name: string;
@@ -10,46 +10,92 @@ interface ProfessionalAvatarProps {
   className?: string;
 }
 
-export function ProfessionalAvatar({ name, profilePicture, className }: ProfessionalAvatarProps) {
+// Helper para determinar si es URL externa
+function isExternalUrl(url: string): boolean {
+  return url.startsWith('http://') || url.startsWith('https://');
+}
+
+function ProfessionalAvatarComponent({ name, profilePicture, className }: ProfessionalAvatarProps) {
   const [imageError, setImageError] = useState(false);
-  const [imageLoaded, setImageLoaded] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
 
-  const initials = name.split(' ').map(n => n[0]).join('').toUpperCase();
+  // Memoizar cálculo de iniciales
+  const initials = useMemo(() => 
+    name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2),
+    [name]
+  );
 
-  if (profilePicture && !imageError) {
+  // Determinar la URL de la imagen
+  const imageSrc = useMemo(() => {
+    if (!profilePicture) return null;
+    return isExternalUrl(profilePicture) 
+      ? profilePicture 
+      : `/uploads/profiles/${profilePicture}`;
+  }, [profilePicture]);
+
+  // Marcar como montado solo en el cliente
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  // Resetear error cuando cambia la imagen
+  useEffect(() => {
+    if (imageSrc) {
+      setImageError(false);
+    } else {
+      setImageError(true);
+    }
+  }, [imageSrc]);
+
+  // Handlers
+  const handleError = useCallback(() => {
+    setImageError(true);
+  }, []);
+
+  // Determinar el tamaño del texto según el tamaño del avatar
+  const textSize = useMemo(() => {
+    if (className?.includes('h-8') || className?.includes('w-8')) return 'text-xs';
+    if (className?.includes('h-10') || className?.includes('w-10')) return 'text-sm';
+    if (className?.includes('h-12') || className?.includes('w-12')) return 'text-sm';
+    return 'text-lg';
+  }, [className]);
+
+  // Si hay imagen y no hay error, mostrar la imagen
+  if (imageSrc && !imageError && isMounted) {
     return (
       <Avatar className={className}>
-        <div className="w-full h-full rounded-full overflow-hidden relative">
-          {/* Skeleton mientras carga */}
-          {!imageLoaded && (
-            <div className="absolute inset-0 bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 animate-pulse rounded-full">
-              <div className="w-full h-full flex items-center justify-center">
-                <div className="w-8 h-8 bg-gray-400 rounded-full animate-pulse"></div>
-              </div>
-            </div>
+        <div className="w-full h-full rounded-full overflow-hidden relative bg-gray-100">
+          {isExternalUrl(imageSrc) ? (
+            // Para URLs externas (OAuth), usar img nativo
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={imageSrc}
+              alt={name}
+              className="absolute inset-0 w-full h-full object-cover z-10"
+              onError={handleError}
+            />
+          ) : (
+            <Image
+              src={imageSrc}
+              alt={name}
+              fill
+              className="object-cover z-10"
+              onError={handleError}
+            />
           )}
-          
-          <Image
-            src={`/uploads/profiles/${profilePicture}`}
-            alt={name}
-            width={122}
-            height={122}
-            className={`w-full h-full object-cover transition-opacity duration-300 ${
-              imageLoaded ? 'opacity-100' : 'opacity-0'
-            }`}
-            onError={() => setImageError(true)}
-            onLoad={() => setImageLoaded(true)}
-          />
         </div>
       </Avatar>
     );
   }
 
+  // Fallback: mostrar iniciales si no hay imagen, hay error, o no está montado
   return (
     <Avatar className={className}>
-      <AvatarFallback className="bg-[#006F4B]/10 text-[#006F4B] text-sm font-semibold">
+      <AvatarFallback className={`bg-white text-[#006F4B] ${textSize} font-bold border-2 border-gray-100`}>
         {initials}
       </AvatarFallback>
     </Avatar>
   );
 }
+
+export const ProfessionalAvatar = memo(ProfessionalAvatarComponent);

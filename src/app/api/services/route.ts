@@ -20,6 +20,7 @@ export async function GET(request: NextRequest) {
     const where: Prisma.ServiceWhereInput = {
       available: true,
       professional: { 
+        status: 'active',
         user: { verified: true },
       },
     };
@@ -87,7 +88,7 @@ export async function GET(request: NextRequest) {
               rating: true,
               reviewCount: true,
               ProfilePicture: true,
-              user: { select: { firstName: true, lastName: true, verified: true } },
+              user: { select: { firstName: true, lastName: true, verified: true, location: true } },
             },
           },
         },
@@ -104,8 +105,11 @@ export async function GET(request: NextRequest) {
       priceRange: s.priceRange,
       professional: {
         id: s.professional.id,
-        location: s.professional.location ?? null,
-        user: { name: `${s.professional.user.firstName} ${s.professional.user.lastName}`.trim() },
+        location: s.professional.location ?? s.professional.user.location ?? null,
+        user: { 
+          name: `${s.professional.user.firstName} ${s.professional.user.lastName}`.trim(),
+          location: s.professional.user.location ?? null,
+        },
         rating: s.professional.rating ?? 0,
         reviewCount: s.professional.reviewCount ?? 0,
         verified: s.professional.verified,

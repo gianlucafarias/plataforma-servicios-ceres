@@ -1,7 +1,5 @@
-import { Card, CardContent } from "@/components/ui/card";
 import Image from "next/image";
 import { Badge } from "@/components/ui/badge";
-import { ReviewSection } from "@/components/features/ReviewSection";
 import { ProfessionalAvatar } from "@/components/features/ProfessionalAvatar";
 import { getLocations } from "@/lib/taxonomy";
 import { 
@@ -10,18 +8,28 @@ import {
   Phone,
   Mail,
   Award,
-  CheckCircle,
+  CheckCircle2,
   Instagram,
   Facebook,
-  ExternalLink,
   Linkedin,
   Globe,
-  FileText
+  FileText,
+  Briefcase,
+  CalendarDays,
+  ArrowLeft,
+  Star,
+  MessageCircle,
+  ExternalLink,
+  AlertCircle,
+  Store
 } from "lucide-react";
 import Link from "next/link";
 import WhatsAppIcon from "@/components/ui/whatsapp";
-import type { Review as AppReview } from "@/types";
 import { checkProfessionalAvailability } from "@/lib/availability";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/app/api/auth/options";
+import type { Metadata } from "next";
+import { getBaseUrl, generateProfessionalStructuredData, generateBreadcrumbsStructuredData } from "@/lib/seo";
 
 type TimeSlot = {
   enabled: boolean;
@@ -38,12 +46,14 @@ type DaySchedule = {
 
 type ApiProfessional = {
   id: string;
+  userId?: string;
+  status?: 'pending' | 'active' | 'suspended';
   bio: string;
   experienceYears?: number;
   verified?: boolean;
   rating?: number;
   reviewCount?: number;
-  user: { firstName: string; lastName: string; email: string; phone?: string; verified?: boolean };
+  user: { firstName: string; lastName: string; email: string; phone?: string; verified?: boolean; image?: string; location?: string | null };
   whatsapp?: string;
   instagram?: string;
   facebook?: string;
@@ -56,524 +66,797 @@ type ApiProfessional = {
   specialties?: string[];
   professionalGroup?: 'oficios' | 'profesiones';
   serviceLocations?: string[];
+  hasPhysicalStore?: boolean;
+  physicalStoreAddress?: string;
   schedule?: Record<string, DaySchedule>;
   services: { title: string; description?: string; priceRange?: string; category?: { name?: string; slug?: string } }[];
+  certifications?: Array<{
+    id: string;
+    certificationType: string;
+    certificationNumber: string;
+    issuingOrganization: string;
+    issueDate: string | null;
+    expiryDate: string | null;
+    documentUrl: string | null;
+    category?: { id: string; name: string; slug: string } | null;
+  }>;
 };
+
+// Función helper para obtener datos del profesional
+async function getProfessionalData(id: string): Promise<ApiProfessional | null> {
+  try {
+    const baseUrl = getBaseUrl();
+    const res = await fetch(new URL(`/api/professional/${id}`, baseUrl), { 
+      cache: 'no-store',
+      headers: {
+        'Cache-Control': 'no-store',
+      }
+    });
+    const json: { success: boolean; data?: ApiProfessional } = await res.json();
+    return json?.success && json?.data ? json.data : null;
+  } catch (error) {
+    console.error('Error fetching professional:', error);
+    return null;
+  }
+}
+
+// Generar metadata dinámica para SEO
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
+  const { id } = await params;
+  const data = await getProfessionalData(id);
+  
+  if (!data) {
+    return {
+      title: "Profesional no encontrado",
+      description: "El profesional que buscas no está disponible.",
+    };
+  }
+
+  const baseUrl = getBaseUrl();
+  const professionalName = `${data.user.firstName} ${data.user.lastName}`.trim();
+  const category = data.services[0]?.category?.name || "Profesional";
+  const location = data.location || data.user.location || "Ceres, Santa Fe";
+  const bio = data.bio || `Profesional ${category} en ${location}`;
+  const imageUrl = data.ProfilePicture || data.user.image 
+    ? (data.ProfilePicture?.startsWith('http') 
+        ? data.ProfilePicture 
+        : `${baseUrl}${data.ProfilePicture?.startsWith('/') ? '' : '/'}${data.ProfilePicture || data.user.image}`)
+    : `${baseUrl}/gob_iso.png`;
+  
+  const pageUrl = `${baseUrl}/profesionales/${id}`;
+  const title = `${professionalName} - ${category} en Ceres | Servicios Ceres`;
+  const description = `${bio.substring(0, 155)}${bio.length > 155 ? '...' : ''} | ${location}`;
+
+  return {
+    title,
+    description,
+    alternates: {
+      canonical: pageUrl,
+    },
+    openGraph: {
+      title,
+      description,
+      url: pageUrl,
+      siteName: "Servicios Ceres",
+      locale: "es_AR",
+      type: "profile",
+      images: [
+        {
+          url: imageUrl,
+          width: 400,
+          height: 400,
+          alt: `${professionalName} - ${category}`,
+        },
+      ],
+    },
+    twitter: {
+      card: "summary",
+      title,
+      description,
+      images: [imageUrl],
+    },
+    robots: {
+      index: data.status === 'active',
+      follow: data.status === 'active',
+    },
+  };
+}
 
 export default async function ProfessionalDetailPage({ params }: { params: Promise<{ id: string }>}) {
   const { id } = await params;
+  const session = await getServerSession(authOptions);
 
-  let data: ApiProfessional | null = null;
-  try {
-    const baseUrl =
-      process.env.NEXT_PUBLIC_BASE_URL ||
-      process.env.NEXTAUTH_URL ||
-      (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000');
-    const res = await fetch(new URL(`/api/professional/${id}`, baseUrl), { cache: 'no-store' });
-    const json: { success: boolean; data?: ApiProfessional } = await res.json();
-    if (!json?.success || !json?.data) {
-      return (
-        <div className="min-h-screen bg-gray-50">
-          <div className="container mx-auto px-4 py-8">
-            <p className="text-center text-gray-600">Error al cargar el profesional.</p>
-          </div>
-        </div>
-      );
-    }
-    data = json.data;
-  } catch (error) {
-    console.error('Error fetching professional:', error);
+  const data = await getProfessionalData(id);
+  
+  if (!data) {
     return (
-      <div className="min-h-screen bg-gray-50">
-        <div className="container mx-auto px-4 py-8">
-          <p className="text-center text-gray-600">Error al cargar el profesional.</p>
+      <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-gray-600 mb-4">No se encontró el profesional.</p>
+          <Link href="/profesionales" className="inline-flex items-center gap-2 text-[#006F4B] hover:underline">
+            <ArrowLeft className="h-4 w-4" /> Volver a profesionales
+          </Link>
         </div>
       </div>
     );
   }
 
-  if (!data) {
-    return null;
-  }
+  // Verificar si el perfil está pendiente y si el usuario es el dueño
+  const isPending = data.status === 'pending';
+  const isOwner = session?.user?.id && data.userId === session.user.id;
+  const showPendingOverlay = isPending && isOwner;
 
-  type SocialNetworks = { 
-    instagram?: string; 
-    facebook?: string; 
-    website?: string;
-    linkedin?: string;
-    portfolio?: string;
-    cv?: string;
-    profilePicture?: string;
-  };
-
-  // Función para formatear los horarios
-  const formatSchedule = (scheduleData: Record<string, DaySchedule>) => {
-    const daysMap = {
-      monday: "Lunes",
-      tuesday: "Martes", 
-      wednesday: "Miércoles",
-      thursday: "Jueves",
-      friday: "Viernes",
-      saturday: "Sábado",
-      sunday: "Domingo"
-    };
-
-    const formattedHours: Record<string, string> = {};
-
-    Object.entries(daysMap).forEach(([dayKey]) => {
-      const daySchedule = scheduleData[dayKey];
-      
-      if (!daySchedule) {
-        formattedHours[dayKey] = "No disponible";
-        return;
-      }
-
-      if (daySchedule.fullDay) {
-        formattedHours[dayKey] = "24 horas";
-        return;
-      }
-
-      const morning = daySchedule.morning?.enabled 
-        ? `${daySchedule.morning.start} - ${daySchedule.morning.end}`
-        : null;
-      
-      const afternoon = daySchedule.afternoon?.enabled
-        ? `${daySchedule.afternoon.start} - ${daySchedule.afternoon.end}`
-        : null;
-
-      if (morning && afternoon) {
-        formattedHours[dayKey] = `${morning} / ${afternoon}`;
-      } else if (morning) {
-        formattedHours[dayKey] = morning;
-      } else if (afternoon) {
-        formattedHours[dayKey] = afternoon;
-      } else {
-        formattedHours[dayKey] = "No disponible";
-      }
-    });
-
-    return formattedHours;
-  };
-
-  // Verificar disponibilidad actual
   const availability = checkProfessionalAvailability(data.schedule);
+  const locations = getLocations();
+  
+  // El location puede venir como nombre completo (ej. "Ceres, Santa Fe, Argentina") o como ID
+  // Intentamos usar el location del professional, si no existe usamos el del user
+  const rawLocation = data.location || data.user?.location;
+  let locationName = 'Ceres, Santa Fe, Argentina'; // Default
+  
+  if (rawLocation) {
+    // Si parece ser un ID (solo letras minúsculas, sin comas), buscar en LOCATIONS
+    if (!rawLocation.includes(',')) {
+      const found = locations.find(l => l.id === rawLocation);
+      locationName = found?.name || rawLocation;
+    } else {
+      // Ya es el nombre completo
+      locationName = rawLocation;
+    }
+  }
+  
+  const coverageLocations = data.serviceLocations?.includes('all-region') 
+    ? ['Toda la región']
+    : data.serviceLocations?.filter(locId => locId !== rawLocation).map(locId => {
+        const found = locations.find(l => l.id === locId);
+        return found?.name || locId;
+      }).filter(Boolean) || [];
 
-  const professional = {
-    id: data.id,
+  const p = {
+    name: `${data.user.firstName} ${data.user.lastName}`.trim(),
     bio: data.bio,
-    experienceYears: data.experienceYears ?? 0,
+    years: data.experienceYears ?? 0,
     verified: !!(data.user.verified || data.verified),
     rating: data.rating ?? 0,
-    reviewCount: data.reviewCount ?? 0,
-    professionalGroup: data.professionalGroup,
-    specialties: Array.isArray(data.specialties) ? data.specialties : [],
-    user: {
-      name: `${data.user.firstName} ${data.user.lastName}`.trim(),
-      email: data.user.email,
-      phone: data.user.phone || "",
-      whatsapp: data.whatsapp || data.user.phone || "",
-    },
-    location: data.location || "",
-    serviceLocations: data.serviceLocations || [],
-    services: (data.services || []).map((s: { title: string; description?: string; priceRange?: string; category?: { name?: string; slug?: string } }) => ({
-      title: s.title,
-      description: s.description,
-      priceRange: s.priceRange,
-      category: s.category,
-    })),
-    socialNetworks: {
-      instagram: data.instagram,
-      facebook: data.facebook,
-      website: data.website,
-      linkedin: data.linkedin,
-      portfolio: data.portfolio,
-      cv: data.CV,
-      profilePicture: data.ProfilePicture,
-    } as SocialNetworks,
-    workingHours: data.schedule ? formatSchedule(data.schedule) : {
-      monday: "Todo el día",
-      tuesday: "Todo el día",
-      wednesday: "Todo el día",
-      thursday: "Todo el día",
-      friday: "Todo el día",
-      saturday: "Todo el día",
-      sunday: "Todo el día",
-    },
-    workOnHolidays: data.schedule?.monday?.workOnHolidays || false,
-    availability: availability,
+    reviews: data.reviewCount ?? 0,
+    category: data.services[0]?.category?.name,
+    phone: data.user.phone || "",
+    email: data.user.email,
+    whatsapp: data.whatsapp || data.user.phone || "",
+    location: locationName,
+    coverage: coverageLocations,
+    picture: data.ProfilePicture || data.user.image, // Fallback a imagen de OAuth
+    services: data.services || [],
+    availability,
+    instagram: data.instagram,
+    facebook: data.facebook,
+    linkedin: data.linkedin,
+    website: data.website,
+    portfolio: data.portfolio,
+    cv: data.CV,
+    schedule: data.schedule,
+    holidays: data.schedule?.monday?.workOnHolidays || false,
+    certifications: data.certifications || [],
   };
 
-  const reviews: AppReview[] = [];
+  
+  // Formatear horarios
+  const formatSchedule = () => {
+    if (!p.schedule) return null;
+    
+    const days = [
+      { key: 'monday', short: 'Lun', label: 'Lunes' },
+      { key: 'tuesday', short: 'Mar', label: 'Martes' },
+      { key: 'wednesday', short: 'Mié', label: 'Miércoles' },
+      { key: 'thursday', short: 'Jue', label: 'Jueves' },
+      { key: 'friday', short: 'Vie', label: 'Viernes' },
+      { key: 'saturday', short: 'Sáb', label: 'Sábado' },
+      { key: 'sunday', short: 'Dom', label: 'Domingo' }
+    ];
+
+    return days.map(({ key, short, label }) => {
+      const day = p.schedule?.[key];
+      let time = 'Cerrado';
+      let isOpen = false;
+      
+      if (day?.fullDay) {
+        time = '24h';
+        isOpen = true;
+      } else if (day?.morning?.enabled || day?.afternoon?.enabled) {
+        const parts = [];
+        if (day.morning?.enabled) parts.push(`${day.morning.start}-${day.morning.end}`);
+        if (day.afternoon?.enabled) parts.push(`${day.afternoon.start}-${day.afternoon.end}`);
+        time = parts.join(' / ');
+        isOpen = true;
+      }
+      
+      return { key, short, label, time, isOpen };
+    });
+  };
+
+  const schedule = formatSchedule();
+  const todayIndex = new Date().getDay();
+  const dayKeys = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+  const todayKey = dayKeys[todayIndex];
+
+  // Generar structured data JSON-LD
+  const baseUrl = getBaseUrl();
+  const professionalStructuredData = generateProfessionalStructuredData({
+    id: data.id,
+    name: p.name,
+    bio: p.bio,
+    category: p.category,
+    location: p.location,
+    phone: p.phone,
+    email: p.email,
+    website: p.website,
+    rating: p.rating,
+    reviewCount: p.reviews,
+    services: p.services.map(s => ({ title: s.title, description: s.description })),
+    image: p.picture ? (p.picture.startsWith('http') ? p.picture : `${baseUrl}${p.picture.startsWith('/') ? '' : '/'}${p.picture}`) : undefined,
+  });
+
+  // Breadcrumbs
+  const breadcrumbsData = generateBreadcrumbsStructuredData([
+    { name: "Inicio", url: baseUrl },
+    { name: "Profesionales", url: `${baseUrl}/servicios` },
+    { name: p.name, url: `${baseUrl}/profesionales/${id}` },
+  ]);
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8">
-        <div className="max-w-6xl mx-auto">
-          {/* Breadcrumb */}
-          <nav className="flex items-center space-x-2 text-xs sm:text-sm text-gray-600 sm:mb-6 overflow-x-auto">
-            <Link href="/" className="hover:text-[#006F4B] whitespace-nowrap">Inicio</Link>
-            <span>/</span>
-            <Link href="/profesionales" className="hover:text-[#006F4B] whitespace-nowrap">Profesionales</Link>
-            <span>/</span>
-            <span className="text-gray-900 truncate">{professional.user.name}</span>
-          </nav>
+    <>
+      {/* Structured Data JSON-LD */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(professionalStructuredData) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbsData) }}
+      />
+      
+      <div className="min-h-screen bg-[#f8f9fa]">
+      {/* Banner de perfil pendiente */}
+      {showPendingOverlay && (
+        <div className="bg-gradient-to-r from-amber-500 via-orange-500 to-yellow-500 text-white py-4 px-4">
+          <div className="container mx-auto">
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3 flex-1">
+                <AlertCircle className="h-5 w-5 flex-shrink-0" />
+                <div>
+                  <p className="font-semibold text-sm">Tu perfil está en revisión</p>
+                  <p className="text-xs text-white/90">
+                    Tu perfil está siendo revisado por nuestro equipo. Una vez aprobado, será visible públicamente.
+                  </p>
+                </div>
+              </div>
+              <Link
+                href="/dashboard"
+                className="bg-white text-amber-600 py-2 px-4 rounded-lg font-semibold text-sm hover:bg-gray-100 transition-colors whitespace-nowrap"
+              >
+                Ir al Dashboard
+              </Link>
+            </div>
+          </div>
+        </div>
+      )}
 
-          {/* Header del profesional */}
-          <Card className="rounded-2xl border border-gray-100 mb-8 py-0">
-            <CardContent className="p-4 sm:p-6 lg:p-8">
-              <div className="-mx-4 -mt-4 sm:-mx-6 sm:-mt-6 lg:-mx-8 lg:-mt-8 rounded-t-2xl overflow-hidden">
-                <div className="bg-gradient-to-br from-[var(--gov-green)]/5 to-[var(--gov-yellow)]/10 p-4 sm:p-6 lg:p-8 pb-8 sm:pb-10 mb-5">
-                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-10 items-start">
-                    <div className="lg:col-span-2">
-                      <div className="flex flex-row items-start gap-4 sm:gap-8">
-                        <ProfessionalAvatar
-                          name={professional.user.name}
-                          profilePicture={professional.socialNetworks.profilePicture}
-                          className="h-20 w-20 sm:h-24 sm:w-24 lg:h-28 lg:w-28 mx-auto sm:mx-0 flex-shrink-0"
-                        />
-                        <div className="flex-1 min-w-0 sm:ml-2 mt-1 sm:mt-0">
-                          <div className="flex items-start justify-between">
-                            <div className="text-left w-full">
-                              <div className="flex flex-row items-center gap-2 sm:gap-3">
-                                <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 font-rutan mb-1 sm:mb-0">
-                                  {professional.user.name}
-                                </h1>
-                                {professional.verified && (
-                                  <Image src="/verificado.png" alt="Verified" width={18} height={18} />
-                                )}
-                              </div>
-                              {professional.services[0]?.category?.name && (
-                                <div className="mt-2">
-                                  <Badge variant="outline" className="rounded-xl text-xs bg-white">
-                                    {professional.services[0]?.category?.name}
-                                  </Badge>
-                                </div>
-                              )}
-                            </div>
+      {/* Hero compacto */}
+      <div className="bg-gradient-to-r from-[#006F4B] to-[#00875A]">
+        <div className="container mx-auto px-4 py-6">
+          {/* Back */}
+          <Link 
+            href="/profesionales" 
+            className="inline-flex items-center gap-1.5 text-white/70 hover:text-white text-sm mb-4"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Ver más profesionales
+          </Link>
+
+          <div className="flex flex-col lg:flex-row gap-6 items-start">
+            {/* Info principal */}
+            <div className="flex gap-4 lg:gap-6 flex-1">
+              <div className="relative flex-shrink-0">
+                <ProfessionalAvatar
+                  name={p.name}
+                  profilePicture={p.picture}
+                  className="h-24 w-24 lg:h-28 lg:w-28 ring-4 ring-white/20 shadow-xl"
+                />
+                {p.verified && (
+                  <div
+                    className="absolute -bottom-1 -right-1 lg:-bottom-1 lg:-right-1 bg-white rounded-full p-0.5 shadow-lg z-10"
+                    title="Certificado"
+                    aria-label="Certificado"
+                  >
+                    <Image src="/verificado.png" alt="Certificado" width={24} height={24} className="w-6 h-6 lg:w-6 lg:h-6" />
+                  </div>
+                )}
+              </div>
+              
+              <div className="flex-1 min-w-0 text-white">
+                <h1 className="text-2xl lg:text-3xl font-bold mb-1">{p.name}</h1>
+                <p className="text-white/80 text-lg mb-3">{p.category}</p>
+                
+                <div className="flex flex-wrap gap-2 text-sm">
+                  <span className="inline-flex items-center gap-1.5 bg-white/15 backdrop-blur-sm px-3 py-1.5 rounded-full">
+                    <MapPin className="h-3.5 w-3.5" />
+                    {p.location || "Ceres, Santa Fe, Argentina"}
+                  </span>
+                  <span className="inline-flex items-center gap-1.5 bg-white/15 backdrop-blur-sm px-3 py-1.5 rounded-full">
+                    <Award className="h-3.5 w-3.5" />
+                    {p.years} años exp.
+                  </span>
+                  <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full ${
+                    p.availability.isAvailable 
+                      ? 'bg-green-400/30 text-green-100' 
+                      : 'bg-white/15'
+                  }`}>
+                    <span className={`h-2 w-2 rounded-full ${p.availability.isAvailable ? 'bg-green-400 animate-pulse' : 'bg-white/50'}`} />
+                    {p.availability.isAvailable ? 'Disponible' : 'No disponible'}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* CTAs */}
+            <div className="flex gap-3 w-full lg:w-auto">
+              <a
+                href={`https://wa.me/${p.whatsapp}?text=Hola ${p.name}, vi tu perfil en Servicios Ceres y me gustaría contactarte.`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex-1 lg:flex-none flex items-center justify-center gap-2 bg-white text-[#006F4B] hover:bg-gray-50 py-3 px-6 rounded-xl font-bold transition-all shadow-lg"
+              >
+                <WhatsAppIcon className="h-5 w-5" />
+                <span>Contactar</span>
+              </a>
+              <a
+                href={`tel:${p.phone}`}
+                className="flex items-center justify-center gap-2 bg-white/15 hover:bg-white/25 text-white py-3 px-4 rounded-xl font-medium transition-all border border-white/20"
+                title="Llamar"
+              >
+                <Phone className="h-5 w-5" />
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Contenido */}
+      <div className="container mx-auto px-4 py-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          
+          {/* Columna principal */}
+          <div className="lg:col-span-2 space-y-5">
+            
+            {/* Card: Presentación + Qué hace */}
+            <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
+              {/* Bio */}
+              <div className="p-6 border-b border-gray-100">
+                <p className="text-gray-700 leading-relaxed">{p.bio || 'Este profesional aún no ha agregado una descripción.'}</p>
+              </div>
+              
+              {/* Servicios - Rediseñado */}
+              <div className="p-6">
+                <h2 className="font-bold text-gray-900 mb-4 flex items-center gap-2">
+                  {p.services.length === 1 ? 'Servicio' : 'Servicios'}
+                </h2>
+                
+                <div className="space-y-3">
+                  {p.services.map((service, i) => (
+                    <div key={i} className="group">
+                      <div className="flex items-start gap-3 p-4 rounded-xl bg-gradient-to-r from-[#006F4B]/5 to-transparent border border-[#006F4B]/10 hover:border-[#006F4B]/30 transition-all">
+                        <div className="h-10 w-10 rounded-lg bg-[#006F4B] flex items-center justify-center flex-shrink-0">
+                          <CheckCircle2 className="h-5 w-5 text-white" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between gap-2 mb-1">
+                            <h3 className="font-semibold text-gray-900 text-lg">{service.title}</h3>
+                            {service.priceRange && (
+                              <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100 border-0 text-xs">
+                                {service.priceRange}
+                              </Badge>
+                            )}
                           </div>
-                          <div className="mt-3 sm:mt-4 grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3 text-sm">
-                            
-                            
-                            <div className="flex items-center justify-start gap-2 text-gray-700">
-                              <MapPin className="h-4 w-4" />
-                              <div className="flex flex-col">
-                                <span className="font-medium">
-                                  {professional.location ? getLocations().find(l => l.id === professional.location)?.name || professional.location : 'Ubicación no especificada'}
-                                </span>
-                                {professional.serviceLocations && professional.serviceLocations.length > 0 && (
-                                  <div className="flex flex-wrap gap-1 mt-1">
-                                    {professional.serviceLocations.includes('all-region') ? (
-                                      <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full">
-                                        Toda la región
-                                      </span>
-                                    ) : (
-                                      professional.serviceLocations.map((locationId) => {
-                                        const location = getLocations().find(l => l.id === locationId);
-                                        return location ? (
-                                          <span key={locationId} className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full">
-                                            {location.name}
-                                          </span>
-                                        ) : null;
-                                      })
-                                    )}
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                            <div className="flex items-center justify-start gap-2 text-gray-700">
-                              <Award className="h-4 w-4" />
-                              <span>{professional.experienceYears} año{professional.experienceYears === 1 ? '' : 's'} de experiencia</span>
-                            </div>
-                            <div className={`flex items-center justify-start gap-2 sm:col-span-2 ${professional.availability.isAvailable ? 'text-green-700' : 'text-gray-500'}`}>
-                              <Clock className="h-4 w-4" />
-                              <div className="flex flex-col">
-                                <span className="font-medium">{professional.availability.status}</span>
-                                {professional.availability.reason && !professional.availability.isAvailable && (
-                                  <span className="text-xs opacity-80">{professional.availability.reason}</span>
-                                )}
-                              </div>
-                            </div>
-                          </div>
+                          {service.description ? (
+                            <p className="text-gray-600 text-sm">{service.description}</p>
+                          ) : (
+                            <p className="text-gray-400 text-sm italic">Consultar por este servicio</p>
+                          )}
                         </div>
                       </div>
                     </div>
-                    <div className="space-y-4">
-                      <div className="flex space-x-3">
-                        <a
-                          href={`https://wa.me/${professional.user.whatsapp}?text=Hola ${professional.user.name}, vi tu perfil en Servicios Ceres y me interesa contactarte.`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex-1 bg-gradient-to-r from-green-500 to-green-600 text-white py-4 px-6 rounded-xl font-semibold hover:from-green-600 hover:to-green-700 focus:ring-4 focus:ring-green-100 focus:ring-offset-2 transition-all duration-200 transform flex items-center justify-center"
-                        >
-                          <span className="hidden sm:inline">Contactar por WhatsApp</span>
-                          <span className="sm:hidden">WhatsApp</span>
-                          <WhatsAppIcon className="h-5 w-5 ml-2" />
-                        </a>
-                        <a
-                          href={`tel:${professional.user.phone}`}
-                          className="w-14 h-14 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-all duration-200 flex items-center justify-center"
-                          title="Llamar por teléfono"
-                        >
-                          <Phone className="h-5 w-5" />
-                        </a>
-                      </div>
-                    </div>
+                  ))}
+                </div>
+                
+                {/* CTA secundario */}
+                <div className="mt-5 p-4 bg-gray-50 rounded-xl border border-dashed border-gray-200">
+                  <p className="text-sm text-gray-600 mb-3">
+                    <MessageCircle className="h-4 w-4 inline mr-1.5 text-[#006F4B]" />
+                    ¿Necesitas alguno de estos servicios?
+                  </p>
+                  <a
+                    href={`https://wa.me/${p.whatsapp}?text=Hola ${p.name}, vi tu perfil en Servicios Ceres y me gustaría consultar por tus servicios.`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 bg-[#25D366] text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-[#20BD5C] transition-colors"
+                  >
+                    <WhatsAppIcon className="h-4 w-4" />
+                    Pedir presupuesto
+                  </a>
+                </div>
+              </div>
+            </div>
+
+            {/* Zona de cobertura */}
+            {p.coverage.length > 0 && (
+              <div className="bg-white rounded-2xl shadow-sm p-6">
+                <h2 className="font-bold text-gray-900 mb-3 flex items-center gap-2">
+                  <MapPin className="h-5 w-5 text-[#006F4B]" />
+                  También trabaja en
+                </h2>
+                <div className="flex flex-wrap gap-2">
+                  {p.coverage.map((loc, i) => (
+                    <span key={i} className="inline-flex items-center gap-1.5 bg-blue-50 text-blue-700 px-3 py-1.5 rounded-full text-sm">
+                      <MapPin className="h-3.5 w-3.5" />
+                      {loc}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Local Físico - Solo si tiene */}
+            {data.hasPhysicalStore && data.physicalStoreAddress && (
+              <div className="bg-white rounded-2xl shadow-sm p-6">
+                <h2 className="font-bold text-gray-900 mb-4 flex items-center gap-2">
+                  <Store className="h-5 w-5 text-[#006F4B]" />
+                  Local Físico
+                </h2>
+                <div className="flex items-start gap-3">
+                  <MapPin className="h-5 w-5 text-gray-400 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <p className="text-gray-900 font-medium">{data.physicalStoreAddress}</p>
                   </div>
                 </div>
               </div>
+            )}
 
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-10 mt-0">
-				{/* Descripción y servicios debajo de la cabecera, ocupando todo el ancho */}
-				<div className="lg:col-span-2 mt-5">
-        <h3 className="text-lg font-semibold text-gray-900 mb-3 font-rutan text-left">Descripción</h3>
+            {/* Reseñas - Solo si hay */}
+            {p.reviews > 0 && (
+              <div className="bg-white rounded-2xl shadow-sm p-6">
+                <h2 className="font-bold text-gray-900 mb-4 flex items-center gap-2">
+                  <Star className="h-5 w-5 text-amber-500" />
+                  Opiniones de clientes
+                </h2>
+                <div className="flex items-center gap-4">
+                  <div className="text-center">
+                    <div className="text-4xl font-bold text-gray-900">{p.rating.toFixed(1)}</div>
+                    <div className="flex gap-0.5 justify-center mt-1">
+                      {[1,2,3,4,5].map(star => (
+                        <Star key={star} className={`h-4 w-4 ${star <= p.rating ? 'text-amber-400 fill-amber-400' : 'text-gray-200'}`} />
+                      ))}
+                    </div>
+                    <div className="text-sm text-gray-500 mt-1">{p.reviews} reseñas</div>
+                  </div>
+                </div>
+              </div>
+            )}
 
-				  <p className="text-gray-700 leading-relaxed text-left">
-					{professional.bio}
-				  </p>
+            {/* Certificaciones - Solo si hay certificaciones aprobadas */}
+            {p.certifications && p.certifications.length > 0 && (
+              <div className="bg-white rounded-2xl shadow-sm p-6">
+                <h2 className="font-bold text-gray-900 mb-4 flex items-center gap-2">
+                  <Award className="h-5 w-5 text-[#006F4B]" />
+                  Certificaciones profesionales
+                </h2>
+                <div className="space-y-4">
+                  {p.certifications.map((cert) => {
+                    const getCertificationTypeLabel = (type: string) => {
+                      switch (type) {
+                        case 'matricula':
+                          return 'Matrícula Profesional';
+                        case 'certificado':
+                          return 'Certificado';
+                        case 'licencia':
+                          return 'Licencia';
+                        case 'curso':
+                          return 'Certificado de Curso';
+                        default:
+                          return 'Certificación';
+                      }
+                    };
 
-				  <div className="mt-6">
-					<h3 className="text-lg font-semibold text-gray-900 mb-3 font-rutan text-left">Servicios ofrecidos</h3>
-					<div className="space-y-3">
-					  {professional.services.map((service, index) => (
-						<Card key={index} className="rounded-xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow">
-						  <CardContent className="p-2">
-							<div className="flex items-start gap-3">
-							  <CheckCircle className="h-5 w-5 text-green-600 flex-shrink-0 mt-0.5" />
-							  <div className="flex-1 min-w-0">
-								<div className="flex items-start justify-between gap-3">
-								  <p className="text-sm sm:text-base font-medium text-gray-900 break-words">{service.title}</p>
-								  {service.priceRange && (
-									<span className="text-xs sm:text-sm text-gray-500 whitespace-nowrap">{service.priceRange}</span>
-								  )}
-								</div>
-								{service.description && (
-								  <p className="text-xs sm:text-sm text-gray-600 mt-1">
-									{service.description}
-								  </p>
-								)}
-							  </div>
-							</div>
-						  </CardContent>
-						</Card>
-					  ))}
-					</div>
-				  </div>
-
-				  {/* Sección de cobertura de servicios */}
-				  <div className="mt-8">
-					<h3 className="text-lg font-semibold text-gray-900 mb-4 font-rutan text-left">Ofrece sus servicios en:</h3>
-					<Card className="rounded-2xl p-6">
-					  <CardContent className="p-2">
-            <div className="flex items-start gap-3">
-						<div className="flex-1">
-						  {/* Ubicación principal */}
-						  <div className="mb-3">
-							<span className="inline-flex items-center gap-2 bg-green-100 text-green-800 px-3 py-2 rounded-full text-sm font-medium">
-							  <MapPin className="h-4 w-4" />
-							  {professional.location ? getLocations().find(l => l.id === professional.location)?.name || professional.location : 'No especificada'}
-							</span>
-						  </div>
-
-						  {/* Cobertura de servicios */}
-						  {professional.serviceLocations && professional.serviceLocations.length > 0 ? (
-							<div>
-							  <p className="text-sm text-gray-600 mb-2">También atiende en:</p>
-							  <div className="flex flex-wrap gap-2">
-								{professional.serviceLocations.includes('all-region') ? (
-								  <span className="inline-flex items-center gap-2 bg-gradient-to-r from-green-500 to-green-600 text-white px-4 py-2 rounded-full text-sm font-semibold shadow-md">
-									<MapPin className="h-4 w-4" />
-								Toda la región
-								  </span>
-								) : (
-								  professional.serviceLocations
-									.filter(locationId => locationId !== professional.location) // No mostrar la ubicación principal de nuevo
-									.map((locationId) => {
-									  const location = getLocations().find(l => l.id === locationId);
-									  return location ? (
-										<span key={locationId} className="inline-flex items-center gap-2 bg-blue-100 text-blue-800 px-3 py-2 rounded-full text-sm font-medium">
-										  <MapPin className="h-4 w-4" />
-										  {location.name}
-										</span>
-									  ) : null;
-									})
-								)}
-							  </div>
-							</div>
-						  ) : (
-							<div className="text-sm text-gray-500 italic">
-							  Solo atiende en su ubicación principal
-							</div>
-						  )}
-						</div>
-					  </div>
-            </CardContent>
-					</Card>
-				  </div>
-				</div>
-
-                {/* Sidebar con acciones */}
-                <div className="space-y-4 lg:pl-2">
-                  {/* Botones de contacto directo */}
-                  
-                  
-                      <h3 className="font-semibold text-gray-900 mb-3 text-left">Información de contacto</h3>
-                      <div className="space-y-2 text-sm">
-                        <div className="flex items-center justify-start gap-2 text-gray-700 rounded-xl border border-gray-100 bg-gray-50 px-3 py-2">
-                          <Phone className="h-4 w-4 flex-shrink-0 text-[#006F4B]" />
-                          <span className="break-all">{professional.user.phone}</span>
-                        </div>
-                        <div className="flex items-center justify-start gap-2 text-gray-700 rounded-xl border border-gray-100 bg-gray-50 px-3 py-2">
-                          <Mail className="h-4 w-4 flex-shrink-0 text-[#006F4B]" />
-                          <span className="break-all text-xs sm:text-sm">{professional.user.email}</span>
-                        </div>
-                      </div>
-
-                      {/* Horarios */}
-                      <div className="mt-4">
-                        <h3 className="font-semibold text-gray-900 mb-3 text-left">Horarios</h3>
-                        <div className="space-y-1 text-xs">
-                          {Object.entries({
-                            "Lunes": professional.workingHours.monday,
-                            "Martes": professional.workingHours.tuesday,
-                            "Miércoles": professional.workingHours.wednesday,
-                            "Jueves": professional.workingHours.thursday,
-                            "Viernes": professional.workingHours.friday,
-                            "Sábado": professional.workingHours.saturday,
-                            "Domingo": professional.workingHours.sunday,
-                          }).map(([day, hours]) => {
-                            // Determinar si es el día actual
-                            const today = new Date();
-                            const dayMap = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
-                            const isToday = day === dayMap[today.getDay()];
-                            
-                            return (
-                              <div 
-                                key={day} 
-                                className={`flex items-center justify-between py-1 px-2 rounded-lg ${
-                                  isToday 
-                                    ? 'bg-green-50 border border-green-200' 
-                                    : ''
-                                }`}
-                              >
-                                <span className={`font-medium ${isToday ? 'text-green-800' : 'text-gray-700'}`}>
-                                  {day}
-                                  {isToday && <span className="ml-1 text-green-600">•</span>}
-                                </span>
-                                <span className={`text-xs ${hours === "No disponible" ? "text-gray-500" : "text-green-600"}`}>
-                                  {hours}
-                                </span>
-                              </div>
-                            );
-                          })}
+                    return (
+                      <div
+                        key={cert.id}
+                        className="p-4 rounded-xl border border-gray-200 bg-white"
+                      >
+                        <div className="flex items-start justify-between gap-3 mb-2">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              <Award className="h-4 w-4 text-[#006F4B]" />
+                              <h3 className="font-semibold text-gray-900">
+                                {getCertificationTypeLabel(cert.certificationType)}
+                              </h3>
+                            </div>
+                            {cert.category && (
+                              <p className="text-sm text-gray-600 mb-1">
+                                Categoría: <span className="font-medium">{cert.category.name}</span>
+                              </p>
+                            )}
+                          </div>
                         </div>
                         
-                        {professional.workOnHolidays && (
-                          <div className="mt-2 p-2 bg-green-50 border border-green-200 rounded-lg">
-                            <p className="text-xs text-green-800">
-                              <span className="font-semibold">También trabaja en días feriados</span>
-                            </p>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                          <div>
+                            <p className="text-xs text-gray-500 mb-0.5">Número</p>
+                            <p className="font-medium text-gray-900">{cert.certificationNumber}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-gray-500 mb-0.5">Organización emisora</p>
+                            <p className="font-medium text-gray-900">{cert.issuingOrganization}</p>
+                          </div>
+                          {cert.issueDate && (
+                            <div>
+                              <p className="text-xs text-gray-500 mb-0.5">Fecha de emisión</p>
+                              <p className="font-medium text-gray-900">
+                                {new Date(cert.issueDate).toLocaleDateString('es-AR', {
+                                  year: 'numeric',
+                                  month: 'long',
+                                  day: 'numeric'
+                                })}
+                              </p>
+                            </div>
+                          )}
+                          {cert.expiryDate && (
+                            <div>
+                              <p className="text-xs text-gray-500 mb-0.5">Fecha de vencimiento</p>
+                              <p className="font-medium text-gray-900">
+                                {new Date(cert.expiryDate).toLocaleDateString('es-AR', {
+                                  year: 'numeric',
+                                  month: 'long',
+                                  day: 'numeric'
+                                })}
+                              </p>
+                            </div>
+                          )}
+                        </div>
+
+                        {cert.documentUrl && (
+                          <div className="mt-3 pt-3 border-t border-gray-200">
+                            <a
+                              href={cert.documentUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-2 text-sm text-[#006F4B] hover:underline font-medium"
+                            >
+                              <FileText className="h-4 w-4" />
+                              Ver documento
+                              <ExternalLink className="h-3 w-3" />
+                            </a>
                           </div>
                         )}
                       </div>
-                  
-
-                  {/* Redes sociales y perfil profesional */}
-                  {(professional.socialNetworks.instagram || professional.socialNetworks.facebook || professional.socialNetworks.website || professional.socialNetworks.linkedin || professional.socialNetworks.portfolio || professional.socialNetworks.cv) && (
-                   <div>
-                        <h3 className="font-semibold text-gray-900 mb-3 text-center lg:text-left">Redes sociales y perfil profesional</h3>
-                        <div className="space-y-2">
-                          {professional.socialNetworks.instagram && (
-                            <a
-                              href={`https://instagram.com/${professional.socialNetworks.instagram.replace('@', '')}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="flex items-center gap-2 text-gray-700 rounded-xl border border-gray-100 bg-gray-50 px-3 py-2 hover:bg-pink-50 transition-colors justify-center lg:justify-start"
-                            >
-                              <Instagram className="h-4 w-4 text-pink-600" />
-                              <span className="text-sm">{professional.socialNetworks.instagram}</span>
-                              <ExternalLink className="h-3 w-3" />
-                            </a>
-                          )}
-                          {professional.socialNetworks.facebook && (
-                            <a
-                              href={`https://facebook.com/${professional.socialNetworks.facebook}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="flex items-center gap-2 text-gray-700 rounded-xl border border-gray-100 bg-gray-50 px-3 py-2 hover:bg-blue-50 transition-colors justify-center lg:justify-start"
-                            >
-                              <Facebook className="h-4 w-4 text-blue-600" />
-                              <span className="text-sm">{professional.socialNetworks.facebook}</span>
-                              <ExternalLink className="h-3 w-3" />
-                            </a>
-                          )}
-                          {professional.socialNetworks.linkedin && (
-                            <a
-                              href={`https://linkedin.com/in/${professional.socialNetworks.linkedin.replace('/in/', '').replace('/', '')}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="flex items-center gap-2 text-gray-700 rounded-xl border border-gray-100 bg-gray-50 px-3 py-2 hover:bg-blue-50 transition-colors justify-center lg:justify-start"
-                            >
-                              <Linkedin className="h-4 w-4 text-blue-700" />
-                              <span className="text-sm">LinkedIn</span>
-                              <ExternalLink className="h-3 w-3" />
-                            </a>
-                          )}
-                          {professional.socialNetworks.website && (
-                            <a
-                              href={professional.socialNetworks.website}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="flex items-center gap-2 text-gray-700 rounded-xl border border-gray-100 bg-gray-50 px-3 py-2 hover:bg-green-50 transition-colors justify-center lg:justify-start"
-                            >
-                              <Globe className="h-4 w-4 text-[#006F4B]" />
-                              <span className="text-sm">Sitio web</span>
-                              <ExternalLink className="h-3 w-3" />
-                            </a>
-                          )}
-                          {professional.socialNetworks.portfolio && (
-                            <a
-                              href={professional.socialNetworks.portfolio}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="flex items-center gap-2 text-gray-700 rounded-xl border border-gray-100 bg-gray-50 px-3 py-2 hover:bg-purple-50 transition-colors justify-center lg:justify-start"
-                            >
-                              <Globe className="h-4 w-4 text-purple-600" />
-                              <span className="text-sm">Portfolio</span>
-                              <ExternalLink className="h-3 w-3" />
-                            </a>
-                          )}
-                          {professional.socialNetworks.cv && (
-                            <a
-                              href={`/uploads/profiles/${professional.socialNetworks.cv}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="flex items-center gap-2 text-gray-700 rounded-xl border border-gray-100 bg-gray-50 px-3 py-2 hover:bg-blue-50 transition-colors justify-center lg:justify-start cursor-pointer"
-                            >
-                              <FileText className="h-4 w-4 text-blue-600" />
-                              <span className="text-sm">Ver CV</span>
-                              <ExternalLink className="h-3 w-3" />
-                            </a>
-                          )}
-                        </div>
-                        </div>
-                  )}
-
-
+                    );
+                  })}
                 </div>
               </div>
-            </CardContent>
-          </Card>
+            )}
+          </div>
 
-          {/* Sección de Reseñas */}
-          <div className="mt-8">
-            <ReviewSection 
-              reviews={reviews}
-              averageRating={professional.rating}
-              totalReviews={professional.reviewCount}
-            />
+          {/* Sidebar */}
+          <div className="space-y-5">
+            
+            {/* Contacto directo */}
+            <div className="bg-white rounded-2xl shadow-sm p-5">
+              <h3 className="font-bold text-gray-900 mb-4 flex items-center gap-2">
+                <Phone className="h-5 w-5 text-[#006F4B]" />
+                Contacto directo
+              </h3>
+              <div className="space-y-3">
+                <a 
+                  href={`tel:${p.phone}`}
+                  className="flex items-center gap-3 p-3 rounded-xl bg-gray-50 hover:bg-[#006F4B]/5 transition-colors group"
+                >
+                  <div className="h-10 w-10 rounded-full bg-[#006F4B]/10 flex items-center justify-center group-hover:bg-[#006F4B]/20 transition-colors">
+                    <Phone className="h-5 w-5 text-[#006F4B]" />
+                  </div>
+                  <div>
+                    <div className="font-semibold text-gray-900">{p.phone}</div>
+                    <div className="text-xs text-gray-500">Llamar ahora</div>
+                  </div>
+                </a>
+                <a 
+                  href={`mailto:${p.email}`}
+                  className="flex items-center gap-3 p-3 rounded-xl bg-gray-50 hover:bg-[#006F4B]/5 transition-colors group"
+                >
+                  <div className="h-10 w-10 rounded-full bg-[#006F4B]/10 flex items-center justify-center group-hover:bg-[#006F4B]/20 transition-colors">
+                    <Mail className="h-5 w-5 text-[#006F4B]" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="font-semibold text-gray-900 truncate text-sm">{p.email}</div>
+                    <div className="text-xs text-gray-500">Enviar email</div>
+                  </div>
+                </a>
+
+                {/* Redes sociales */}
+                {p.instagram && (
+                  <a
+                    href={`https://instagram.com/${p.instagram.replace('@', '')}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-3 p-3 rounded-xl bg-gray-50 hover:bg-[#006F4B]/5 transition-colors group"
+                  >
+                    <div className="h-10 w-10 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
+                      <Instagram className="h-5 w-5 text-white" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="font-semibold text-gray-900 text-sm">Instagram</div>
+                      <div className="text-xs text-gray-500 truncate">{p.instagram}</div>
+                    </div>
+                    <ExternalLink className="h-4 w-4 text-gray-400" />
+                  </a>
+                )}
+                {p.facebook && (
+                  <a
+                    href={`https://facebook.com/${p.facebook}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-3 p-3 rounded-xl bg-gray-50 hover:bg-[#006F4B]/5 transition-colors group"
+                  >
+                    <div className="h-10 w-10 rounded-full bg-blue-600 flex items-center justify-center">
+                      <Facebook className="h-5 w-5 text-white" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="font-semibold text-gray-900 text-sm">Facebook</div>
+                      <div className="text-xs text-gray-500 truncate">{p.facebook}</div>
+                    </div>
+                    <ExternalLink className="h-4 w-4 text-gray-400" />
+                  </a>
+                )}
+                {p.linkedin && (
+                  <a
+                    href={`https://linkedin.com/in/${p.linkedin.replace('/in/', '').replace('/', '')}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-3 p-3 rounded-xl bg-gray-50 hover:bg-[#006F4B]/5 transition-colors group"
+                  >
+                    <div className="h-10 w-10 rounded-full bg-blue-700 flex items-center justify-center">
+                      <Linkedin className="h-5 w-5 text-white" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="font-semibold text-gray-900 text-sm">LinkedIn</div>
+                      <div className="text-xs text-gray-500 truncate">{p.linkedin}</div>
+                    </div>
+                    <ExternalLink className="h-4 w-4 text-gray-400" />
+                  </a>
+                )}
+                {p.website && (
+                  <a
+                    href={p.website}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-3 p-3 rounded-xl bg-gray-50 hover:bg-[#006F4B]/5 transition-colors group"
+                  >
+                    <div className="h-10 w-10 rounded-full bg-gray-700 flex items-center justify-center">
+                      <Globe className="h-5 w-5 text-white" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="font-semibold text-gray-900 text-sm">Sitio web</div>
+                      <div className="text-xs text-gray-500 truncate">{p.website}</div>
+                    </div>
+                    <ExternalLink className="h-4 w-4 text-gray-400" />
+                  </a>
+                )}
+              </div>
+            </div>
+
+            {/* Horarios */}
+            <div className="bg-white rounded-2xl shadow-sm p-5">
+              <h3 className="font-bold text-gray-900 mb-4 flex items-center gap-2">
+                <CalendarDays className="h-5 w-5 text-[#006F4B]" />
+                Horarios
+              </h3>
+              
+              {schedule ? (
+                <div className="space-y-1">
+                  {schedule.map(({ key, short, time, isOpen }) => {
+                    const isToday = key === todayKey;
+                    return (
+                      <div 
+                        key={key}
+                        className={`flex justify-between items-center py-2 px-3 rounded-lg text-sm ${
+                          isToday ? 'bg-[#006F4B]/10 font-medium' : ''
+                        }`}
+                      >
+                        <span className={isToday ? 'text-[#006F4B]' : 'text-gray-700'}>
+                          {short}
+                          {isToday && <span className="ml-1 text-[10px] bg-[#006F4B] text-white px-1.5 py-0.5 rounded uppercase">Hoy</span>}
+                        </span>
+                        <span className={isOpen ? (isToday ? 'text-[#006F4B]' : 'text-gray-600') : 'text-gray-400'}>
+                          {time}
+                        </span>
+                      </div>
+                    );
+                  })}
+                  {p.holidays && (
+                    <div className="mt-3 text-xs text-green-600 flex items-center gap-1">
+                      <CheckCircle2 className="h-3.5 w-3.5" />
+                      Atiende feriados
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="text-center py-4">
+                  <Clock className="h-8 w-8 text-gray-300 mx-auto mb-2" />
+                  <p className="text-sm text-gray-500">Consultar disponibilidad</p>
+                  <a
+                    href={`https://wa.me/${p.whatsapp}?text=Hola ${p.name}, quería consultar tu disponibilidad horaria.`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 text-[#006F4B] text-sm font-medium mt-2 hover:underline"
+                  >
+                    <WhatsAppIcon className="h-4 w-4" />
+                    Preguntar
+                  </a>
+                </div>
+              )}
+            </div>
+
+            {/* Perfil profesional */}
+            {(p.portfolio || p.cv) && (
+              <div className="bg-white rounded-2xl shadow-sm p-5">
+                <h3 className="font-bold text-gray-900 mb-4 flex items-center gap-2">
+                  <Briefcase className="h-5 w-5 text-[#006F4B]" />
+                  Perfil profesional
+                </h3>
+                
+                <div className="space-y-2">
+                  {p.portfolio && (
+                    <a
+                      href={p.portfolio}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-3 p-2.5 rounded-lg hover:bg-gray-50 transition-colors"
+                    >
+                      <div className="h-9 w-9 rounded-lg bg-purple-600 flex items-center justify-center">
+                        <Briefcase className="h-5 w-5 text-white" />
+                      </div>
+                      <span className="text-sm font-medium text-gray-700 flex-1">Portfolio</span>
+                      <ExternalLink className="h-4 w-4 text-gray-400" />
+                    </a>
+                  )}
+                  {p.cv && (
+                    <a
+                      href={`/uploads/profiles/${p.cv}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-3 p-2.5 rounded-lg hover:bg-gray-50 transition-colors"
+                    >
+                      <div className="h-9 w-9 rounded-lg bg-red-500 flex items-center justify-center">
+                        <FileText className="h-5 w-5 text-white" />
+                      </div>
+                      <span className="text-sm font-medium text-gray-700 flex-1">Curriculum Vitae</span>
+                      <ExternalLink className="h-4 w-4 text-gray-400" />
+                    </a>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Sin reseñas aún - mensaje pequeño */}
+            {p.reviews === 0 && (
+              <div className="bg-amber-50 border border-amber-100 rounded-2xl p-4 text-center">
+                <Star className="h-6 w-6 text-amber-400 mx-auto mb-2" />
+                <p className="text-sm text-amber-800 font-medium">Sé el primero en dejar una reseña</p>
+                <p className="text-xs text-amber-600 mt-1">Ayuda a otros usuarios compartiendo tu experiencia</p>
+              </div>
+            )}
+
           </div>
         </div>
       </div>
     </div>
+    </>
   );
 }

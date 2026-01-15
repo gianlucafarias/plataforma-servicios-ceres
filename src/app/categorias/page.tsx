@@ -4,8 +4,10 @@ import { Button } from "@/components/ui/button";
 import { ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { SUBCATEGORIES_OFICIOS, AREAS_OFICIOS } from "@/lib/taxonomy";
-// Datos mock de categorías expandidas
+import type { Metadata } from "next";
+import { getAbsoluteUrl } from "@/lib/seo";
 
+// Datos mock de categorías expandidas
 const categories = AREAS_OFICIOS.map((category) => ({
   id: category.id,
   name: category.name,
@@ -13,6 +15,27 @@ const categories = AREAS_OFICIOS.map((category) => ({
   services: SUBCATEGORIES_OFICIOS.filter((s) => s.areaSlug === category.slug),
   group: 'oficios'
 }));
+
+export const metadata: Metadata = {
+  title: "Categorías de Servicios en Ceres",
+  description: "Explora todas las categorías de servicios profesionales disponibles en Ceres. Encuentra plomeros, electricistas, albañiles y más profesionales verificados.",
+  alternates: {
+    canonical: getAbsoluteUrl("/categorias"),
+  },
+  openGraph: {
+    title: "Categorías de Servicios en Ceres | Servicios Ceres",
+    description: "Explora todas las categorías de servicios profesionales disponibles en Ceres. Encuentra exactamente lo que necesitas.",
+    url: getAbsoluteUrl("/categorias"),
+    siteName: "Servicios Ceres",
+    locale: "es_AR",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Categorías de Servicios en Ceres",
+    description: "Explora todas las categorías de servicios profesionales disponibles en Ceres.",
+  },
+};
 
 export default function CategoriasPage() {
 
@@ -58,7 +81,7 @@ export default function CategoriasPage() {
                   
                   <CardContent>
                     <p className="text-gray-600 text-sm leading-relaxed mb-4">
-                     Descripcion de ctagoria
+                      Profesionales especializados en {category.name.toLowerCase()} disponibles en Ceres y la región.
                     </p>
                     
                     <div className="mb-4">

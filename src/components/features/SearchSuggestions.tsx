@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useMemo, useEffect, useRef, useCallback, memo } from "react";
 import { SUBCATEGORIES_OFICIOS, SUBCATEGORIES_PROFESIONES, AREAS_OFICIOS, Subcategory, Area } from "@/lib/taxonomy";
 import Link from "next/link";
 import { Search, Building2, User } from "lucide-react";
@@ -16,33 +16,36 @@ interface SearchResult {
   parentArea?: Area;
 }
 
-export function SearchSuggestions({ query, isVisible, onSelect, onClose }: SearchSuggestionsProps) {
-  const [results, setResults] = useState<SearchResult[]>([]);
+// Pre-calcular mapa de áreas para búsqueda O(1)
+const AREAS_MAP = new Map(AREAS_OFICIOS.map(area => [area.slug, area]));
+
+function SearchSuggestionsComponent({ query, isVisible, onSelect, onClose }: SearchSuggestionsProps) {
   const containerRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (!query.trim() || query.length < 1) {
-      setResults([]);
-      return;
+  // Memoizar resultados de búsqueda
+  const results = useMemo(() => {
+    const trimmed = query.trim();
+    if (!trimmed || trimmed.length < 1) {
+      return [];
     }
 
-    const searchTerm = query.toLowerCase();
+    const searchTerm = trimmed.toLowerCase();
     const searchResults: SearchResult[] = [];
 
     // Buscar en subcategorías de oficios
-    SUBCATEGORIES_OFICIOS.forEach(subcategory => {
+    for (const subcategory of SUBCATEGORIES_OFICIOS) {
       if (subcategory.name.toLowerCase().includes(searchTerm)) {
-        const parentArea = AREAS_OFICIOS.find(area => area.slug === subcategory.areaSlug);
+        const parentArea = subcategory.areaSlug ? AREAS_MAP.get(subcategory.areaSlug) : undefined;
         searchResults.push({
           type: 'subcategory',
           item: subcategory,
           parentArea
         });
       }
-    });
+    }
 
     // Buscar en subcategorías de profesiones
-    SUBCATEGORIES_PROFESIONES.forEach(subcategory => {
+    for (const subcategory of SUBCATEGORIES_PROFESIONES) {
       if (subcategory.name.toLowerCase().includes(searchTerm)) {
         searchResults.push({
           type: 'subcategory',
@@ -50,10 +53,10 @@ export function SearchSuggestions({ query, isVisible, onSelect, onClose }: Searc
           parentArea: undefined
         });
       }
-    });
+    }
 
     // Buscar en áreas directamente
-    AREAS_OFICIOS.forEach(area => {
+    for (const area of AREAS_OFICIOS) {
       if (area.name.toLowerCase().includes(searchTerm)) {
         searchResults.push({
           type: 'area',
@@ -61,40 +64,32 @@ export function SearchSuggestions({ query, isVisible, onSelect, onClose }: Searc
           parentArea: undefined
         });
       }
-    });
+    }
 
     // Limitar a 8 resultados
-    setResults(searchResults.slice(0, 8));
+    return searchResults.slice(0, 8);
   }, [query]);
 
+  // Click outside handler
   useEffect(() => {
+    if (!isVisible) return;
+
     const handleClickOutside = (event: MouseEvent) => {
       if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
         onClose();
       }
     };
 
-    if (isVisible) {
-      document.addEventListener('mousedown', handleClickOutside);
-    }
-
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [isVisible, onClose]);
 
-  if (!isVisible || results.length === 0) {
-    return null;
-  }
+  // Memoizar handlers
+  const handleSuggestionClick = useCallback((result: SearchResult) => {
+    onSelect(result.item.name);
+  }, [onSelect]);
 
-  const handleSuggestionClick = (result: SearchResult) => {
-    const suggestionText = result.type === 'subcategory' 
-      ? result.item.name 
-      : result.item.name;
-    onSelect(suggestionText);
-  };
-
-  const getSuggestionLink = (result: SearchResult) => {
+  const getSuggestionLink = useCallback((result: SearchResult) => {
     if (result.type === 'subcategory') {
       const subcategory = result.item as Subcategory;
       if (subcategory.group === 'oficios' && result.parentArea) {
@@ -107,7 +102,11 @@ export function SearchSuggestions({ query, isVisible, onSelect, onClose }: Searc
       return `/servicios?grupo=${area.group}&categoria=${area.slug}`;
     }
     return '#';
-  };
+  }, []);
+
+  if (!isVisible || results.length === 0) {
+    return null;
+  }
 
   return (
     <div 
@@ -156,3 +155,5 @@ export function SearchSuggestions({ query, isVisible, onSelect, onClose }: Searc
     </div>
   );
 }
+
+export const SearchSuggestions = memo(SearchSuggestionsComponent);

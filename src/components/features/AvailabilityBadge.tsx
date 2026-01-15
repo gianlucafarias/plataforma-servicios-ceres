@@ -1,6 +1,7 @@
 import { Badge } from "@/components/ui/badge";
 import { Clock } from "lucide-react";
 import { checkProfessionalAvailability, type ProfessionalSchedule } from "@/lib/availability";
+import { useMemo, memo } from "react";
 
 interface AvailabilityBadgeProps {
   schedule?: ProfessionalSchedule | null;
@@ -9,37 +10,30 @@ interface AvailabilityBadgeProps {
   showReason?: boolean;
 }
 
-export function AvailabilityBadge({ 
+function AvailabilityBadgeComponent({ 
   schedule, 
   variant = 'default',
   showIcon = true,
   showReason = false
 }: AvailabilityBadgeProps) {
-  const availability = checkProfessionalAvailability(schedule);
+  // Memoizar el cálculo de disponibilidad
+  const availability = useMemo(() => 
+    checkProfessionalAvailability(schedule),
+    [schedule]
+  );
 
-  const getVariant = () => {
-    if (availability.isAvailable) {
-      return 'default';
-    }
-    return 'destructive';
-  };
-
-  const getClassName = () => {
-    const baseClasses = "text-xs";
-    
-    if (variant === 'compact') {
-      return `${baseClasses} px-2 py-1`;
-    }
-    
-    return `${baseClasses} px-3 py-1`;
-  };
+  const badgeVariant = availability.isAvailable ? 'default' : 'destructive';
+  
+  const className = variant === 'compact' 
+    ? "text-xs px-2 py-1" 
+    : "text-xs px-3 py-1";
 
   if (variant === 'detailed' && showReason && availability.reason && !availability.isAvailable) {
     return (
       <div className="flex flex-col gap-1">
         <Badge 
-          variant={getVariant()} 
-          className={getClassName()}
+          variant={badgeVariant} 
+          className={className}
         >
           {showIcon && <Clock className="h-3 w-3 mr-1" />}
           {availability.status}
@@ -51,11 +45,13 @@ export function AvailabilityBadge({
 
   return (
     <Badge 
-      variant={getVariant()} 
-      className={getClassName()}
+      variant={badgeVariant} 
+      className={className}
     >
       {showIcon && <Clock className="h-3 w-3 mr-1" />}
       {availability.status}
     </Badge>
   );
 }
+
+export const AvailabilityBadge = memo(AvailabilityBadgeComponent);

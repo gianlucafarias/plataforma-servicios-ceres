@@ -5,6 +5,7 @@ import bcrypt from 'bcryptjs';
 import { prisma } from '@/lib/prisma';
 import { generateRandomToken } from '@/lib/utils';
 import { enqueueEmailVerify } from '@/jobs/email.producer';
+import { enqueueSlackAlert } from '@/jobs/slack.producer';
 
 
 export async function POST(request: NextRequest) {
@@ -35,6 +36,8 @@ export async function POST(request: NextRequest) {
       experienceYears?: number;
       professionalGroup?: CategoryGroup;
       serviceLocations?: string[];
+      hasPhysicalStore?: boolean;
+      physicalStoreAddress?: string;
       services?: ServiceFormInput[];
     }
 
@@ -58,6 +61,8 @@ export async function POST(request: NextRequest) {
       experienceYears,
       professionalGroup,
       serviceLocations,
+      hasPhysicalStore,
+      physicalStoreAddress,
       services,
     }: RegisterRequestPayload = await request.json();
 
@@ -166,6 +171,8 @@ export async function POST(request: NextRequest) {
             CV: cv || null,
             ProfilePicture: picture || null,
             serviceLocations: serviceLocations || [],
+            hasPhysicalStore: hasPhysicalStore || false,
+            physicalStoreAddress: hasPhysicalStore ? physicalStoreAddress : null,
             services: servicesCreateData && servicesCreateData.length > 0 ? {
               create: servicesCreateData,
             } : undefined,
@@ -207,6 +214,19 @@ export async function POST(request: NextRequest) {
         const origin = baseUrl.startsWith('http') ? baseUrl : `https://${baseUrl}`;
         const verifyUrl = `${origin}/auth/verify?token=${encodeURIComponent(result.token)}&email=${encodeURIComponent(userWithoutPassword.email)}`;
         console.log('Verification URL (dev):', verifyUrl);
+      }
+    }
+
+    // Notificar a Slack cuando se registre un nuevo profesional pendiente
+    if (result.professional) {
+      try {
+        await enqueueSlackAlert(
+          `prof:new:${result.professional.id}`,
+          `🔔 Nuevo profesional registrado (pendiente):\n*${userWithoutPassword.firstName} ${userWithoutPassword.lastName}*\nEmail: ${userWithoutPassword.email}\nGrupo: ${result.professional.professionalGroup || 'N/A'}\nServicios: ${services?.length || 0}`
+        );
+      } catch (slackError) {
+        // No fallar si Slack falla
+        console.error('Error enviando alerta a Slack:', slackError);
       }
     }
 

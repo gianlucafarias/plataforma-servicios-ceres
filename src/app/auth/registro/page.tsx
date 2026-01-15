@@ -2,6 +2,7 @@
 
 import { useMemo, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { signIn } from "next-auth/react";
 import { useAuth } from "@/hooks/useAuth";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -9,11 +10,29 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
+import { Button } from "@/components/ui/button";
 import { GROUPS, getAreasByGroup, getSubcategories, getLocations, getGenders } from "@/lib/taxonomy";
 import type { CategoryGroup } from "@/types";
-import { Eye, EyeOff, User, Mail, Lock, Phone, Building2, Award, Send, ArrowLeft, CheckCircle, MapPin, CircleUser, Upload, FileText, Globe, Linkedin, Instagram, Facebook, MessageCircle } from "lucide-react";
+import { Eye, EyeOff, User, Mail, Lock, Phone, Building2, Award, Send, ArrowLeft, CheckCircle, MapPin, CircleUser, Upload, FileText, Globe, Linkedin, Instagram, Facebook, MessageCircle, Store } from "lucide-react";
 import Link from "next/link";
 import { DateBirthPicker } from "./_components/date-birth-picker";
+
+// Iconos de redes sociales
+const GoogleIcon = () => (
+  <svg viewBox="0 0 24 24" className="w-5 h-5" fill="currentColor">
+    <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+    <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+    <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
+    <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+  </svg>
+);
+
+const FacebookIcon = () => (
+  <svg viewBox="0 0 24 24" className="w-5 h-5" fill="#1877F2">
+    <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+  </svg>
+);
 
 export default function RegistroPage() {
   const router = useRouter();
@@ -29,7 +48,7 @@ export default function RegistroPage() {
     email: "",
     confirmEmail: "",
     phone: "",
-    location: "ceres",
+    location: "",
     password: "",
     confirmPassword: "",
     acceptTerms: false,
@@ -49,6 +68,8 @@ export default function RegistroPage() {
     specialties: [] as string[],
     professionalGroup: "" as "" | CategoryGroup,
     serviceLocations: [] as string[], // Lugares donde ofrece servicios
+    hasPhysicalStore: false,
+    physicalStoreAddress: "",
     
     // Paso 3: Servicios
     services: [
@@ -60,20 +81,46 @@ export default function RegistroPage() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [errors, setErrors] = useState<{[key: string]: string}>({});
   const [isLoading, setIsLoading] = useState(false);
+  const [socialLoading, setSocialLoading] = useState<string | null>(null);
 
   const areas = useMemo(() => getAreasByGroup(formData.professionalGroup as CategoryGroup), [formData.professionalGroup]);
   const locations = useMemo(() => getLocations(), []);
   const genders = useMemo(() => getGenders(), []);
 
+  // Registrarse con redes sociales y luego completar perfil profesional
+  const handleSocialRegister = async (provider: "google" | "facebook") => {
+    setSocialLoading(provider);
+    try {
+      // Redirige a OAuth y luego a completar-perfil
+      await signIn(provider, { callbackUrl: "/auth/completar-perfil" });
+    } catch (err) {
+      console.error(`Error con ${provider}:`, err);
+      setSocialLoading(null);
+    }
+  };
+
   // Inicializar serviceLocations con la localidad principal cuando cambie
   useEffect(() => {
-    if (formData.location && !formData.serviceLocations.includes(formData.location)) {
-      setFormData(prev => ({
-        ...prev,
-        serviceLocations: [formData.location, ...prev.serviceLocations]
-      }));
+    if (formData.location) {
+      setFormData(prev => {
+        // Si la localidad principal no está en serviceLocations, agregarla al inicio
+        if (!prev.serviceLocations.includes(formData.location)) {
+          return {
+            ...prev,
+            serviceLocations: [formData.location, ...prev.serviceLocations.filter(loc => loc !== formData.location)]
+          };
+        }
+        // Si la localidad principal cambió, actualizar serviceLocations
+        if (prev.serviceLocations[0] !== formData.location) {
+          return {
+            ...prev,
+            serviceLocations: [formData.location, ...prev.serviceLocations.filter(loc => loc !== formData.location)]
+          };
+        }
+        return prev;
+      });
     }
-  }, [formData.location, formData.serviceLocations]);
+  }, [formData.location]);
 
   const steps = [
     { id: 1, title: "Datos Personales", description: "Información básica" },
@@ -183,6 +230,7 @@ export default function RegistroPage() {
       newErrors.confirmEmail = "Los emails no coinciden";
     }
     if (!formData.phone.trim()) newErrors.phone = "El teléfono es requerido";
+    if (!formData.location.trim()) newErrors.location = "La localidad es requerida";
     if (!formData.password.trim()) {
       newErrors.password = "La contraseña es requerida";
     } else if (formData.password.length < 6) {
@@ -289,6 +337,7 @@ export default function RegistroPage() {
         bio: formData.bio,
         experienceYears: parseInt(String(formData.experienceYears || '0')),
         professionalGroup: formData.professionalGroup as CategoryGroup,
+        serviceLocations: formData.serviceLocations,
         // Campos de redes sociales
         whatsapp: formData.whatsapp,
         instagram: formData.instagram,
@@ -298,6 +347,9 @@ export default function RegistroPage() {
         portfolio: formData.portfolio,
         cv: formData.cv,
         picture: formData.picture,
+        // Local físico
+        hasPhysicalStore: formData.hasPhysicalStore,
+        physicalStoreAddress: formData.physicalStoreAddress,
         services: formData.services.map((s) => ({
           categoryId: s.categoryId,
           title: s.title,
@@ -367,6 +419,57 @@ export default function RegistroPage() {
         <p className="text-gray-600">
           Completa tus datos básicos
         </p>
+      </div>
+
+      {/* Registro rápido con redes sociales */}
+      <div className="bg-gray-50 rounded-xl p-5 border border-gray-100">
+        <p className="text-sm text-center text-gray-600 mb-4">
+          <span className="font-medium text-gray-900">Registro rápido:</span> Usá tu cuenta de Google o Facebook
+        </p>
+        <div className="grid grid-cols-2 gap-3">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => handleSocialRegister("google")}
+            disabled={isLoading || socialLoading !== null}
+            className="h-11 rounded-xl border-2 border-gray-200 hover:border-gray-300 hover:bg-white font-medium transition-all"
+          >
+            {socialLoading === "google" ? (
+              <div className="w-5 h-5 border-2 border-gray-300 border-t-gray-600 rounded-full animate-spin" />
+            ) : (
+              <>
+                <GoogleIcon />
+                <span className="ml-2">Google</span>
+              </>
+            )}
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => handleSocialRegister("facebook")}
+            disabled={isLoading || socialLoading !== null}
+            className="h-11 rounded-xl border-2 border-gray-200 hover:border-[#1877F2] hover:bg-blue-50 font-medium transition-all"
+          >
+            {socialLoading === "facebook" ? (
+              <div className="w-5 h-5 border-2 border-blue-300 border-t-blue-600 rounded-full animate-spin" />
+            ) : (
+              <>
+                <FacebookIcon />
+                <span className="ml-2">Facebook</span>
+              </>
+            )}
+          </Button>
+        </div>
+        <p className="text-xs text-center text-gray-500 mt-3">
+          Después de autenticarte, completarás tu perfil profesional
+        </p>
+      </div>
+
+      {/* Divider */}
+      <div className="flex items-center gap-4">
+        <div className="flex-1 h-px bg-gray-200"></div>
+        <span className="text-gray-400 text-sm">o completá el formulario</span>
+        <div className="flex-1 h-px bg-gray-200"></div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -508,29 +611,31 @@ export default function RegistroPage() {
         {errors.phone && <p className="text-red-600 text-sm mt-1">{errors.phone}</p>}
       </div>
       <div>
-        <Label htmlFor="phone" className="text-sm font-semibold text-gray-700">
-          Localidad
+        <Label htmlFor="location" className="text-sm font-semibold text-gray-700">
+          Localidad Principal *
         </Label>
         <div className="relative mt-1">
-        <MapPin className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-
+          <MapPin className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 z-10" />
           <Select
-                        value={formData.location}
-                    onValueChange={(value) => handleInputChange('location', value)}
-                  >
-
-                    <SelectTrigger className="w-full pl-10 rounded-lg border-2 focus:ring-4 focus:ring-green-100 focus:border-[#006F4B] transition-all duration-200">
-
-                      <SelectValue placeholder="Selecciona una localidad" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {locations.map((a) => (
-                        <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+            value={formData.location}
+            onValueChange={(value) => handleInputChange('location', value)}
+          >
+            <SelectTrigger className={`w-full pl-10 rounded-lg border-2 focus:ring-4 focus:ring-green-100 focus:border-[#006F4B] transition-all duration-200 ${
+              errors.location ? 'border-red-300' : 'border-gray-200'
+            }`}>
+              <SelectValue placeholder="Selecciona tu localidad principal" />
+            </SelectTrigger>
+            <SelectContent>
+              {locations.map((location) => (
+                <SelectItem key={location.id} value={location.id}>{location.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
-        {errors.phone && <p className="text-red-600 text-sm mt-1">{errors.phone}</p>}
+        {errors.location && <p className="text-red-600 text-sm mt-1">{errors.location}</p>}
+        <p className="text-xs text-gray-500 mt-1">
+          Selecciona la localidad donde resides. Podrás agregar más localidades donde ofreces servicios en el siguiente paso.
+        </p>
       </div>
         </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -868,6 +973,52 @@ export default function RegistroPage() {
           </div>
         </div>
 
+        {/* Local Físico */}
+        <div className="mt-6 pt-6 border-t border-gray-200">
+          <div className="mb-4">
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">
+              Local Físico
+            </h3>
+            <p className="text-sm text-gray-600">
+              Si tenés un local físico, podés agregar la dirección (opcional)
+            </p>
+          </div>
+
+          <div className="space-y-4">
+            <div className="flex items-center space-x-3">
+              <Switch
+                id="hasPhysicalStore"
+                checked={formData.hasPhysicalStore}
+                onCheckedChange={(checked) => handleInputChange('hasPhysicalStore', checked)}
+              />
+              <Label htmlFor="hasPhysicalStore" className="text-sm font-semibold text-gray-700 cursor-pointer">
+                Tengo un local físico
+              </Label>
+            </div>
+
+            {formData.hasPhysicalStore && (
+              <div>
+                <Label htmlFor="physicalStoreAddress" className="text-sm font-semibold text-gray-700">
+                  Dirección del local *
+                </Label>
+                <div className="relative mt-1">
+                  <Store className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                  <Input
+                    id="physicalStoreAddress"
+                    value={formData.physicalStoreAddress}
+                    onChange={(e) => handleInputChange('physicalStoreAddress', e.target.value)}
+                    className="pl-10 rounded-lg border-2 focus:ring-4 focus:ring-green-100 focus:border-[#006F4B] transition-all duration-200 border-gray-200"
+                    placeholder="Ej: Av. San Martín 123, Ceres"
+                  />
+                </div>
+                {errors.physicalStoreAddress && (
+                  <p className="text-red-600 text-sm mt-1">{errors.physicalStoreAddress}</p>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
           <div>
             <Label htmlFor="picture" className="text-sm font-semibold text-gray-700">
@@ -1123,17 +1274,45 @@ export default function RegistroPage() {
   );
 
   return (
-    <div className="min-h-screen bg-muted py-8 px-4">
-      <div className="max-w-6xl mx-auto">
-        <Card className="overflow-hidden p-0">
-          
+    <div className="min-h-screen bg-gray-50">
+      {/* Hero Header */}
+      <div className="bg-gradient-to-br from-[#006F4B] via-[#008255] to-[#004d35] relative overflow-hidden">
+        {/* Patrón de fondo */}
+        <div className="absolute inset-0 opacity-10">
+          <div className="absolute top-10 left-20 w-32 h-32 rounded-full border-2 border-white/30"></div>
+          <div className="absolute bottom-10 right-20 w-24 h-24 rounded-full border-2 border-white/20"></div>
+        </div>
+        
+        <div className="relative z-10 px-4 py-8">
+          <div className="max-w-4xl mx-auto">
+            {/* Back link */}
+            <Link href="/" className="inline-flex items-center gap-2 text-white/80 hover:text-white mb-6 transition-colors">
+              <ArrowLeft className="w-4 h-4" />
+              <span className="text-sm">Volver al inicio</span>
+            </Link>
+            
+            <div className="text-center text-white">
+              <h1 className="text-3xl md:text-4xl font-bold mb-2">
+                Registrate como Profesional
+              </h1>
+              <p className="text-white/80 text-lg max-w-2xl mx-auto">
+                Completá tu perfil y comenzá a ofrecer tus servicios en la plataforma oficial de Ceres
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
 
-          <CardContent className="p-8">
+      {/* Form Content */}
+      <div className="max-w-4xl mx-auto px-4 -mt-6 pb-12">
+        <Card className="overflow-hidden shadow-xl border-0">
+          <CardContent className="p-6 md:p-8">
             {/* Stepper visual */}
             {renderStepIndicator()}
 
             {errors.general && (
-              <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+              <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-6 flex items-center gap-3">
+                <div className="w-2 h-2 rounded-full bg-red-500 flex-shrink-0"></div>
                 <p className="text-red-800 text-sm">{errors.general}</p>
               </div>
             )}
@@ -1142,11 +1321,11 @@ export default function RegistroPage() {
             {currentStep === 2 && renderStep2()}
             {currentStep === 3 && renderStep3()}
 
-            <div className="flex space-x-4 mt-8">
+            <div className="flex gap-4 mt-8">
               {currentStep > 1 && (
                 <button
                   onClick={() => setCurrentStep(currentStep - 1)}
-                  className="flex-1 bg-gray-100 text-gray-700 py-4 px-6 rounded-lg hover:bg-gray-200 font-semibold transition-all duration-200 flex items-center justify-center"
+                  className="flex-1 bg-gray-100 text-gray-700 py-4 px-6 rounded-xl hover:bg-gray-200 font-semibold transition-all duration-200 flex items-center justify-center"
                 >
                   <ArrowLeft className="mr-2 h-4 w-4" />
                   Anterior
@@ -1156,7 +1335,7 @@ export default function RegistroPage() {
               {currentStep < 3 ? (
                 <button
                   onClick={handleNext}
-                  className="flex-1 bg-gradient-to-r from-[#006F4B] to-[#008F5B] text-white py-4 px-6 rounded-lg font-semibold hover:from-[#008F5B] hover:to-[#006F4B] focus:ring-4 focus:ring-green-100 focus:ring-offset-2 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
+                  className="flex-1 bg-[#006F4B] hover:bg-[#005a3d] text-white py-4 px-6 rounded-xl font-semibold transition-all duration-200 shadow-lg shadow-[#006F4B]/20 cursor-pointer"
                 >
                   Continuar
                 </button>
@@ -1164,10 +1343,10 @@ export default function RegistroPage() {
                 <button
                   onClick={handleSubmit}
                   disabled={isLoading}
-                  className="flex-1 bg-gradient-to-r from-[#006F4B] to-[#008F5B] text-white py-4 px-6 rounded-lg font-semibold hover:from-[#008F5B] hover:to-[#006F4B] focus:ring-4 focus:ring-green-100 focus:ring-offset-2 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+                  className="flex-1 bg-[#006F4B] hover:bg-[#005a3d] text-white py-4 px-6 rounded-xl font-semibold transition-all duration-200 shadow-lg shadow-[#006F4B]/20 flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isLoading ? (
-                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
                   ) : (
                     <>
                       <Send className="mr-2 h-4 w-4" />
@@ -1192,14 +1371,15 @@ export default function RegistroPage() {
               </div>
             )}
 
-            <div className="bg-green-50 border border-green-200 rounded-lg p-4 mt-6">
-              <div className="flex items-start">
-                <div className="flex-shrink-0">
-                  <Building2 className="w-5 h-5 text-[#006F4B] mt-0.5" />
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mt-6">
+              <div className="flex items-start gap-3">
+                <div className="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0">
+                  <Building2 className="w-4 h-4 text-amber-600" />
                 </div>
-                <div className="ml-3">
-                  <p className="text-sm text-green-800">
-                    <span className="font-semibold">Verificación:</span> Tu registro será revisado por nuestro equipo. Te notificaremos por email cuando sea aprobado.
+                <div>
+                  <p className="text-sm font-medium text-amber-800">Verificación requerida</p>
+                  <p className="text-sm text-amber-700 mt-0.5">
+                    Tu registro será revisado por nuestro equipo. Te notificaremos por email cuando sea aprobado.
                   </p>
                 </div>
               </div>

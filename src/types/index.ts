@@ -6,6 +6,7 @@ export interface User {
   firstName: string;
   lastName: string;
   name?: string; // Para compatibilidad con NextAuth
+  image?: string; // Foto de perfil (puede ser URL de OAuth o ruta local)
   phone?: string;
   birthDate?: Date;
   location?: string;
@@ -122,6 +123,9 @@ export interface RegisterFormData {
   bio?: string;
   experienceYears?: number;
   professionalGroup?: CategoryGroup;
+  serviceLocations?: string[];
+  hasPhysicalStore?: boolean;
+  physicalStoreAddress?: string;
   services?: ServiceFormData[];
 }
 

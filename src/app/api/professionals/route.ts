@@ -14,7 +14,9 @@ export async function GET(request: NextRequest) {
     const limit = Math.min(50, Math.max(1, parseInt(searchParams.get('limit') || '12', 10)));
     const sortBy = (searchParams.get('sortBy') || 'recent') as 'name' | 'rating' | 'recent';
 
-    const where: Prisma.ProfessionalWhereInput = {};
+    const where: Prisma.ProfessionalWhereInput = {
+      status: 'active',
+    };
 
     if (grupo) {
       where.professionalGroup = grupo; 
@@ -77,7 +79,7 @@ export async function GET(request: NextRequest) {
         skip: (page - 1) * limit,
         take: limit,
         include: {
-          user: { select: { firstName: true, lastName: true, verified: true } },
+          user: { select: { firstName: true, lastName: true, verified: true, image: true, location: true } },
           services: {
             take: 1,
             orderBy: { createdAt: 'asc' },
@@ -93,10 +95,11 @@ export async function GET(request: NextRequest) {
       bio: p.bio,
       verified: p.verified || p.user.verified,
       primaryCategory: { name: p.services[0]?.category?.name ?? undefined },
-      location: p.location ?? undefined,
+      location: p.location ?? p.user.location ?? undefined,
       rating: p.rating ?? 0,
       reviewCount: p.reviewCount ?? 0,
-      ProfilePicture: p.ProfilePicture ?? undefined,
+      // Usar ProfilePicture si existe, sino usar imagen de OAuth del usuario
+      ProfilePicture: p.ProfilePicture || p.user.image || undefined,
     }));
 
     return NextResponse.json({

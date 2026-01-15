@@ -1,27 +1,21 @@
 "use client"
-import { Button } from "@/components/ui/button";
 import { CategoryCarousel } from "@/components/features/CategoryCarousel";
-import { ServiceCard } from "@/components/features/ServiceCard";
+import { ProfessionalCard } from "@/components/features/ProfessionalCard";
 import { SearchSuggestions } from "@/components/features/SearchSuggestions";
-import { Search, ArrowRight, Shield, Rocket, CheckCircle2, UserPlus, LayoutGrid, MessageCircle, MapPin } from "lucide-react";
+import { Search, ArrowRight, Rocket, CheckCircle2, UserPlus, MessageCircle, MapPin, Verified } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 import { SUBCATEGORIES_PROFESIONES, AREAS_OFICIOS, SUBCATEGORIES_OFICIOS } from "@/lib/taxonomy";
-import { Card } from "@/components/ui/card";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { CategorySuggest } from "@/components/features/CategorySuggest";
 import { useFeaturedServices } from "@/hooks/useFeaturedCategories";
+import { useRouter } from "next/navigation";
 
 
 export default function Home() {
+  const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
   const [showSuggestions, setShowSuggestions] = useState(false)
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    const id = requestAnimationFrame(() => setMounted(true));
-    return () => cancelAnimationFrame(id);
-  }, []);
 
   const { services, loading, error } = useFeaturedServices(6);
     const handleSuggestionClick = (suggestionName: string) => {
@@ -43,16 +37,15 @@ export default function Home() {
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (searchQuery.trim()) {
-      window.location.href = `/servicios?q=${encodeURIComponent(searchQuery.trim())}`;
+      router.push(`/servicios?q=${encodeURIComponent(searchQuery.trim())}`);
     }
   };
 
   return (
-    <div className="min-h-screen">
-            
-           {/* Hero Section */}
-           <section className="relative overflow-hidden py-16 md:py-20 lg:py-24">
-        <div className={`absolute inset-0 -z-10 bg-[#EBE4C0] `}>
+    <div className="min-h-screen bg-background-light dark:bg-background-dark text-gray-800 dark:text-gray-200 transition-colors duration-300">
+      {/* Hero Section */}
+      <header className="relative overflow-hidden">
+        <div className="absolute inset-0 bg-[#EBE4C0]">
           {/* Fondo base */}
           <Image
             src="/fondosolo.png"
@@ -65,379 +58,356 @@ export default function Home() {
             blurDataURL="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMSIgaGVpZ2h0PSIxIiBmaWxsPSIjRTlGNkYwIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciLz4="
           />
           
-            <div className={`hidden xl:block absolute left-0 top-0 h-full w-1/3 transition-all duration-700 ease-out ${mounted ? "opacity-70 translate-x-0" : "opacity-0 -translate-x-8"}`}>
-              <Image
-                src="/elementosizquierda.png"
-                alt=""
-                fill
-                priority
-                sizes="33vw"
-                className="object-contain object-left"
-                placeholder="blur"
-                blurDataURL="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMSIgaGVpZ2h0PSIxIiBmaWxsPSIjRTlGNkYwIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciLz4="
-              />
-            </div>
-            
-            <div className={`hidden xl:block absolute right-0 top-0 h-full w-1/3 transition-all duration-700 ease-out ${mounted ? "opacity-70 translate-x-0" : "opacity-0 translate-x-8"}`}>
-              <Image
-                src="/elementosderecha.png"
-                alt=""
-                fill
-                priority
-                sizes="33vw"
-                className="object-contain object-right"
-                placeholder="blur"
-                blurDataURL="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMSIgaGVpZ2h0PSIxIiBmaWxsPSIjRTlGNkYwIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciLz4="
-              />
-            </div>
+          {/* Elementos decorativos izquierda */}
+          <div className="hidden xl:block absolute left-0 top-0 h-full w-1/3 transition-all duration-700 ease-out">
+            <Image
+              src="/elementosizquierda.png"
+              alt=""
+              fill
+              priority
+              sizes="33vw"
+              className="object-contain object-left opacity-70"
+              placeholder="blur"
+              blurDataURL="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMSIgaGVpZ2h0PSIxIiBmaWxsPSIjRTlGNkYwIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciLz4="
+            />
+          </div>
+          
+          {/* Elementos decorativos derecha */}
+          <div className="hidden xl:block absolute right-0 top-0 h-full w-1/3 transition-all duration-700 ease-out">
+            <Image
+              src="/elementosderecha.png"
+              alt=""
+              fill
+              priority
+              sizes="33vw"
+              className="object-contain object-right opacity-70"
+              placeholder="blur"
+              blurDataURL="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMSIgaGVpZ2h0PSIxIiBmaWxsPSIjRTlGNkYwIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciLz4="
+            />
+          </div>
         </div>
-
-        <div className="absolute inset-0 "></div>
+        
         {/* Decoración de fondo */}
-        <div className="pointer-events-none absolute inset-0 opacity-40 md:opacity-50">
+        <div className="pointer-events-none absolute inset-0 opacity-40 md:opacity-50 z-0">
           <div className="absolute -top-20 -left-20 h-64 w-64 md:h-80 md:w-80 lg:h-96 lg:w-96 rounded-full blur-3xl" />
           <div className="absolute -bottom-20 -right-20 h-64 w-64 md:h-80 md:w-80 lg:h-[28rem] lg:w-[28rem] rounded-full blur-3xl" />
         </div>
-        <div className="container mx-auto px-4">
-        <div className="max-w-5xl mx-auto text-center relative">
-            <h1
-              className={`text-4xl md:text-5xl lg:text-4xl font-rutan font-semibold tracking-tight text-foreground mb-6 max-w-3xl mx-auto transition-all duration-700 ease-out ${mounted ? "opacity-100 translate-y-0" : "opacity-0 translate-y-3"}`}
+        
+        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-background-light dark:to-background-dark z-0"></div>
+        <div className="relative z-10 max-w-5xl mx-auto px-4 pt-20 pb-24 text-center">
+          <h2 className="text-3xl md:text-5xl font-semibold text-gray-900 dark:text-white mb-6">
+            ¿Buscás un técnico? ¿Profesional?<br/>
+            <span className="text-primary font-extrabold">¡Encontralo acá!</span>
+          </h2>
+          <p className="text-lg text-gray-600 dark:text-gray-300 mb-10 max-w-2xl mx-auto">
+            Plataforma del Gobierno de la Ciudad de Ceres para conectar vecinos con profesionales verificados de manera segura y rápida.
+          </p>
+          
+          {/* Barra de búsqueda principal */}
+          <form
+            role="search"
+            aria-label="Buscar servicios"
+            onSubmit={handleSearchSubmit}
+            className="bg-white dark:bg-gray-800 p-2 rounded-full shadow-soft max-w-3xl mx-auto flex items-center border border-gray-100 dark:border-gray-700 mb-6 shadow-lg"
+          >
+            <label htmlFor="q" className="sr-only">Buscar servicios</label>
+            <input
+              id="q"
+              name="q"
+              type="search"
+              value={searchQuery}
+              onChange={handleSearchChange}
+              onFocus={() => setShowSuggestions(searchQuery.length > 0)}
+              placeholder="¿Qué servicio necesitas? Ej: plomero, electricista..."
+              aria-label="¿Qué servicio necesitas?"
+              autoComplete="off"
+              className="flex-grow bg-transparent border-none focus:ring-0 text-gray-700 dark:text-gray-200 px-6 py-3 placeholder-gray-400"
+            />
+            <button 
+              type="submit" 
+              aria-label="Buscar" 
+              className="bg-primary hover:bg-emerald-800 text-white rounded-full p-3 w-12 h-12 flex items-center justify-center transition-colors shadow-lg"
             >
-              ¿Buscás un técnico? ¿Profesional? ¿Alguien que te ayude a resolver algo?{" "}
-              <br />
-              <span className="block font-bold bg-clip-text text-transparent bg-gradient-to-r from-[#006F4B] to-[#008F5B] leading-tight">¡Encontralo acá!</span>
-            </h1>
-            <p
-              className={`text-base md:text-lg lg:text-xl text-muted-foreground mb-8 max-w-2xl mx-auto transition-all duration-700 ease-out ${mounted ? "opacity-100 translate-y-0" : "opacity-0 translate-y-3"}`}
-              style={{ transitionDelay: "120ms" }}
+              <Search className="h-5 w-5" />
+            </button>
+          </form>
+          <div className="relative max-w-3xl mx-auto">
+            <SearchSuggestions
+              query={searchQuery}
+              isVisible={showSuggestions}
+              onSelect={handleSuggestionClick}
+              onClose={() => setShowSuggestions(false)}
+            />
+          </div>
+          
+          {/* Sugerencias rápidas */}
+          <div className="flex flex-wrap justify-center gap-2 mt-6 text-sm">
+            <span className="text-gray-500 dark:text-gray-400 font-medium mr-2 self-center">Busco:</span>
+            <CategorySuggest handleSuggestionClick={handleSuggestionClick} randomSuggestionsNumber={4} categories={SUBCATEGORIES_OFICIOS} />
+          </div>
+          
+          {/* Botones CTA */}
+          <div className="flex flex-col sm:flex-row justify-center gap-4 mt-10">
+            <Link 
+              href="/servicios" 
+              className="px-8 py-3 bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-semibold rounded-full shadow-sm hover:shadow-md transition-all border border-gray-200 dark:border-gray-600 flex items-center justify-center gap-2"
             >
-              Plataforma del Gobierno de la Ciudad de Ceres para conectar vecinos con profesionales verificados.
-            </p>
+              Ver todos los servicios
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+            <Link 
+              href="/auth/registro" 
+              className="px-8 py-3 font-semibold rounded-full shadow-lg bg-amber-600 text-white transition-all transform hover:-translate-y-0.5"
+            >
+              Ofrecer mis servicios
+            </Link>
+          </div>
+        </div>
+      </header>
 
-            {/* Barra de búsqueda principal */}
-            <form
-              role="search"
-              aria-label="Buscar servicios"
-              className={`relative z-50 max-w-2xl mx-auto mb-4 transition-all duration-700 ease-out ${mounted ? "opacity-100 translate-y-0" : "opacity-0 translate-y-3"}`}
-              style={{ transitionDelay: "240ms" }}
-              onSubmit={handleSearchSubmit}
-            >
-              <label htmlFor="q" className="sr-only">Buscar servicios</label>
-              <ArrowRight className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground pointer-events-none" aria-hidden="true" />
-              <input
-                id="q"
-                name="q"
-                type="search"
-                value={searchQuery}
-                onChange={handleSearchChange}
-                onFocus={() => setShowSuggestions(searchQuery.length > 0)}
-                placeholder="¿Qué servicio necesitas? Ej: plomero, electricista..."
-                aria-label="¿Qué servicio necesitas?"
-                autoComplete="off"
-                className="w-full rounded-2xl border-2 border-gray-200 bg-background pl-12 pr-28 py-4 text-lg ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-green-100 focus-visible:border-[#006F4B] transition-all duration-200"
-              />
-              <button type="submit" aria-label="Buscar" className="cursor-pointer absolute right-2 top-1/2 -translate-y-1/2 bg-[#008255] text-white px-6 py-3 rounded-xl font-semibold hover:bg-[#008F4B] focus:ring-4 focus:ring-green-100 focus:ring-offset-2 transition-all duration-200 shadow-lg hover:shadow-xl">
-                <Search />
-              </button>
-              
-              <SearchSuggestions
-                query={searchQuery}
-                isVisible={showSuggestions}
-                onSelect={handleSuggestionClick}
-                onClose={() => setShowSuggestions(false)}
-              />
-            </form>
-            <div
-              className={`flex flex-wrap gap-2 justify-center items-center mb-12 transition-all duration-700 ease-out ${mounted ? "opacity-100 translate-y-0" : "opacity-0 translate-y-3"}`}
-              style={{ transitionDelay: "320ms" }}
-            >
-              <label className="text-muted-foreground ">Busco: </label>
-              <CategorySuggest handleSuggestionClick={handleSuggestionClick} randomSuggestionsNumber={6} categories={SUBCATEGORIES_OFICIOS} />
+      {/* Beneficios clave */}
+      <section className="bg-primary text-white py-12">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-8 text-center md:text-left">
+            <div className="flex flex-col items-center md:items-start p-4 rounded-xl hover:bg-white/10 transition-colors cursor-default">
+              <Verified className="h-10 w-10 mb-3 opacity-90" />
+              <h3 className="font-bold text-lg mb-1">Desarrollo local</h3>
+              <p className="text-sm opacity-80 text-center md:text-left">Iniciativa del Gobierno de la Ciudad de Ceres</p>
             </div>
-              
-              
-            <div
-              className={`flex flex-wrap justify-center gap-4 transition-all duration-700 ease-out ${mounted ? "opacity-100 translate-y-0" : "opacity-0 translate-y-3"}`}
-              style={{ transitionDelay: "360ms" }}
-            >
-              <Link href="/servicios" className=" text-black px-8 py-4 rounded-xl  bg-white/80 hover:bg-gray-200 font-semibold shadow-lg text-lg transition-all duration-200 inline-flex items-center">
-                Ver todos los servicios
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </Link>
-              <Link href="/auth/registro" className="bg-[#FDBA38] text-black px-8 py-4 rounded-xl font-semibold text-lg hover:bg-[#F4A623]  transition-all duration-400 shadow-lg inline-flex items-center">
-                Ofrecer mis servicios
-              </Link>
+            <div className="flex flex-col items-center md:items-start p-4 rounded-xl hover:bg-white/10 transition-colors cursor-default">
+              <Rocket className="h-10 w-10 mb-3 opacity-90" />
+              <h3 className="font-bold text-lg mb-1">Rápido y simple</h3>
+              <p className="text-sm opacity-80 text-center md:text-left">Buscá, elegí y coordiná en minutos</p>
+            </div>
+            <div className="flex flex-col items-center md:items-start p-4 rounded-xl hover:bg-white/10 transition-colors cursor-default">
+              <MessageCircle className="h-10 w-10 mb-3 opacity-90" />
+              <h3 className="font-bold text-lg mb-1">Contacto directo</h3>
+              <p className="text-sm opacity-80 text-center md:text-left">Coordiná por WhatsApp o teléfono</p>
+            </div>
+            <div className="flex flex-col items-center md:items-start p-4 rounded-xl hover:bg-white/10 transition-colors cursor-default">
+              <MapPin className="h-10 w-10 mb-3 opacity-90" />
+              <h3 className="font-bold text-lg mb-1">Enfocado en la región</h3>
+              <p className="text-sm opacity-80 text-center md:text-left">Profesionales de Ceres y la zona</p>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Beneficios clave (sin métricas) */}
-      <section className="py-12 bg-[var(--gov-green)]">
-        <div className="container mx-auto px-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-8 text-white">
-            <div className="text-center">
-              <div className="flex justify-center mb-2">
-                <Shield className="h-8 w-8 text-white" />
-              </div>
-              <div className="text-lg font-semibold">Desarrollo local</div>
-              <div className="text-sm opacity-90">Iniciativa del Gobierno de la Ciudad de Ceres</div>
-            </div>
-
-            <div className="text-center">
-              <div className="flex justify-center mb-2">
-                <Rocket className="h-8 w-8 text-white" />
-              </div>
-              <div className="text-lg font-semibold">Rápido y simple</div>
-              <div className="text-sm opacity-90">Buscá, elegí y coordiná en minutos</div>
-            </div>
-
-            <div className="text-center">
-              <div className="flex justify-center mb-2">
-                <MessageCircle className="h-8 w-8 text-white" />
-              </div>
-              <div className="text-lg font-semibold">Contacto directo</div>
-              <div className="text-sm opacity-90">Coordiná por WhatsApp o teléfono</div>
-            </div>
-            
-            <div className="text-center">
-              <div className="flex justify-center mb-2">
-                <MapPin className="h-8 w-8 text-white" />
-              </div>
-              <div className="text-lg font-semibold">Enfocado en la región</div>
-              <div className="text-sm opacity-90">Profesionales de Ceres y la zona</div>
-            </div>
+      {/* Categorías populares - Oficios */}
+      <section className="py-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="text-center mb-12">
+          <span className="text-primary font-semibold tracking-wider text-sm uppercase mb-2 block">Explorá por categoría</span>
+          <h3 className="text-3xl font-bold text-gray-900 dark:text-white mb-3">¿Qué servicio necesitás?</h3>
+          <p className="text-gray-500 dark:text-gray-400">Encontrá tu solución, ¡con solo un clic!</p>
+        </div>
+        <div className="flex justify-between items-end mb-6">
+          <h4 className="text-2xl font-bold text-gray-800 dark:text-gray-100">Oficios</h4>
+          <div className="flex gap-2">
+            <button 
+              onClick={() => {
+                const container = document.querySelector('.carousel-3d') as HTMLElement;
+                if (container) {
+                  const itemWidth = container.clientWidth * 0.8;
+                  container.scrollBy({ left: -itemWidth, behavior: "smooth" });
+                }
+              }}
+              className="w-10 h-10 rounded-full border border-gray-200 dark:border-gray-700 flex items-center justify-center hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-300 transition-colors"
+              aria-label="Anterior"
+            >
+              <ArrowRight className="h-5 w-5 rotate-180" />
+            </button>
+            <button 
+              onClick={() => {
+                const container = document.querySelector('.carousel-3d') as HTMLElement;
+                if (container) {
+                  const itemWidth = container.clientWidth * 0.8;
+                  container.scrollBy({ left: itemWidth, behavior: "smooth" });
+                }
+              }}
+              className="w-10 h-10 rounded-full border border-gray-200 dark:border-gray-700 flex items-center justify-center hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-300 transition-colors"
+              aria-label="Siguiente"
+            >
+              <ArrowRight className="h-5 w-5" />
+            </button>
           </div>
+        </div>
+        <CategoryCarousel categories={AREAS_OFICIOS} showViewAll={true} />
+        <div className="text-center mt-8">
+          <Link 
+            href="/categorias"
+            className="inline-flex items-center gap-2 px-6 py-2 rounded-full border border-gray-300 dark:border-gray-600 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+          >
+            Ver todas las categorías
+            <ArrowRight className="h-4 w-4" />
+          </Link>
         </div>
       </section>
 
-      {/* Categorías populares */}
-      <section className="relative py-20 overflow-hidden bg-gradient-to-br from-[var(--gov-green)]/5 to-[var(--gov-yellow)]/10">
-        {/* Decoración de fondo */}
-        <div className="pointer-events-none absolute inset-0 opacity-70">
-          <div className="absolute -top-24 -left-24 h-72 w-72 rounded-full bg-[var(--gov-green)]/10 blur-3xl" />
-          <div className="absolute -bottom-24 -right-24 h-72 w-72 rounded-full bg-[var(--gov-yellow)]/20 blur-3xl" />
-        </div>
-        <div className="container mx-auto px-4 relative">
-          <div className="text-center mb-12">
-            <div className="inline-flex items-center gap-2 rounded-full border border-green-100 bg-green-50 px-3 py-1 text-sm text-[var(--gov-green)] mb-3">
-              <LayoutGrid className="h-4 w-4" />
-              Explora por categoría
-            </div>
-            <h2 className="text-3xl lg:text-4xl font-rutan font-bold mb-3">
-            ¿Qué servicio necesitás?
-            </h2>
-            <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            Encontrá tu solución, ¡con solo un clic!
-
-            </p>
-          </div>
-          <div className="text-center">
-            <h2 className="text-3xl lg:text-3xl font-rutan font-bold">Oficios</h2>
-            <p className="text-lg text-muted-foreground">Categorías más solicitadas </p>
-          </div>
-          <CategoryCarousel categories={AREAS_OFICIOS} />
-
-          <div className="text-center mt-10">
-            <Button variant="outline" size="lg" asChild>
-              <Link href="/categorias">
-                Ver todas las categorías
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </Link>
-            </Button>
-          </div>
-        </div>
-      </section>
-
-      {/* Profesionales destacados */}
-      <section className="py-16 bg-white">
-        <div className="container mx-auto px-4">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl lg:text-4xl font-rutan font-bold mb-4">
-            Profesionales 
-            </h2>
-            <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            Categorías más solicitadas
-            </p>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mb-8">
+      {/* Profesiones */}
+      <section className="py-12 bg-white dark:bg-surface-dark">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <h4 className="text-2xl font-bold text-gray-800 dark:text-gray-100 mb-8 text-center">Profesiones</h4>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {SUBCATEGORIES_PROFESIONES.map((p) => (
               <Link key={p.slug} href={`/profesionales?categoria=${p.slug}`}>
-                <Card 
-                  className="group relative h-52 flex items-center justify-center text-center rounded-2xl text-white hover:brightness-110 transition-transform duration-300 ease-out cursor-pointer p-0 transform-gpu will-change-transform ring-1 ring-transparent hover:ring-white/20 hover:z-30 overflow-hidden"
-                >
+                <div className="group relative h-48 rounded-2xl overflow-hidden shadow-md">
                   {/* Imagen de fondo */}
                   {p.image && (
                     <Image
                       src={p.image}
                       alt={p.name}
                       fill
-                      sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                      sizes="(max-width: 768px) 100vw, 33vw"
                       className="object-cover"
                       priority={false}
                       placeholder="blur"
                       blurDataURL="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMSIgaGVpZ2h0PSIxIiBmaWxsPSIjRTlGNkYwIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciLz4="
                     />
                   )}
-
-                  {/* Overlay de gradiente */}
-                  <div className="absolute inset-0 bg-gradient-to-b from-transparent from-0% via-[#006F4B]/40 via-30% to-[#006F4B]/95 to-100% transition-all duration-300 group-hover:from-transparent group-hover:from-0% group-hover:via-[#006F4B]/50 group-hover:via-30% group-hover:to-[#006F4B]/98 group-hover:to-100%" />
-
-                  {/* Contenido */}
-                  <div className="relative z-10 flex flex-col items-center justify-center h-full p-8">
-                    <div className="text-2xl lg:text-2xl font-rutan font-semibold drop-shadow-sm">
-                      {p.name}
-                    </div>
+                  {/* Overlay */}
+                  <div className="absolute inset-0 bg-primary/80 group-hover:bg-primary/70 transition-colors flex items-center justify-center">
+                    <h5 className="text-white font-bold text-xl tracking-wide">{p.name}</h5>
                   </div>
-                </Card>
+                </div>
               </Link>
             ))}
           </div>
-          <div className="text-center">
-            <Button variant="outline" size="lg" asChild>
-              <Link href="/profesionales">
-                Ver todos los profesionales
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </Link>
-            </Button>
+          <div className="text-center mt-8">
+            <Link 
+              href="/profesionales"
+              className="inline-flex items-center gap-2 px-6 py-2 rounded-full border border-gray-300 dark:border-gray-600 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+            >
+              Ver todos los profesionales
+              <ArrowRight className="h-4 w-4" />
+            </Link>
           </div>
         </div>
       </section>
 
 
- {/* Servicios destacados */}
- <section className="py-16 bg-muted/30">
-        <div className="container mx-auto px-4">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl lg:text-4xl font-rutan font-bold mb-4">
-            Perfles destacados
-            </h2>
-            <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            Trabajadores mejores calificados y más solicitados
-            </p>
-          </div>
-          
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mb-8">
-            {loading ? (
-              Array.from({ length: 3 }).map((_, i) => (
-                <div key={i} className="h-40 rounded-2xl bg-gray-100 animate-pulse" />
-              ))
-            ) : error ? (
-              <div className="col-span-full text-red-600">{error}</div>
-            ) : services.length === 0 ? (
-              <div className="col-span-full text-muted-foreground">No hay servicios para mostrar aún.</div>
-            ) : (
-              services
-                .filter(service => 
-                  service.professional && 
-                  service.category && 
-                  service.professional.user &&
-                  service.professional.user.name
-                )
-                .map((service) => (
-                  <ServiceCard 
-                    key={service.id} 
-                    service={{
-                      ...service,
-                      professional: {
-                        ...service.professional!,
-                        user: {
-                          ...service.professional!.user!,
-                          name: service.professional!.user!.name!
-                        }
-                      },
-                      category: service.category!
-                    }} 
-                  />
-                ))
-            )}
-          </div>
+      {/* Profesionales destacados */}
+      <section className="py-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="text-center mb-12">
+          <h3 className="text-3xl font-bold text-gray-900 dark:text-white mb-3">Profesionales destacados</h3>
+          <p className="text-gray-500 dark:text-gray-400">Verificados y listos para ayudarte</p>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {loading ? (
+            Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="h-40 rounded-2xl bg-gray-100 dark:bg-gray-800 animate-pulse" />
+            ))
+          ) : error ? (
+            <div className="col-span-full text-red-600">{error}</div>
+          ) : services.length === 0 ? (
+            <div className="col-span-full text-muted-foreground">No hay servicios para mostrar aún.</div>
+          ) : (
+            (() => {
+              // Agrupar servicios destacados por profesional para no repetir cards
+              const grouped = new Map<string, typeof services>();
 
-          <div className="text-center">
-            <Button variant="outline" size="lg" asChild>
-              <Link href="/servicios">
-                Ver todos los servicios
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </Link>
-            </Button>
-          </div>
+              services
+                .filter(
+                  (service) =>
+                    service.professional &&
+                    service.category &&
+                    service.professional.user &&
+                    service.professional.user.name
+                )
+                .forEach((service) => {
+                  const pid = service.professional!.id;
+                  if (!grouped.has(pid)) {
+                    grouped.set(pid, []);
+                  }
+                  grouped.get(pid)!.push(service);
+                });
+
+              return Array.from(grouped.values()).map((svcList) => {
+                const first = svcList[0]!;
+                const prof = first.professional!;
+                return (
+                  <ProfessionalCard
+                    key={prof.id}
+                    professional={{
+                      id: prof.id,
+                      user: { name: prof.user!.name! },
+                      bio: (prof as unknown as { bio?: string }).bio || first.description,
+                      verified: prof.verified,
+                      specialties: svcList.map((s) => s.title),
+                      primaryCategory: { name: first.category!.name },
+                      location: (prof as unknown as { location?: string | null }).location || undefined,
+                      socialNetworks: {
+                        profilePicture: (prof as unknown as { ProfilePicture?: string | null }).ProfilePicture || undefined,
+                      },
+                    }}
+                  />
+                );
+              });
+            })()
+          )}
         </div>
       </section>
 
       {/* CTA para profesionales */}
-      <section className="relative py-20 lg:py-28 overflow-hidden bg-gradient-to-br from-[var(--gov-green)]/5 to-[var(--gov-yellow)]/10">
-        {/* Decoración de fondo */}
-        <div className="pointer-events-none absolute inset-0 opacity-60">
-          <div className="absolute -top-24 -left-24 h-72 w-72 rounded-full bg-[var(--gov-green)]/10 blur-3xl" />
-          <div className="absolute -bottom-24 -right-24 h-72 w-72 rounded-full bg-[var(--gov-yellow)]/20 blur-3xl" />
-        </div>
-        <div className="container mx-auto px-2 sm:px-4 lg:px-8">
-          <div className="relative w-full max-w-[1400px] mx-auto rounded-3xl border border-gray-100 bg-white/70 supports-[backdrop-filter]:bg-white/60 backdrop-blur shadow-xl overflow-hidden">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-0">
-              {/* Columna izquierda */}
-              <div className="flex flex-col justify-center items-center lg:items-start text-center lg:text-left p-8 lg:p-14 xl:p-16">
-                <div className="inline-flex items-center gap-2 rounded-full border border-green-100 bg-green-50 px-3 py-1 text-sm text-[var(--gov-green)] w-fit mb-4 mx-auto lg:mx-0">
-                  <Rocket className="h-4 w-4" />
-                  Crece en Ceres
-                </div>
-                <h2 className="text-3xl lg:text-4xl font-rutan font-bold mb-4">
-                   ¿Querés publicar tus servicios?
-                </h2>
-                
-
-                <div className="space-y-4 mb-8">
-                  <div className="flex items-start justify-center lg:justify-start gap-3">
-                    <div className="mt-1 grid place-items-center h-9 w-9 rounded-xl bg-[var(--gov-green)]/10 text-[var(--gov-green)]">
-                      <UserPlus className="h-5 w-5" />
-                    </div>
-                    <div>
-                      <p className="font-medium leading-tight">Registro</p>
-                      <p className="text-sm text-muted-foreground">Creá tu perfil y agregá tus servicios. Recordá que toda la información tiene que ser verídica y demostrable</p>
-                    </div>
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-20">
+        <div className="relative rounded-3xl overflow-hidden bg-primary shadow-2xl">
+          <div className="grid grid-cols-1 lg:grid-cols-2">
+            <div className="p-10 lg:p-16 flex flex-col justify-center text-white z-10">
+              <div className="inline-flex items-center gap-2 mb-4 bg-white/20 w-fit px-3 py-1 rounded-full backdrop-blur-sm">
+                <Rocket className="h-4 w-4" />
+                <span className="text-xs font-semibold uppercase tracking-wide">Crece en Ceres</span>
+              </div>
+              <h3 className="text-3xl md:text-4xl font-bold mb-6">¿Querés publicar tus servicios?</h3>
+              <div className="space-y-6">
+                <div className="flex gap-4">
+                  <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0">
+                    <UserPlus className="h-5 w-5" />
                   </div>
-                  <div className="flex items-start justify-center lg:justify-start gap-3">
-                    <div className="mt-1 grid place-items-center h-9 w-9 rounded-xl bg-[var(--gov-green)]/10 text-[var(--gov-green)]">
-                      <CheckCircle2 className="h-5 w-5" />
-                    </div>
-                    <div>
-                      <p className="font-medium leading-tight">Verificación</p>
-                      <p className="text-sm text-muted-foreground">Para mayor seguridad, nuestro equipo validará tu información</p>
-                    </div>
-                  </div>
-                  <div className="flex items-start justify-center lg:justify-start gap-3">
-                    <div className="mt-1 grid place-items-center h-9 w-9 rounded-xl bg-[var(--gov-green)]/10 text-[var(--gov-green)]">
-                      <Rocket className="h-5 w-5" />
-                    </div>
-                    <div>
-                      <p className="font-medium leading-tight">¡Listo!</p>
-                      <p className="text-sm text-muted-foreground">Ya estás listo para comenzar a recibir y gestionar solicitudes</p>
-                    </div>
+                  <div>
+                    <h4 className="font-bold text-lg">Registro</h4>
+                    <p className="text-sm opacity-80">Creá tu perfil y agregá tus servicios. Recordá que toda la información tiene que ser verídica.</p>
                   </div>
                 </div>
-
-                <Button
-                  size="lg"
-                  className="bg-gradient-to-r from-[#006F4B] to-[#008F5B] text-white shadow-lg hover:shadow-xl hover:from-[#008F5B] hover:to-[#006F4B]"
-                  asChild
+                <div className="flex gap-4">
+                  <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0">
+                    <CheckCircle2 className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-lg">Verificación</h4>
+                    <p className="text-sm opacity-80">Para mayor seguridad, nuestro equipo validará tu información.</p>
+                  </div>
+                </div>
+                <div className="flex gap-4">
+                  <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0">
+                    <Rocket className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-lg">¡Listo!</h4>
+                    <p className="text-sm opacity-80">Ya estás listo para comenzar a recibir y gestionar solicitudes.</p>
+                  </div>
+                </div>
+              </div>
+              <div className="mt-10">
+                <Link
+                  href="/auth/registro"
+                  className="bg-white text-primary px-8 py-3 rounded-full font-bold shadow-lg hover:bg-gray-100 transition-all flex items-center gap-2 w-fit"
                 >
-                  <Link href="/auth/registro" className="inline-flex items-center">
-                    Crea tu perfil gratis
-                    <ArrowRight className="ml-2 h-4 w-4" />
-                  </Link>
-                </Button>
+                  Crea tu perfil gratis
+                  <ArrowRight className="h-4 w-4" />
+                </Link>
               </div>
-              {/* Columna derecha (imagen) - oculta en mobile */}
-              <div className="relative hidden lg:block">
-                <div className="relative w-full h-[280px] lg:h-full min-h-[380px]">
-                  <Image
-                    src="/servicios/instalacion-aires.jpg"
-                    alt="Profesional trabajando"
-                    fill
-                    className="object-cover"
-                    priority
-                  />
-                </div>
-              </div>
+            </div>
+            <div className="relative h-64 lg:h-auto">
+              <Image
+                src="/servicios/instalacion-aires.jpg"
+                alt="Profesional trabajando"
+                fill
+                className="object-cover"
+                priority
+              />
+              <div className="absolute inset-0 bg-primary/20 mix-blend-multiply"></div>
+              <div className="absolute inset-0 bg-gradient-to-r from-primary via-transparent to-transparent lg:hidden"></div>
+              <div className="absolute inset-0 bg-gradient-to-t from-primary via-transparent to-transparent lg:hidden"></div>
+              <div className="absolute inset-y-0 left-0 w-32 bg-gradient-to-r from-primary to-transparent hidden lg:block"></div>
             </div>
           </div>
         </div>

@@ -1,95 +1,59 @@
 "use client";
 
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Search, List, Grid, ChevronLeft, ChevronRight } from "lucide-react";
+import { Search, ArrowRight, Verified, Zap, MapPin, Wrench, Snowflake, Bolt, Car, TreePine, type LucideIcon } from "lucide-react";
 import { useServices } from "@/hooks/useServices";
-import { ServiceCard } from "@/components/features/ServiceCard";
+import { ProfessionalCard } from "@/components/features/ProfessionalCard";
 import { AREAS_OFICIOS, SUBCATEGORIES_OFICIOS, SUBCATEGORIES_PROFESIONES, LOCATIONS } from "@/lib/taxonomy";
-// import { Service } from "@/types";
-import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
+import { CategoryItem } from "@/components/features/CategoryItem";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import Link from "next/link";
 
 export default function ServiciosPage() {
   const searchParams = useSearchParams();
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [selectedGroup, setSelectedGroup] = useState("all");
-  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
-  // const [showSuggestions, setShowSuggestions] = useState(false);
   const [barSearchQuery, setBarSearchQuery] = useState("");
   const [page, setPage] = useState(1);
   const [selectedArea, setSelectedArea] = useState<string>("all");        // 'all' | areaSlug | 'profesiones'
   const [selectedSubcategory] = useState<string>("all"); // 'all' | subcategorySlug
   const [selectedLocation, setSelectedLocation] = useState<string>("all"); // 'all' | locationId
+  const [showMobileCategories, setShowMobileCategories] = useState(false);
+  const [showVerifiedOnly, setShowVerifiedOnly] = useState(false);
 
   const router = useRouter();
 
-  const allSubcategories = useMemo(() => (
-    [...SUBCATEGORIES_OFICIOS, ...SUBCATEGORIES_PROFESIONES]
-  ), []);
+  const derivedGroup: 'oficios' | 'profesiones' | undefined = useMemo(() => {
+    if (selectedArea === 'profesiones') return 'profesiones';
+    if (selectedArea !== 'all') return 'oficios';
+    if (selectedCategory !== 'all') {
+      // Buscar en subcategorías de oficios
+      const subcatOficios = SUBCATEGORIES_OFICIOS.find(s => s.slug === selectedCategory);
+      if (subcatOficios) return 'oficios';
+      // Buscar en subcategorías de profesiones
+      const subcatProfesiones = SUBCATEGORIES_PROFESIONES.find(s => s.slug === selectedCategory);
+      if (subcatProfesiones) return 'profesiones';
+    }
+    return undefined;
+  }, [selectedArea, selectedCategory]);
 
-// opciones del 1º select (categorías)
-const categoriesOptions = [
-  { value: "all", label: "Todas las categorías" },
-  ...AREAS_OFICIOS.map(a => ({ value: a.slug, label: a.name })),        // oficios por área
-  { value: "profesiones", label: "Profesiones" },                       // categoría única para profesiones
-];
-
-// subcategorías visibles para 2º select y chips
-const visibleSubcategories =
-  selectedArea === "all"
-    ? allSubcategories
-    : selectedArea === "profesiones"
-      ? SUBCATEGORIES_PROFESIONES
-      : SUBCATEGORIES_OFICIOS.filter(s => s.areaSlug === selectedArea);
-
-
-  // Carrusel chips
-  const chipsRef = useRef<HTMLDivElement>(null);
-  const [canScrollLeft, setCanScrollLeft] = useState(false);
-  const [canScrollRight, setCanScrollRight] = useState(false);
-
-  const updateScrollButtons = () => {
-    const el = chipsRef.current;
-    if (!el) return;
-    setCanScrollLeft(el.scrollLeft > 0);
-    setCanScrollRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 1);
-  };
-
-  const scrollChips = (dir: 'left' | 'right') => {
-    const el = chipsRef.current;
-    if (!el) return;
-    const amount = Math.max(200, Math.floor(el.clientWidth * 0.8));
-    el.scrollBy({ left: dir === 'left' ? -amount : amount, behavior: 'smooth' });
-  };
-
-  useEffect(() => {
-    updateScrollButtons();
-    const el = chipsRef.current;
-    if (!el) return;
-    const onScroll = () => updateScrollButtons();
-    el.addEventListener('scroll', onScroll, { passive: true });
-    window.addEventListener('resize', updateScrollButtons);
-    return () => {
-      el.removeEventListener('scroll', onScroll as EventListener);
-      window.removeEventListener('resize', updateScrollButtons);
-    };
-  }, [visibleSubcategories]);
-
-  const derivedGroup: 'oficios' | 'profesiones' | undefined =
-  selectedArea === 'profesiones'
-    ? 'profesiones'
-    : (selectedArea !== 'all' ? 'oficios'
-       : (selectedSubcategory !== 'all'
-           ? (SUBCATEGORIES_PROFESIONES.some(s => s.slug === selectedSubcategory) ? 'profesiones' : 'oficios')
-           : undefined));
+// Determinar la categoría a filtrar
+const categoriaToFilter = useMemo(() => {
+  if (selectedCategory !== "all") {
+    return selectedCategory;
+  }
+  // Si hay un área seleccionada pero no una subcategoría específica, no filtrar por categoría
+  // (el grupo ya filtra por oficios/profesiones)
+  return undefined;
+}, [selectedCategory]);
 
 const filters = {
   q: searchTerm || undefined,
   grupo: derivedGroup,
-  categoria: selectedSubcategory !== "all" ? selectedSubcategory : undefined, // API espera slug de subcategoría
+  categoria: categoriaToFilter, // API espera slug de subcategoría
   location: selectedLocation !== "all" ? selectedLocation : undefined,
   page,
   limit: 20,
@@ -103,19 +67,7 @@ const filters = {
   //   setSearchTerm(suggestionName);
   // };
 
-  const handleCategoryChipClick = (sub: { slug: string; name: string; group: 'oficios' | 'profesiones' }) => {
-    if (selectedCategory === sub.slug) {
-      setSelectedCategory('all');
-      setBarSearchQuery('');
-      setSearchTerm('');
-    } else {
-      setSelectedGroup(sub.group);
-      setSelectedCategory(sub.slug);
-      setBarSearchQuery(sub.name);
-      setSearchTerm(sub.name);
-    }
-    setPage(1);
-  };
+
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
@@ -129,7 +81,29 @@ const filters = {
     const grupo = searchParams.get('grupo');
     const q = searchParams.get('q');
     
-    if (categoria) setSelectedCategory(categoria);
+    if (categoria) {
+      setSelectedCategory(categoria);
+      // Buscar en áreas de oficios
+      const area = AREAS_OFICIOS.find(a => a.slug === categoria);
+      if (area) {
+        setSelectedArea(area.slug);
+        setSelectedGroup('oficios');
+      } else {
+        // Buscar en subcategorías de oficios
+        const subcatOficios = SUBCATEGORIES_OFICIOS.find(s => s.slug === categoria);
+        if (subcatOficios) {
+          setSelectedArea(subcatOficios.areaSlug || 'all');
+          setSelectedGroup('oficios');
+        } else {
+          // Buscar en subcategorías de profesiones
+          const subcatProfesiones = SUBCATEGORIES_PROFESIONES.find(s => s.slug === categoria);
+          if (subcatProfesiones) {
+            setSelectedArea('profesiones');
+            setSelectedGroup('profesiones');
+          }
+        }
+      }
+    }
     if (grupo) setSelectedGroup(grupo);
     if (q) {
       setSearchTerm(q);
@@ -138,14 +112,21 @@ const filters = {
   }, [searchParams]);
 
   useEffect(() => {
-    if (selectedCategory !== 'all') {
-      const current = allSubcategories.find(s => s.slug === selectedCategory);
-      if (!current || (selectedGroup !== 'all' && current.group !== selectedGroup)) {
-        setSelectedCategory('all');
+    if (selectedCategory !== 'all' && selectedGroup !== 'all') {
+      // Verificar que la categoría seleccionada coincide con el grupo
+      if (selectedGroup === 'oficios') {
+        const found = SUBCATEGORIES_OFICIOS.find(s => s.slug === selectedCategory);
+        if (!found) {
+          setSelectedCategory('all');
+        }
+      } else if (selectedGroup === 'profesiones') {
+        const found = SUBCATEGORIES_PROFESIONES.find(s => s.slug === selectedCategory);
+        if (!found) {
+          setSelectedCategory('all');
+        }
       }
     }
-    setPage(1);
-  }, [selectedGroup, allSubcategories, selectedCategory]);
+  }, [selectedGroup, selectedCategory]);
 
   useEffect(() => {
     const params = new URLSearchParams();
@@ -157,173 +138,269 @@ const filters = {
     router.replace(qs ? `/servicios?${qs}` : `/servicios`, { scroll: false });
   }, [selectedGroup, selectedCategory, searchTerm, page, router]);
 
-  const getCategoryDisplayName = () => {
-    const category = categoriesOptions.find(cat => cat.value === selectedCategory);
-    return category ? category.label : "Todos los servicios";
+  // Resetear página cuando cambian los filtros
+  useEffect(() => {
+    setPage(1);
+  }, [selectedGroup, selectedCategory, selectedLocation, searchTerm]);
+
+
+  const handleCategorySelect = (slug: string) => {
+    const area = AREAS_OFICIOS.find(a => a.slug === slug);
+    if (area) {
+      setSelectedArea(slug);
+      setSelectedGroup('oficios');
+      setSelectedCategory('all'); // Categoría principal, no subcategoría específica
+      setSearchTerm('');
+      setBarSearchQuery('');
+      setPage(1);
+    } else if (slug === 'profesiones') {
+      setSelectedArea('profesiones');
+      setSelectedGroup('profesiones');
+      setSelectedCategory('all');
+      setSearchTerm('');
+      setBarSearchQuery('');
+      setPage(1);
+    }
+  };
+
+  const handleSubcategorySelect = (slug: string) => {
+    // Buscar en subcategorías de oficios
+    const subcatOficios = SUBCATEGORIES_OFICIOS.find(s => s.slug === slug);
+    if (subcatOficios) {
+      setSelectedArea(subcatOficios.areaSlug || 'all');
+      setSelectedGroup('oficios');
+      setSelectedCategory(slug);
+      setSearchTerm('');
+      setBarSearchQuery('');
+      setPage(1);
+      return;
+    }
+    // Buscar en subcategorías de profesiones
+    const subcatProfesiones = SUBCATEGORIES_PROFESIONES.find(s => s.slug === slug);
+    if (subcatProfesiones) {
+      setSelectedArea('profesiones');
+      setSelectedGroup('profesiones');
+      setSelectedCategory(slug);
+      setSearchTerm('');
+      setBarSearchQuery('');
+      setPage(1);
+    }
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="container mx-auto px-4 py-8">
-        <div className="max-w-7xl mx-auto">
-          {/* Header */}
-          <div className="mb-8">
-            <div className="flex items-center justify-between mb-6">
-              <div>
-                <h1 className="text-3xl lg:text-4xl font-bold text-gray-900 font-rutan">
-                  {selectedCategory === "all" ? "Encontrar servicios" : getCategoryDisplayName()}
-                </h1>
-                <p className="text-gray-600 mt-1">
-                  {loading ? 'Cargando...' : `${total} ${total === 1 ? 'servicio encontrado' : 'servicios encontrados'}`}
-                </p>
+    <div className="min-h-screen bg-background-light dark:bg-background-dark">
+      <main className="pt-20 pb-12 px-4 lg:px-8 max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-8">
+        {/* Sidebar */}
+        <aside className="hidden lg:block lg:col-span-3 sticky top-20 h-[calc(100vh-6rem)] overflow-y-auto custom-scroll pr-4">
+          {/* CTA para profesionales */}
+          <div className="mb-8 p-5 rounded-2xl bg-gradient-to-br from-primary to-emerald-900 text-white shadow-lg">
+            <h3 className="font-bold text-lg mb-2">¿Ofreces servicios?</h3>
+            <p className="text-xs text-emerald-100 mb-4 leading-relaxed">Unite a la red oficial de profesionales de la ciudad y conectá con más clientes.</p>
+            <Link
+              href="/auth/registro"
+              className="w-full py-2 bg-white text-primary font-semibold text-sm rounded-lg hover:bg-emerald-50 transition-colors flex items-center justify-center gap-2"
+            >
+              Registrarme ahora
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+          </div>
+
+          {/* Categorías */}
+          <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-4">Categorías</h4>
+          <nav className="space-y-2">
+            {/* Áreas de oficios */}
+            {AREAS_OFICIOS.slice(0, 8).map((area) => {
+              const isActive = selectedArea === area.slug;
+              const subcategories = SUBCATEGORIES_OFICIOS.filter(s => s.areaSlug === area.slug);
+              const iconMap: Record<string, LucideIcon | null> = {
+                'construccion-mantenimiento': Wrench,
+                'climatizacion': Snowflake,
+                'servicios-electronicos': Bolt,
+                'automotores': Car,
+                'jardineria': TreePine,
+              };
+              const Icon = iconMap[area.slug] || Wrench;
+              
+              return (
+                <CategoryItem
+                  key={area.id}
+                  name={area.name}
+                  slug={area.slug}
+                  icon={Icon}
+                  isActive={isActive}
+                  subcategories={subcategories.map(s => ({ slug: s.slug, name: s.name }))}
+                  selectedSubcategory={selectedCategory !== 'all' ? selectedCategory : undefined}
+                  onSelect={() => handleCategorySelect(area.slug)}
+                  onSelectSubcategory={handleSubcategorySelect}
+                />
+              );
+            })}
+            
+            {/* Profesiones */}
+            <CategoryItem
+              name="Profesiones"
+              slug="profesiones"
+              icon={null}
+              isActive={selectedArea === 'profesiones'}
+              subcategories={SUBCATEGORIES_PROFESIONES.slice(0, 6).map(s => ({ slug: s.slug, name: s.name }))}
+              selectedSubcategory={selectedCategory !== 'all' ? selectedCategory : undefined}
+              onSelect={() => handleCategorySelect('profesiones')}
+              onSelectSubcategory={handleSubcategorySelect}
+            />
+          </nav>
+        </aside>
+
+        {/* Contenido principal */}
+        <div className="col-span-1 lg:col-span-9 space-y-8">
+          {/* Barra de búsqueda y filtros */}
+          <section className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
+            <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
+              <div className="relative w-full md:w-1/2">
+                <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <Search className="text-gray-400 h-5 w-5" />
+                </span>
+                <input
+                  type="text"
+                  value={barSearchQuery}
+                  onChange={handleSearchChange}
+                  placeholder="¿Qué servicio estás buscando? ej: Plomero, Electricista..."
+                  className="block w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg leading-5 bg-gray-50 dark:bg-gray-800 placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary sm:text-sm transition-colors"
+                />
+              </div>
+              <div className="flex gap-2 w-full md:w-auto overflow-x-auto pb-1 md:pb-0 no-scrollbar items-center">
+                <div className="relative min-w-[180px]">
+                  <MapPin className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 pointer-events-none z-10" />
+                  <Select
+                    value={selectedLocation}
+                    onValueChange={(value) => {
+                      setSelectedLocation(value);
+                      setPage(1);
+                    }}
+                  >
+                    <SelectTrigger className="w-full pl-10 pr-8 py-1.5 rounded-lg border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-xs font-medium focus:ring-4 focus:ring-green-100 focus:border-[#006F4B] transition-all duration-200">
+                      <SelectValue placeholder="Todas las ciudades" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todas las ciudades</SelectItem>
+                      {LOCATIONS.map((loc) => (
+                        <SelectItem key={loc.id} value={loc.id}>
+                          {loc.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <button 
+                  onClick={() => {
+                    setShowVerifiedOnly(!showVerifiedOnly);
+                    setPage(1);
+                  }}
+                  className={`flex items-center gap-1 px-3 py-1.5 rounded-lg border-2 text-xs font-medium whitespace-nowrap transition-all duration-200 ${
+                    showVerifiedOnly
+                      ? 'border-[#006F4B] bg-[#006F4B] text-white focus:ring-4 focus:ring-green-100'
+                      : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 focus:ring-4 focus:ring-green-100 focus:border-[#006F4B]'
+                  }`}
+                >
+                  <Verified className="h-4 w-4" />
+                  Verificados
+                </button>
               </div>
             </div>
+          </section>
 
-            {/* Filtros mejorados */}
-            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden mb-8">
-              {/* Header de filtros */}
-              <div className="bg-gradient-to-r from-gray-50 to-gray-100 px-6 py-4 border-b border-gray-200">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="text-lg font-semibold text-gray-900">Filtros de búsqueda</h3>
-                    <p className="text-sm text-gray-600">Encuentra el servicio que necesitas</p>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Button
-                      variant={viewMode === "grid" ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => setViewMode("grid")}
-                      className="rounded-lg"
-                    >
-                      <Grid className="h-4 w-4 mr-1" />
-                      Grid
-                    </Button>
-                    <Button
-                      variant={viewMode === "list" ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => setViewMode("list")}
-                      className="rounded-lg"
-                    >
-                      <List className="h-4 w-4 mr-1" />
-                      Lista
-                    </Button>
-                  </div>
-                </div>
-              </div>
+          {/* Filtros por categoría - Mobile */}
+          <section className="lg:hidden bg-white dark:bg-gray-800 rounded-2xl p-4 shadow-sm border border-gray-200 dark:border-gray-700">
+            <button
+              type="button"
+              onClick={() => setShowMobileCategories((prev) => !prev)}
+              className="w-full flex items-center justify-between px-2 py-1.5 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors"
+            >
+              <span>Categorías</span>
+              <span className="text-xs text-gray-400">
+                {showMobileCategories ? "Ocultar" : "Mostrar"}
+              </span>
+            </button>
+            {showMobileCategories && (
+              <div className="mt-3 space-y-2 max-h-[380px] overflow-y-auto custom-scroll pr-1">
+                {/* Áreas de oficios */}
+                {AREAS_OFICIOS.slice(0, 8).map((area) => {
+                  const isActive = selectedArea === area.slug;
+                  const subcategories = SUBCATEGORIES_OFICIOS.filter(
+                    (s) => s.areaSlug === area.slug
+                  );
+                  const iconMap: Record<string, LucideIcon | null> = {
+                    "construccion-mantenimiento": Wrench,
+                    climatizacion: Snowflake,
+                    "servicios-electronicos": Bolt,
+                    automotores: Car,
+                    jardineria: TreePine,
+                  };
+                  const Icon = iconMap[area.slug] || Wrench;
 
-              {/* Contenido de filtros */}
-              <div className="p-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                  {/* Búsqueda */}
-                  <div className="space-y-2 lg:col-span-2">
-                    <label className="text-sm font-medium text-gray-700">Buscar</label>
-                    <div className="relative">
-                      <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-                      <Input
-                        type="search"
-                        placeholder="Nombre, especialidad, servicios..."
-                        value={barSearchQuery}
-                        onChange={handleSearchChange}
-                        className="pl-10 h-9 rounded-lg border-gray-300 focus:border-[#006F4B] focus:ring-2 focus:ring-[#006F4B]/20 transition-all duration-200"
-                      />
-                    </div>
-                  </div>
+                  return (
+                    <CategoryItem
+                      key={area.id}
+                      name={area.name}
+                      slug={area.slug}
+                      icon={Icon}
+                      isActive={isActive}
+                      subcategories={subcategories.map((s) => ({
+                        slug: s.slug,
+                        name: s.name,
+                      }))}
+                      selectedSubcategory={
+                        selectedCategory !== "all" ? selectedCategory : undefined
+                      }
+                      onSelect={() => {
+                        handleCategorySelect(area.slug);
+                      }}
+                      onSelectSubcategory={(slug) => {
+                        handleSubcategorySelect(slug);
+                      }}
+                    />
+                  );
+                })}
 
-                  {/* Grupo */}
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700">Grupo</label>
-                    <div className="relative">
-                      <Select value={selectedArea} onValueChange={setSelectedArea}>
-                        <SelectTrigger className="w-full h-12 rounded-lg border-gray-300 focus:border-[#006F4B] focus:ring-2 focus:ring-[#006F4B]/20 transition-all duration-200">
-                          <SelectValue placeholder="Seleccionar grupo" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {categoriesOptions.map((g) => (
-                            <SelectItem key={g.value} value={g.value}>
-                              {g.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-
-                 
-                  {/* Localidad */}
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700">Lugar de trabajo</label>
-                    <div className="relative">
-                      <Select value={selectedLocation} onValueChange={setSelectedLocation}>
-                        <SelectTrigger className="w-full h-12 rounded-lg border-gray-300 focus:border-[#006F4B] focus:ring-2 focus:ring-[#006F4B]/20 transition-all duration-200">
-                          <SelectValue placeholder="Seleccionar localidad" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all">Todas las localidades</SelectItem>
-                          {LOCATIONS.map((l) => (
-                            <SelectItem key={l.id} value={l.id}>
-                              {l.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Chips de categorías */}
-              <div className="px-6 pb-6">
-                <div className="relative">
-                  {canScrollLeft && (
-                    <button
-                      type="button"
-                      aria-label="Desplazar izquierda"
-                      onClick={() => scrollChips('left')}
-                      className="absolute left-0 top-1/2 -translate-y-1/2 z-10 rounded-full bg-white/90 shadow-md border p-1 md:p-2 hover:bg-white"
-                    >
-                      <ChevronLeft className="h-5 w-5 md:h-6 md:w-6" />
-                    </button>
+                {/* Profesiones */}
+                <CategoryItem
+                  name="Profesiones"
+                  slug="profesiones"
+                  icon={null}
+                  isActive={selectedArea === "profesiones"}
+                  subcategories={SUBCATEGORIES_PROFESIONES.slice(0, 6).map(
+                    (s) => ({ slug: s.slug, name: s.name })
                   )}
-
-                  <div
-                    ref={chipsRef}
-                    className="flex gap-2 whitespace-nowrap py-1 overflow-x-auto scroll-smooth px-8"
-                    style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
-                  >
-                    {visibleSubcategories.map((s) => (
-                      <Button
-                        key={s.slug}
-                        variant={selectedCategory === s.slug ? "default" : "outline"}
-                        size="sm"
-                        className="rounded-full"
-                        onClick={() => handleCategoryChipClick(s)}
-                      >
-                        {s.name}
-                      </Button>
-                    ))}
-                  </div>
-
-                  {canScrollRight && (
-                    <button
-                      type="button"
-                      aria-label="Desplazar derecha"
-                      onClick={() => scrollChips('right')}
-                      className="absolute right-0 top-1/2 -translate-y-1/2 z-10 rounded-full bg-white/90 shadow-md border p-1 md:p-2 hover:bg-white"
-                    >
-                      <ChevronRight className="h-5 w-5 md:h-6 md:w-6" />
-                    </button>
-                  )}
-                </div>
+                  selectedSubcategory={
+                    selectedCategory !== "all" ? selectedCategory : undefined
+                  }
+                  onSelect={() => {
+                    handleCategorySelect("profesiones");
+                  }}
+                  onSelectSubcategory={(slug) => {
+                    handleSubcategorySelect(slug);
+                  }}
+                />
               </div>
+            )}
+          </section>
+
+          {/* Header de resultados */}
+          <div className="flex items-end justify-between border-b border-gray-200 dark:border-gray-700 pb-2">
+            <div>
+              <h2 className="text-xl font-bold text-gray-900 dark:text-white">Profesionales Destacados</h2>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                {loading ? 'Cargando...' : `${total} ${total === 1 ? 'servicio encontrado' : 'servicios encontrados'}`}
+              </p>
             </div>
           </div>
+
 
           {/* Estados de carga y error */}
           {loading ? (
             <div className="flex items-center justify-center py-12">
               <div className="text-center">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto"></div>
-                <p className="mt-4 text-gray-600">Cargando servicios...</p>
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+                <p className="mt-4 text-gray-600 dark:text-gray-400">Cargando servicios...</p>
               </div>
             </div>
           ) : error ? (
@@ -337,16 +414,30 @@ const filters = {
               </Button>
             </div>
           ) : services.length === 0 ? (
-            <div className="text-center py-12">
-              <p className="text-gray-500 text-lg">No se encontraron servicios.</p>
-              <p className="text-gray-400 text-sm mt-2">Intenta ajustar tus filtros de búsqueda.</p>
+            <div className="col-span-full flex flex-col items-center justify-center py-16 text-center">
+              <div className="bg-gray-100 dark:bg-gray-800 p-4 rounded-full mb-4">
+                <Search className="h-8 w-8 text-gray-400" />
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">No encontramos resultados</h3>
+              <p className="text-gray-600 dark:text-gray-400 max-w-md mt-2 mb-6">
+                No hay servicios que coincidan con tu búsqueda. 
+                Intenta con términos más generales o limpia los filtros.
+              </p>
+              <Button 
+                variant="outline" 
+                onClick={() => {
+                  setSearchTerm("");
+                  setBarSearchQuery("");
+                  setSelectedCategory("all");
+                  setSelectedGroup("all");
+                  setSelectedLocation("all");
+                }}
+              >
+                Limpiar todos los filtros
+              </Button>
             </div>
           ) : (
-            <div className={
-              viewMode === "grid" 
-                ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
-                : "space-y-4"
-            }>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {(() => {
                 // agrupar por profesional
                 const grouped = new Map<string, {
@@ -367,23 +458,19 @@ const filters = {
                 return Array.from(grouped.values()).map(({ professional, services: svcList }) => {
                   const first = svcList[0]!;
                   return (
-                    <ServiceCard
+                    <ProfessionalCard
                       key={professional!.id}
-                      service={{
-                        id: first.id,
-                        title: first.title,
-                        description: first.description,
-                        priceRange: first.priceRange,
-                        professional: {
-                          id: professional!.id,
-                          user: { name: professional!.user!.name! },
-                          rating: professional!.rating,
-                          reviewCount: professional!.reviewCount,
-                          verified: professional!.verified,
-                          ProfilePicture: (professional as unknown as { ProfilePicture?: string }).ProfilePicture || null,
-                          services: svcList.map(s => ({ id: s.id, title: s.title })),
+                      professional={{
+                        id: professional!.id,
+                        user: { name: professional!.user!.name! },
+                        bio: (professional as unknown as { bio?: string }).bio || first.description,
+                        verified: professional!.verified,
+                        specialties: svcList.map(s => s.title),
+                        primaryCategory: { name: first.category!.name },
+                        location: (professional as unknown as { location?: string | null }).location || undefined,
+                        socialNetworks: {
+                          profilePicture: (professional as unknown as { ProfilePicture?: string | null }).ProfilePicture || undefined,
                         },
-                        category: { name: first.category!.name },
                       }}
                     />
                   );
@@ -394,7 +481,7 @@ const filters = {
 
           {/* Paginación */}
           {services.length > 0 && totalPages > 1 && (
-            <div className="mt-12 flex justify-center">
+            <div className="mt-8 flex justify-center">
               <div className="flex items-center space-x-2">
                 <Button 
                   variant="outline" 
@@ -404,7 +491,7 @@ const filters = {
                 >
                   Anterior
                 </Button>
-                <span className="px-3 py-2 rounded-xl border">
+                <span className="px-3 py-2 rounded-xl border border-gray-200 dark:border-gray-700">
                   {page} / {totalPages}
                 </span>
                 <Button 
@@ -418,8 +505,46 @@ const filters = {
               </div>
             </div>
           )}
+
+          {/* Hero Section - Movido al final */}
+          <section className="bg-[#F8F5EE] dark:bg-gray-800 rounded-2xl p-6 md:p-8 flex flex-col md:flex-row items-center justify-between gap-6 relative overflow-hidden">
+            <div className="absolute -right-10 -top-10 w-40 h-40 bg-yellow-200 dark:bg-yellow-900/20 rounded-full blur-3xl opacity-50"></div>
+            <div className="absolute -left-10 -bottom-10 w-40 h-40 bg-green-200 dark:bg-green-900/20 rounded-full blur-3xl opacity-50"></div>
+            <div className="relative z-10 max-w-lg">
+              <div className="inline-flex items-center gap-2 bg-white dark:bg-gray-700 rounded-full px-3 py-1 shadow-sm mb-3">
+                <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+                <span className="text-xs font-medium text-gray-600 dark:text-gray-300">Más de 500 profesionales activos</span>
+              </div>
+              <h1 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white mb-2">
+                Encontrá tu solución, <span className="text-primary">¡con solo un clic!</span>
+              </h1>
+              <p className="text-gray-600 dark:text-gray-400 text-sm">
+                Plataforma oficial para conectar vecinos con profesionales verificados en Ceres.
+              </p>
+            </div>
+            <div className="relative z-10 flex gap-4">
+              <div className="flex flex-col items-center gap-1">
+                <div className="w-10 h-10 rounded-full bg-white dark:bg-gray-700 flex items-center justify-center shadow-sm text-primary">
+                  <Verified className="h-5 w-5" />
+                </div>
+                <span className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase">Seguro</span>
+              </div>
+              <div className="flex flex-col items-center gap-1">
+                <div className="w-10 h-10 rounded-full bg-white dark:bg-gray-700 flex items-center justify-center shadow-sm text-primary">
+                  <Zap className="h-5 w-5" />
+                </div>
+                <span className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase">Rápido</span>
+              </div>
+              <div className="flex flex-col items-center gap-1">
+                <div className="w-10 h-10 rounded-full bg-white dark:bg-gray-700 flex items-center justify-center shadow-sm text-primary">
+                  <MapPin className="h-5 w-5" />
+                </div>
+                <span className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase">Local</span>
+              </div>
+            </div>
+          </section>
         </div>
-      </div>
+      </main>
     </div>
   );
 }
