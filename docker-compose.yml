@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # Redis para BullMQ (OPCIONAL - solo si no tienes Redis corriendo)
   redis:
