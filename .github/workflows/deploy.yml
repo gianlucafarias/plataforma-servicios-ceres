@@ -46,14 +46,12 @@ jobs:
             echo "🗄️ Aplicando migraciones de base de datos..."
             npx prisma migrate deploy
             
-            # 4. Reiniciar con PM2 (Sin afectar otros servicios)
-            echo "🔄 Reiniciando servicios en PM2..."
-            # Intentamos borrar los servicios viejos de Docker para liberar RAM
-            sudo docker-compose down || true
+            # 4. Reiniciar con PM2
+            echo "🔄 Actualizando servicios Ceres..."
             
-            # Arrancar/Reiniciar con PM2 usando el archivo de configuración
-            pm2 delete ceres-app ceres-worker || true
-            pm2 start ecosystem.config.js --env production
-            pm2 save
+            # Usamos sudo pm2 y startOrRestart con nombres ÚNICOS
+            # Esto permitirá que lo veas cuando hagas pm2 list como root
+            sudo pm2 startOrRestart ecosystem.config.js --env production
+            sudo pm2 save
             
-            echo "✅ ¡Deploy Exitoso con PM2! App corriendo en puerto 3012."
+            echo "✅ ¡Deploy Exitoso! Ahora puedes ver Ceres en tu lista global con 'pm2 list'."
