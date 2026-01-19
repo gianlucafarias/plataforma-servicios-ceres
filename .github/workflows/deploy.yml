@@ -26,19 +26,12 @@ jobs:
             # 1. Obtener cambios
             git fetch origin main && git reset --hard origin/main
             
-            # 2. Actualizar .env
-            update_env_var() {
-              local key=$1
-              local value=$2
-              grep -q "^${key}=" .env && sed -i "s|^${key}=.*|${key}=${value}|" .env || echo "${key}=${value}" >> .env
-            }
-            
-            echo "📝 Actualizando variables de entorno..."
-            update_env_var "DATABASE_URL" "${{ secrets.DATABASE_URL }}"
-            update_env_var "NEXT_PUBLIC_BASE_URL" "${{ secrets.NEXT_PUBLIC_BASE_URL }}"
-            update_env_var "NEXTAUTH_URL" "${{ secrets.NEXTAUTH_URL }}"
-            update_env_var "NEXTAUTH_SECRET" "${{ secrets.NEXTAUTH_SECRET }}"
-            update_env_var "NODE_ENV" "production"
+            # 2. Verificar .env (Usamos el que tú configuraste manualmente en el VPS)
+            if [ ! -f .env ]; then
+              echo "❌ Error: El archivo .env no existe en /var/www/plataforma-servicios-ceres"
+              exit 1
+            fi
+            echo "✅ Usando configuración .env local del servidor."
             
             # 3. Instalar dependencias y Build (Nativo, sin Docker)
             echo "📦 Instalando dependencias..."
