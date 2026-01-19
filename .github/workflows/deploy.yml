@@ -9,22 +9,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-          
-      - name: Install dependencies (Migrator)
-        run: npm ci
-        
-      - name: 🗄️ Aplicar Migraciones de DB (desde GitHub)
-        env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-        run: npx prisma migrate deploy
 
-      - name: 🚀 Deploy a VPS via SSH
+      - name: 🚀 Deploy a VPS via PM2
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.VPS_HOST }}
@@ -34,58 +20,47 @@ jobs:
           command_timeout: 30m
           script: |
             set -e
-            echo "🚀 Iniciando deploy en VPS..."
+            echo "🚀 Iniciando deploy con PM2..."
             cd /var/www/plataforma-servicios-ceres
             
-            # Detectar IP del host
-            DOCKER_GATEWAY_IP=$(docker network inspect bridge --format '{{range .IPAM.Config}}{{.Gateway}}{{end}}' 2>/dev/null || echo "172.17.0.1")
-            
-            # Pull y Backup
+            # 1. Obtener cambios
             git fetch origin main && git reset --hard origin/main
-            [ -f .env ] && cp .env .env.backup.$(date +%Y%m%d_%H%M%S)
             
-            # Función para actualizar variables
+            # 2. Actualizar .env
             update_env_var() {
               local key=$1
               local value=$2
               grep -q "^${key}=" .env && sed -i "s|^${key}=.*|${key}=${value}|" .env || echo "${key}=${value}" >> .env
             }
             
-            # Actualizar .env (mantenemos esto para el runtime de la app)
-            echo "📝 Actualizando .env..."
+            echo "📝 Actualizando variables de entorno..."
             update_env_var "DATABASE_URL" "${{ secrets.DATABASE_URL }}"
             update_env_var "NEXT_PUBLIC_BASE_URL" "${{ secrets.NEXT_PUBLIC_BASE_URL }}"
             update_env_var "NEXTAUTH_URL" "${{ secrets.NEXTAUTH_URL }}"
             update_env_var "NEXTAUTH_SECRET" "${{ secrets.NEXTAUTH_SECRET }}"
             update_env_var "NODE_ENV" "production"
             
-            # 🛠️ CORRECCIÓN DE RED (solo para el runtime de la app)
-            sed -i "s|localhost:5432|${DOCKER_GATEWAY_IP}:5432|g" .env
-            sed -i "s|127.0.0.1:5432|${DOCKER_GATEWAY_IP}:5432|g" .env
+            # 3. Instalar dependencias y Build (Nativo, sin Docker)
+            echo "📦 Instalando dependencias..."
+            npm install
             
-            # Aislamiento de proyecto
-            export COMPOSE_PROJECT_NAME=ceres
+            echo "🗄️ Generando Prisma Client..."
+            npx prisma generate
             
-            # Detectar qué versión de docker-compose usar
-            if docker compose version &> /dev/null; then
-              COMPOSE_CMD="docker compose"
-            elif command -v docker-compose &> /dev/null; then
-              COMPOSE_CMD="docker-compose"
-            else
-              echo "❌ Error: Docker Compose no está instalado"
-              exit 1
-            fi
-            echo "🐳 Usando: $COMPOSE_CMD"
-
-            # Limpiar y Construir
-            sudo docker image prune -f
-            echo "🔨 Construyendo imagen..."
-            sudo $COMPOSE_CMD build --no-cache \
-              --build-arg NEXT_PUBLIC_BASE_URL="${{ secrets.NEXT_PUBLIC_BASE_URL }}" \
-              --build-arg NEXTAUTH_URL="${{ secrets.NEXTAUTH_URL }}" \
-              --build-arg DATABASE_URL="${{ secrets.DATABASE_URL }}" app
+            echo "🔨 Construyendo aplicación (Next.js)..."
+            npm run build
             
-            echo "🚀 Levantando App..."
-            sudo $COMPOSE_CMD up -d --remove-orphans app
+            echo "🗄️ Aplicando migraciones de base de datos..."
+            npx prisma migrate deploy
             
-            echo "✅ ¡Deploy Exitoso! La DB fue actualizada por GitHub y la App por el VPS."
+            # 4. Reiniciar con PM2 (Sin afectar otros servicios)
+            echo "🔄 Reiniciando servicios en PM2..."
+            # Intentamos borrar los servicios viejos de Docker para liberar RAM
+            sudo docker-compose down || true
+            
+            # Arrancar/Reiniciar con PM2 usando el archivo de configuración
+            pm2 delete ceres-app ceres-worker || true
+            pm2 start ecosystem.config.js --env production
+            pm2 save
+            
+            echo "✅ ¡Deploy Exitoso con PM2! App corriendo en puerto 3012."
