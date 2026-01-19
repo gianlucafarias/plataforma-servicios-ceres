@@ -94,12 +94,16 @@ jobs:
               rm get-docker.sh
             fi
             
-            # Instalar Docker Compose si no está instalado
-            if ! command -v docker-compose &> /dev/null && ! docker compose version &> /dev/null; then
-              echo "🐳 Instalando Docker Compose..."
-              sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-              sudo chmod +x /usr/local/bin/docker-compose
+            # Detectar qué versión de docker-compose usar
+            if docker compose version &> /dev/null; then
+              COMPOSE_CMD="docker compose"
+            elif command -v docker-compose &> /dev/null; then
+              COMPOSE_CMD="docker-compose"
+            else
+              echo "❌ Error: Docker Compose no está instalado"
+              exit 1
             fi
+            echo "🐳 Usando: $COMPOSE_CMD"
             
             # Verificar que Redis esté accesible
             echo "🔍 Verificando Redis..."
@@ -119,21 +123,21 @@ jobs:
             
             echo "🔧 Build args: NEXT_PUBLIC_BASE_URL=$NEXT_PUBLIC_BASE_URL"
             
-            docker compose build --no-cache \
+            $COMPOSE_CMD build --no-cache \
               --build-arg NEXT_PUBLIC_BASE_URL="${NEXT_PUBLIC_BASE_URL}" \
               --build-arg NEXTAUTH_URL="${NEXTAUTH_URL}" \
               --build-arg DATABASE_URL="${DATABASE_URL}"
             
             echo "🚀 Levantando servicios..."
-            docker compose up -d --remove-orphans app worker queues-ui
+            $COMPOSE_CMD up -d --remove-orphans app worker queues-ui
             
             # Ejecutar migraciones
             echo "🗄️ Ejecutando migraciones de base de datos..."
-            docker compose run --rm app npx prisma migrate deploy
+            $COMPOSE_CMD run --rm app npx prisma migrate deploy
             
             # Verificar que los contenedores estén corriendo
             echo "✅ Verificando contenedores..."
-            docker compose ps
+            $COMPOSE_CMD ps
             
             # Verificar health check
             echo "🏥 Verificando health check..."
