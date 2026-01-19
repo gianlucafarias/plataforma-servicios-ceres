@@ -105,7 +105,8 @@ export const authOptions: AuthOptions = {
             }
         })
     ],
-    debug: process.env.NODE_ENV === 'development',
+    // Permite activar logs detallados de NextAuth en producción con NEXTAUTH_DEBUG=true
+    debug: process.env.NODE_ENV === 'development' || process.env.NEXTAUTH_DEBUG === 'true',
     pages: {
         signIn: '/auth/login',
         error: '/auth/login',

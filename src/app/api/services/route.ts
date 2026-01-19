@@ -130,8 +130,16 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     console.error('List services error:', error);
+
+    // Mensaje más informativo
+    const baseMessage = 'Error al obtener servicios';
+    const detailed =
+      error instanceof Error && error.message
+        ? `${baseMessage}. Detalle: ${error.message}`
+        : baseMessage;
+
     return NextResponse.json(
-      { success: false, error: 'fetch_failed', message: 'Error al obtener servicios' },
+      { success: false, error: 'fetch_failed', message: detailed },
       { status: 500 }
     );
   }

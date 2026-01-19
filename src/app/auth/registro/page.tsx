@@ -90,11 +90,54 @@ export default function RegistroPage() {
   // Registrarse con redes sociales y luego completar perfil profesional
   const handleSocialRegister = async (provider: "google" | "facebook") => {
     setSocialLoading(provider);
+    setErrors({}); // Limpiar errores previos
+    
     try {
       // Redirige a OAuth y luego a completar-perfil
-      await signIn(provider, { callbackUrl: "/auth/completar-perfil" });
+      const result = await signIn(provider, { 
+        callbackUrl: "/auth/completar-perfil",
+        redirect: false 
+      });
+      
+      // Si hay un error, mostrarlo
+      if (result?.error) {
+        const errorMessages: Record<string, string> = {
+          AccessDenied: "El acceso con redes sociales no está disponible en este momento.",
+          Configuration: "Error de configuración del servidor. Contactá al administrador.",
+          OAuthSignin: "Error al conectar con el proveedor de autenticación.",
+          OAuthCallback: "Error al procesar la respuesta del proveedor.",
+          OAuthCreateAccount: "No se pudo crear la cuenta con este proveedor.",
+          EmailCreateAccount: "No se pudo crear la cuenta con este email.",
+          Callback: "Error en el proceso de autenticación.",
+          OAuthAccountNotLinked: "Este email ya está registrado con otro método de inicio de sesión.",
+          SessionRequired: "Necesitás iniciar sesión para acceder.",
+          Default: "Ocurrió un error durante la autenticación.",
+        };
+        
+        const errorMessage = errorMessages[result.error] || errorMessages.Default;
+        console.error(`Error en registro con ${provider}:`, result.error, result);
+        setErrors({ general: `Error al registrarse con ${provider === "google" ? "Google" : "Facebook"}: ${errorMessage}` });
+        setSocialLoading(null);
+        return;
+      }
+      
+      // Si es exitoso, redirigir manualmente
+      if (result?.ok && result.url) {
+        window.location.href = result.url;
+        return;
+      }
+      
+      // Si no hay URL pero es ok, podría ser que ya estamos autenticados
+      if (result?.ok) {
+        router.push("/auth/completar-perfil");
+        return;
+      }
+      
     } catch (err) {
       console.error(`Error con ${provider}:`, err);
+      setErrors({ 
+        general: `Error al registrarse con ${provider === "google" ? "Google" : "Facebook"}. Por favor, intentá nuevamente o usá el formulario de registro.` 
+      });
       setSocialLoading(null);
     }
   };

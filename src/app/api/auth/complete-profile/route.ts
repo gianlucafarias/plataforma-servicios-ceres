@@ -108,6 +108,33 @@ export async function POST(request: NextRequest) {
               available: true
             }
           });
+        } else {
+          // Si la categoría no existe, crear una básica
+          console.warn(`Categoría no encontrada para slug: ${service.categoryId}, creando automáticamente`);
+          const fallbackName = String(service.categoryId)
+            .replace(/-/g, ' ')
+            .replace(/\b\w/g, (m: string) => m.toUpperCase());
+          
+          const newCategory = await tx.category.create({
+            data: {
+              name: fallbackName,
+              description: '',
+              slug: service.categoryId,
+              active: true,
+              groupId: professionalGroup,
+            }
+          });
+          
+          await tx.service.create({
+            data: {
+              professionalId: professional.id,
+              categoryId: newCategory.id,
+              categoryGroup: professionalGroup,
+              title: service.title || newCategory.name,
+              description: service.description,
+              available: true
+            }
+          });
         }
       }
 
@@ -121,10 +148,25 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error) {
+    // Log detallado para debugging en producción
     console.error('Error en complete-profile:', error);
+    if (error instanceof Error && error.stack) {
+      console.error('Stack trace:', error.stack);
+    }
+    
+    const message = error instanceof Error ? error.message : 'Error interno del servidor';
+    
+    // Determinar si es un error de validación o del servidor
+    const isValidationError = message.toLowerCase().includes('required') || 
+                               message.toLowerCase().includes('invalid') ||
+                               message.toLowerCase().includes('not found');
+    
     return NextResponse.json(
-      { success: false, error: 'Error al completar el perfil' },
-      { status: 500 }
+      { 
+        success: false, 
+        error: isValidationError ? message : `Error al completar el perfil. Detalle: ${message}` 
+      },
+      { status: isValidationError ? 400 : 500 }
     );
   }
 }

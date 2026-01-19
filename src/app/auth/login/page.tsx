@@ -40,22 +40,24 @@ export default function LoginPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  // Manejar errores de OAuth de la URL
+  // Tabla compartida de mensajes de error de OAuth
+  const errorMessages: Record<string, string> = {
+    AccessDenied: "El acceso con redes sociales no está disponible en este momento. Por favor, usá email y contraseña.",
+    Configuration: "Error de configuración del servidor. Contactá al administrador.",
+    OAuthSignin: "Error al conectar con el proveedor de autenticación.",
+    OAuthCallback: "Error al procesar la respuesta del proveedor.",
+    OAuthCreateAccount: "No se pudo crear la cuenta con este proveedor.",
+    EmailCreateAccount: "No se pudo crear la cuenta con este email.",
+    Callback: "Error en el proceso de autenticación.",
+    OAuthAccountNotLinked: "Este email ya está registrado con otro método de inicio de sesión.",
+    SessionRequired: "Necesitás iniciar sesión para acceder.",
+    Default: "Ocurrió un error durante la autenticación.",
+  };
+
+  // Manejar errores de OAuth de la URL (cuando NextAuth redirige con ?error=...)
   useEffect(() => {
     const errorParam = searchParams.get("error");
     if (errorParam) {
-      const errorMessages: Record<string, string> = {
-        AccessDenied: "El acceso con redes sociales no está disponible en este momento. Por favor, usá email y contraseña.",
-        Configuration: "Error de configuración del servidor. Contactá al administrador.",
-        OAuthSignin: "Error al conectar con el proveedor de autenticación.",
-        OAuthCallback: "Error al procesar la respuesta del proveedor.",
-        OAuthCreateAccount: "No se pudo crear la cuenta con este proveedor.",
-        EmailCreateAccount: "No se pudo crear la cuenta con este email.",
-        Callback: "Error en el proceso de autenticación.",
-        OAuthAccountNotLinked: "Este email ya está registrado con otro método de inicio de sesión.",
-        SessionRequired: "Necesitás iniciar sesión para acceder.",
-        Default: "Ocurrió un error durante la autenticación.",
-      };
       setOauthError(errorMessages[errorParam] || errorMessages.Default);
       setSocialLoading(null);
     }
@@ -87,9 +89,15 @@ export default function LoginPage() {
         redirect: false 
       });
       
-      // Si hay un error, mostrarlo
+      // Si hay un error, mostrarlo de forma amigable y loguear detalles en consola del cliente
       if (result?.error) {
-        setError(`Error al iniciar sesión con ${provider === "google" ? "Google" : "Facebook"}: ${result.error}`);
+        console.error(`Error en login social (${provider})`, result);
+
+        const friendly =
+          errorMessages[result.error] ||
+          `Error al iniciar sesión con ${provider === "google" ? "Google" : "Facebook"}. Intentá nuevamente más tarde.`;
+
+        setError(friendly);
         setSocialLoading(null);
         return;
       }

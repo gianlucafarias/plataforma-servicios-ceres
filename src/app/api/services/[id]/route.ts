@@ -65,7 +65,11 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     return NextResponse.json({ success: true, data: updated });
   } catch (error) {
     console.error('PATCH /api/services/[id] error:', error);
-    return NextResponse.json({ success: false, error: 'server_error' }, { status: 500 });
+    const message =
+      error instanceof Error && error.message
+        ? `Error al actualizar el servicio. Detalle: ${error.message}`
+        : 'Error al actualizar el servicio';
+    return NextResponse.json({ success: false, error: 'server_error', message }, { status: 500 });
   }
 }
 
@@ -87,7 +91,11 @@ export async function DELETE(_: NextRequest, { params }: { params: Promise<{ id:
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('DELETE /api/services/[id] error:', error);
-    return NextResponse.json({ success: false, error: 'server_error' }, { status: 500 });
+    const message =
+      error instanceof Error && error.message
+        ? `Error al eliminar el servicio. Detalle: ${error.message}`
+        : 'Error al eliminar el servicio';
+    return NextResponse.json({ success: false, error: 'server_error', message }, { status: 500 });
   }
 }
 
