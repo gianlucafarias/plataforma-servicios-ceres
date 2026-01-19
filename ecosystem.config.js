@@ -1,17 +1,17 @@
 module.exports = {
   apps: [
     {
-      name: 'ceres-app',
+      name: 'ceres-platform-v1-app',
       script: 'node_modules/next/dist/bin/next',
       args: 'start -p 3012',
-      env: {
+      env_production: {
         NODE_ENV: 'production',
       },
     },
     {
-      name: 'ceres-worker',
+      name: 'ceres-platform-v1-worker',
       script: 'dist/scripts/worker.js',
-      env: {
+      env_production: {
         NODE_ENV: 'production',
       },
     }
