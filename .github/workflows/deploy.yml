@@ -112,8 +112,12 @@ jobs:
             # Construir imágenes Docker CON los build args para NEXT_PUBLIC_*
             echo "🔨 Construyendo imágenes Docker..."
             
-            # Cargar variables del .env para usarlas como build-args
-            export $(grep -v '^#' .env | xargs)
+            # Cargar solo las variables necesarias para build-args (evita problemas con caracteres especiales)
+            NEXT_PUBLIC_BASE_URL=$(grep '^NEXT_PUBLIC_BASE_URL=' .env | cut -d'=' -f2- | tr -d '"' | tr -d "'")
+            NEXTAUTH_URL=$(grep '^NEXTAUTH_URL=' .env | cut -d'=' -f2- | tr -d '"' | tr -d "'")
+            DATABASE_URL=$(grep '^DATABASE_URL=' .env | cut -d'=' -f2- | tr -d '"' | tr -d "'")
+            
+            echo "🔧 Build args: NEXT_PUBLIC_BASE_URL=$NEXT_PUBLIC_BASE_URL"
             
             docker compose build --no-cache \
               --build-arg NEXT_PUBLIC_BASE_URL="${NEXT_PUBLIC_BASE_URL}" \
