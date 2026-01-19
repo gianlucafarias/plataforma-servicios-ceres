@@ -11,9 +11,11 @@ const hoisted = vi.hoisted(() => ({
       findUnique: vi.fn(),
     },
   },
+  getServerSessionMock: vi.fn(),
 }))
 
 vi.mock('@/lib/prisma', () => ({ prisma: hoisted.prismaMock }))
+vi.mock('next-auth', () => ({ getServerSession: hoisted.getServerSessionMock }))
 
 function makeRequest(url: string) {
   const req = new Request(url)
@@ -49,7 +51,11 @@ describe('GET /api/professionals', () => {
 })
 
 describe('GET /api/professional/[id]', () => {
-  beforeEach(() => vi.clearAllMocks())
+  beforeEach(() => {
+    vi.clearAllMocks()
+    // Mock de sesión (null = no autenticado)
+    hoisted.getServerSessionMock.mockResolvedValue(null)
+  })
 
   it('404 cuando no existe', async () => {
     hoisted.prismaMock.professional.findUnique.mockResolvedValueOnce(null)
