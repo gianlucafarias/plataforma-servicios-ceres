@@ -1,29 +1,6 @@
 version: '3.8'
 
 services:
-  # Base de datos PostgreSQL (OPCIONAL - solo si quieres PostgreSQL en Docker)
-  # Si ya tienes PostgreSQL externo, NO levantes este servicio
-  # Usa DATABASE_URL para apuntar a tu base de datos existente
-  postgres:
-    image: postgres:16-alpine
-    container_name: ceres-postgres
-    restart: unless-stopped
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: ceres
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    networks:
-      - ceres-network
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    profiles:
-      - postgres-internal  # Solo se levanta si usas: docker compose --profile postgres-internal up
-
   # Redis para BullMQ (OPCIONAL - solo si no tienes Redis corriendo)
   redis:
     image: redis:7-alpine
@@ -118,7 +95,6 @@ services:
       - ceres-network
 
 volumes:
-  postgres_data:
   redis_data:
 
 networks:
