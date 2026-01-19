@@ -27,11 +27,15 @@ jobs:
             DOCKER_GATEWAY_IP=$(docker network inspect bridge --format '{{range .IPAM.Config}}{{.Gateway}}{{end}}' 2>/dev/null || echo "172.17.0.1")
             echo "🔍 Gateway de Docker: $DOCKER_GATEWAY_IP"
             
-            # Si existe un .env, hacer backup
+            # Si existe un .env, hacer backup (el .env NO está en git, así que no se borra con git reset)
             if [ -f .env ]; then
               echo "📋 Backup del .env existente..."
               cp .env .env.backup.$(date +%Y%m%d_%H%M%S)
             fi
+            
+            # Pull cambios de Git PRIMERO
+            echo "📥 Obteniendo cambios de Git..."
+            git fetch origin main && git reset --hard origin/main
             
             # Función para actualizar o agregar variable en .env
             update_env_var() {
@@ -44,15 +48,14 @@ jobs:
               fi
             }
             
-            # Actualizar variables desde GitHub Secrets (solo las que están definidas)
+            # Actualizar variables desde GitHub Secrets
             echo "📝 Actualizando .env desde GitHub Secrets..."
             
-            # Database (SOLO DATABASE_URL)
+            # Variables críticas para build y runtime
             [ -n "${{ secrets.DATABASE_URL }}" ] && update_env_var "DATABASE_URL" "${{ secrets.DATABASE_URL }}"
-            
-            # NextAuth
             [ -n "${{ secrets.NEXTAUTH_URL }}" ] && update_env_var "NEXTAUTH_URL" "${{ secrets.NEXTAUTH_URL }}"
             [ -n "${{ secrets.NEXTAUTH_SECRET }}" ] && update_env_var "NEXTAUTH_SECRET" "${{ secrets.NEXTAUTH_SECRET }}"
+            [ -n "${{ secrets.NEXT_PUBLIC_BASE_URL }}" ] && update_env_var "NEXT_PUBLIC_BASE_URL" "${{ secrets.NEXT_PUBLIC_BASE_URL }}"
             
             # SMTP
             [ -n "${{ secrets.SMTP_HOST }}" ] && update_env_var "SMTP_HOST" "${{ secrets.SMTP_HOST }}"
@@ -60,12 +63,8 @@ jobs:
             [ -n "${{ secrets.SMTP_USER }}" ] && update_env_var "SMTP_USER" "${{ secrets.SMTP_USER }}"
             [ -n "${{ secrets.SMTP_PASS }}" ] && update_env_var "SMTP_PASS" "${{ secrets.SMTP_PASS }}"
             [ -n "${{ secrets.SMTP_FROM }}" ] && update_env_var "SMTP_FROM" "${{ secrets.SMTP_FROM }}"
-            [ -n "${{ secrets.SMTP_DEBUG }}" ] && update_env_var "SMTP_DEBUG" "${{ secrets.SMTP_DEBUG }}"
             
-            # Public URL
-            [ -n "${{ secrets.NEXT_PUBLIC_BASE_URL }}" ] && update_env_var "NEXT_PUBLIC_BASE_URL" "${{ secrets.NEXT_PUBLIC_BASE_URL }}"
-            
-            # Redis (si no está en Secrets, usar la detectada solo si no existe en .env)
+            # Redis
             if [ -n "${{ secrets.REDIS_URL }}" ]; then
               update_env_var "REDIS_URL" "${{ secrets.REDIS_URL }}"
             elif [ ! -f .env ] || ! grep -q "^REDIS_URL=" .env; then
@@ -73,33 +72,19 @@ jobs:
             fi
             [ -n "${{ secrets.REDIS_PREFIX }}" ] && update_env_var "REDIS_PREFIX" "${{ secrets.REDIS_PREFIX }}"
             
-            # Timezone
-            [ -n "${{ secrets.TZ }}" ] && update_env_var "TZ" "${{ secrets.TZ }}"
-            
-            # Slack
-            [ -n "${{ secrets.SLACK_WEBHOOK_URL }}" ] && update_env_var "SLACK_WEBHOOK_URL" "${{ secrets.SLACK_WEBHOOK_URL }}"
-            
-            # Queues UI
-            [ -n "${{ secrets.QUEUES_UI_PASS }}" ] && update_env_var "QUEUES_UI_PASS" "${{ secrets.QUEUES_UI_PASS }}"
-            
-            # Admin API
-            [ -n "${{ secrets.ADMIN_API_KEY }}" ] && update_env_var "ADMIN_API_KEY" "${{ secrets.ADMIN_API_KEY }}"
-            
-            # Node Environment
-            [ -n "${{ secrets.NODE_ENV }}" ] && update_env_var "NODE_ENV" "${{ secrets.NODE_ENV }}"
-            
-            # Google OAuth
+            # OAuth y APIs
             [ -n "${{ secrets.GOOGLE_CLIENT_ID }}" ] && update_env_var "GOOGLE_CLIENT_ID" "${{ secrets.GOOGLE_CLIENT_ID }}"
             [ -n "${{ secrets.GOOGLE_CLIENT_SECRET }}" ] && update_env_var "GOOGLE_CLIENT_SECRET" "${{ secrets.GOOGLE_CLIENT_SECRET }}"
-            
-            # Facebook OAuth
             [ -n "${{ secrets.FACEBOOK_CLIENT_ID }}" ] && update_env_var "FACEBOOK_CLIENT_ID" "${{ secrets.FACEBOOK_CLIENT_ID }}"
             [ -n "${{ secrets.FACEBOOK_CLIENT_SECRET }}" ] && update_env_var "FACEBOOK_CLIENT_SECRET" "${{ secrets.FACEBOOK_CLIENT_SECRET }}"
+            [ -n "${{ secrets.ADMIN_API_KEY }}" ] && update_env_var "ADMIN_API_KEY" "${{ secrets.ADMIN_API_KEY }}"
+            [ -n "${{ secrets.SLACK_WEBHOOK_URL }}" ] && update_env_var "SLACK_WEBHOOK_URL" "${{ secrets.SLACK_WEBHOOK_URL }}"
+            [ -n "${{ secrets.QUEUES_UI_PASS }}" ] && update_env_var "QUEUES_UI_PASS" "${{ secrets.QUEUES_UI_PASS }}"
+            [ -n "${{ secrets.TZ }}" ] && update_env_var "TZ" "${{ secrets.TZ }}"
             
-            # Pull cambios
-            echo "📥 Obteniendo cambios de Git..."
-            git fetch origin main && git reset --hard origin/main
-            
+            # Siempre production
+            update_env_var "NODE_ENV" "production"
+
             # Instalar Docker si no está instalado
             if ! command -v docker &> /dev/null; then
               echo "🐳 Instalando Docker..."
@@ -124,16 +109,16 @@ jobs:
               echo "⚠️ Advertencia: No se pudo verificar Redis desde contenedor"
             fi
             
-            # Detener PM2 si está corriendo (migración)
-            if command -v pm2 &> /dev/null; then
-              echo "🛑 Deteniendo PM2..."
-              sudo pm2 stop all 2>/dev/null || true
-              sudo pm2 delete all 2>/dev/null || true
-            fi
-            
-            # Construir y levantar servicios Docker (sin postgres, usando DATABASE_URL externo)
+            # Construir imágenes Docker CON los build args para NEXT_PUBLIC_*
             echo "🔨 Construyendo imágenes Docker..."
-            docker compose build --no-cache
+            
+            # Cargar variables del .env para usarlas como build-args
+            export $(grep -v '^#' .env | xargs)
+            
+            docker compose build --no-cache \
+              --build-arg NEXT_PUBLIC_BASE_URL="${NEXT_PUBLIC_BASE_URL}" \
+              --build-arg NEXTAUTH_URL="${NEXTAUTH_URL}" \
+              --build-arg DATABASE_URL="${DATABASE_URL}"
             
             echo "🚀 Levantando servicios..."
             docker compose up -d --remove-orphans app worker queues-ui

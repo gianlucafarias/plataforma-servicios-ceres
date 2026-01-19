@@ -47,6 +47,10 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        - NEXT_PUBLIC_BASE_URL=${NEXT_PUBLIC_BASE_URL}
+        - NEXTAUTH_URL=${NEXTAUTH_URL}
+        - DATABASE_URL=${DATABASE_URL}
     container_name: ceres-app
     restart: unless-stopped
     ports:
@@ -72,6 +76,10 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        - NEXT_PUBLIC_BASE_URL=${NEXT_PUBLIC_BASE_URL}
+        - NEXTAUTH_URL=${NEXTAUTH_URL}
+        - DATABASE_URL=${DATABASE_URL}
     container_name: ceres-worker
     restart: unless-stopped
     command: node dist/scripts/worker.js
@@ -90,6 +98,10 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        - NEXT_PUBLIC_BASE_URL=${NEXT_PUBLIC_BASE_URL}
+        - NEXTAUTH_URL=${NEXTAUTH_URL}
+        - DATABASE_URL=${DATABASE_URL}
     container_name: ceres-queues-ui
     restart: unless-stopped
     command: node dist/scripts/queues-ui.js

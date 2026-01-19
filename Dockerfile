@@ -23,8 +23,18 @@ COPY . .
 # Generar Prisma Client
 RUN npx prisma generate
 
-# Build de la aplicación
+# Build-time arguments para variables que Next.js necesita incrustar en el cliente
+ARG NEXT_PUBLIC_BASE_URL
+ARG NEXTAUTH_URL
+ARG DATABASE_URL
+
+# Exponerlas como variables de entorno para el proceso de build
+ENV NEXT_PUBLIC_BASE_URL=${NEXT_PUBLIC_BASE_URL}
+ENV NEXTAUTH_URL=${NEXTAUTH_URL}
+ENV DATABASE_URL=${DATABASE_URL}
 ENV NEXT_TELEMETRY_DISABLED=1
+
+# Build de la aplicación
 RUN npm run build
 
 # Stage 3: Runner
