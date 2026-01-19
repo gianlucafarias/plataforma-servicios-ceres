@@ -114,6 +114,10 @@ jobs:
               echo "⚠️ Advertencia: No se pudo verificar Redis desde contenedor"
             fi
             
+            # Limpiar SOLO imágenes viejas de este proyecto para no afectar otros servicios
+            echo "🧹 Liberando espacio (solo imágenes huérfanas)..."
+            sudo docker image prune -f
+            
             # Construir imágenes Docker CON los build args para NEXT_PUBLIC_*
             echo "🔨 Construyendo imágenes Docker..."
             
@@ -130,11 +134,11 @@ jobs:
               --build-arg DATABASE_URL="${DATABASE_URL}"
             
             echo "🚀 Levantando servicios..."
-            sudo $COMPOSE_CMD up -d --remove-orphans app worker queues-ui
+            sudo $COMPOSE_CMD up -d --remove-orphans app
             
             # Ejecutar migraciones
             echo "🗄️ Ejecutando migraciones de base de datos..."
-            sudo $COMPOSE_CMD run --rm app npx prisma@6 migrate deploy
+            sudo $COMPOSE_CMD exec -T app ./node_modules/.bin/prisma migrate deploy
             
             # Verificar que los contenedores estén corriendo
             echo "✅ Verificando contenedores..."

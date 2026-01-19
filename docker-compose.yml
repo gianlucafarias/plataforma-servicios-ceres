@@ -46,43 +46,15 @@ services:
       retries: 3
       start_period: 40s
 
-  # Worker de BullMQ
-  worker:
-    image: plataforma-servicios-ceres-app
-    depends_on:
-      - app
-    container_name: ceres-worker
-    restart: unless-stopped
-    command: node dist/scripts/worker.js
-    env_file:
-      - .env
-    environment:
-      - NODE_ENV=production
-      - REDIS_URL=${REDIS_URL:-redis://172.17.0.1:6379/5}
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    networks:
-      - ceres-network
+  # Worker de BullMQ (DESACTIVADO PARA AHORRAR RAM)
+  # worker:
+  #   image: plataforma-servicios-ceres-app
+  #   ...
 
-  # UI de BullMQ
-  queues-ui:
-    image: plataforma-servicios-ceres-app
-    depends_on:
-      - app
-    container_name: ceres-queues-ui
-    restart: unless-stopped
-    command: node dist/scripts/queues-ui.js
-    ports:
-      - "3013:3001"
-    env_file:
-      - .env
-    environment:
-      - NODE_ENV=production
-      - REDIS_URL=${REDIS_URL:-redis://172.17.0.1:6379/5}
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    networks:
-      - ceres-network
+  # UI de BullMQ (DESACTIVADO PARA AHORRAR RAM)
+  # queues-ui:
+  #   image: plataforma-servicios-ceres-app
+  #   ...
 
 volumes:
   redis_data:
