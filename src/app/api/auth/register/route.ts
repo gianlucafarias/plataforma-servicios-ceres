@@ -247,7 +247,13 @@ export async function POST(request: NextRequest) {
 
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Error interno del servidor';
-    console.error('Error al registrar usuario:', message);
+
+    // Log detallado
+    console.error('Error al registrar usuario:', error);
+    if (error instanceof Error && error.stack) {
+      console.error('Stack de registro:', error.stack);
+    }
+
     const isValidation = message.toLowerCase().includes('categoría no encontrada') || message.toLowerCase().includes('faltan datos');
     return NextResponse.json(
       { error: message },

@@ -182,6 +182,17 @@ export default function CompletarPerfilPage() {
         }),
       });
 
+      if (!response.ok) {
+        let errorMessage = 'Error al completar el perfil';
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.error || errorMessage;
+        } catch {}
+        setErrors({ general: errorMessage });
+        setIsLoading(false);
+        return;
+      }
+
       const result = await response.json();
 
       if (result.success) {
@@ -190,8 +201,9 @@ export default function CompletarPerfilPage() {
         setErrors({ general: result.error || "Error al completar el perfil" });
       }
     } catch (error) {
-      console.error("Error:", error);
-      setErrors({ general: "Error al completar el perfil. Intenta nuevamente." });
+      console.error("Error al completar perfil:", error);
+      const errorMessage = error instanceof Error ? error.message : "Error al completar el perfil. Intenta nuevamente.";
+      setErrors({ general: errorMessage });
     } finally {
       setIsLoading(false);
     }

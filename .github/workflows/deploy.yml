@@ -46,12 +46,11 @@ jobs:
             echo "🗄️ Aplicando migraciones de base de datos..."
             npx prisma migrate deploy
             
-            # 4. Reiniciar con PM2
+            # 4. Reiniciar con PM2 (Unificado como ROOT)
             echo "🔄 Actualizando servicios Ceres..."
             
-            # Usamos sudo pm2 y startOrRestart con nombres ÚNICOS
-            # Esto permitirá que lo veas cuando hagas pm2 list como root
-            sudo pm2 startOrRestart ecosystem.config.js --env production
+            # Al no pasar --env, PM2 respeta el entorno del sistema y Next.js carga su .env
+            sudo pm2 startOrRestart ecosystem.config.js
             sudo pm2 save
             
-            echo "✅ ¡Deploy Exitoso! Ahora puedes ver Ceres en tu lista global con 'pm2 list'."
+            echo "✅ ¡Deploy Exitoso! App corriendo en puerto 3012."
