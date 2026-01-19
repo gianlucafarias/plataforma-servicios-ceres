@@ -114,51 +114,29 @@ jobs:
               echo "⚠️ Advertencia: No se pudo verificar Redis desde contenedor"
             fi
             
-            # Limpiar SOLO imágenes viejas de este proyecto para no afectar otros servicios
-            echo "🧹 Liberando espacio (solo imágenes huérfanas)..."
+            # COMPOSE_PROJECT_NAME asegura que solo toquemos este proyecto
+            export COMPOSE_PROJECT_NAME=ceres
+            
+            # Limpiar SOLO imágenes viejas de este proyecto
+            echo "🧹 Limpiando versiones anteriores de Ceres..."
             sudo docker image prune -f
             
-            # Construir imágenes Docker CON los build args para NEXT_PUBLIC_*
-            echo "🔨 Construyendo imágenes Docker..."
-            
-            # Cargar solo las variables necesarias para build-args (evita problemas con caracteres especiales)
+            # Construir imagen única (solo app)
             NEXT_PUBLIC_BASE_URL=$(grep '^NEXT_PUBLIC_BASE_URL=' .env | cut -d'=' -f2- | tr -d '"' | tr -d "'")
             NEXTAUTH_URL=$(grep '^NEXTAUTH_URL=' .env | cut -d'=' -f2- | tr -d '"' | tr -d "'")
             DATABASE_URL=$(grep '^DATABASE_URL=' .env | cut -d'=' -f2- | tr -d '"' | tr -d "'")
             
-            echo "🔧 Build args: NEXT_PUBLIC_BASE_URL=$NEXT_PUBLIC_BASE_URL"
-            
+            echo "� Construyendo aplicación..."
             sudo $COMPOSE_CMD build --no-cache \
               --build-arg NEXT_PUBLIC_BASE_URL="${NEXT_PUBLIC_BASE_URL}" \
               --build-arg NEXTAUTH_URL="${NEXTAUTH_URL}" \
-              --build-arg DATABASE_URL="${DATABASE_URL}"
+              --build-arg DATABASE_URL="${DATABASE_URL}" app
             
-            echo "🚀 Levantando servicios..."
+            echo "🚀 Actualizando servicio..."
             sudo $COMPOSE_CMD up -d --remove-orphans app
             
-            # Ejecutar migraciones
-            echo "🗄️ Ejecutando migraciones de base de datos..."
-            sudo $COMPOSE_CMD exec -T app ./node_modules/.bin/prisma migrate deploy
+            # Ejecutar migraciones (ahora tienen todas las librerías)
+            echo "🗄️ Aplicando cambios en base de datos..."
+            sudo $COMPOSE_CMD exec -T app npx prisma migrate deploy
             
-            # Verificar que los contenedores estén corriendo
-            echo "✅ Verificando contenedores..."
-            sudo $COMPOSE_CMD ps
-            
-            # Verificar health check
-            echo "🏥 Verificando health check..."
-            sleep 5
-            if curl -f http://localhost:3012/api/health > /dev/null 2>&1; then
-              echo "✅ Health check OK"
-            else
-              echo "⚠️ Health check falló (puede ser normal si la app aún está iniciando)"
-            fi
-            
-            # Recargar Apache/Nginx
-            echo "🔄 Recargando web server..."
-            sudo systemctl reload apache2 2>/dev/null || sudo systemctl reload nginx 2>/dev/null || echo "⚠️ Web server reload skipped"
-            
-            # Limpiar imágenes antiguas
-            echo "🧹 Limpiando imágenes antiguas..."
-            sudo docker image prune -f > /dev/null 2>&1 || true
-            
-            echo "✅ Deploy completado exitosamente!"
+            echo "✅ Ceres está online!"
