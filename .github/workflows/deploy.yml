@@ -134,7 +134,7 @@ jobs:
             
             # Ejecutar migraciones
             echo "🗄️ Ejecutando migraciones de base de datos..."
-            sudo $COMPOSE_CMD run --rm app npx prisma migrate deploy
+            sudo $COMPOSE_CMD run --rm app npx prisma@6 migrate deploy
             
             # Verificar que los contenedores estén corriendo
             echo "✅ Verificando contenedores..."
