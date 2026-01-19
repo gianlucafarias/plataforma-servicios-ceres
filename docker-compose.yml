@@ -1,0 +1,102 @@
+version: '3.8'
+
+services:
+  # Redis para BullMQ (OPCIONAL - solo si no tienes Redis corriendo)
+  redis:
+    image: redis:7-alpine
+    container_name: ceres-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    networks:
+      - ceres-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    profiles:
+      - redis-internal  # Solo se levanta si usas: docker compose --profile redis-internal up
+
+  # Aplicación Next.js
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        - NEXT_PUBLIC_BASE_URL=${NEXT_PUBLIC_BASE_URL}
+        - NEXTAUTH_URL=${NEXTAUTH_URL}
+        - DATABASE_URL=${DATABASE_URL}
+    container_name: ceres-app
+    restart: unless-stopped
+    ports:
+      - "3012:3000"
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=production
+      - REDIS_URL=${REDIS_URL:-redis://172.17.0.1:6379/5}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - ceres-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/api/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Worker de BullMQ
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        - NEXT_PUBLIC_BASE_URL=${NEXT_PUBLIC_BASE_URL}
+        - NEXTAUTH_URL=${NEXTAUTH_URL}
+        - DATABASE_URL=${DATABASE_URL}
+    container_name: ceres-worker
+    restart: unless-stopped
+    command: node dist/scripts/worker.js
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=production
+      - REDIS_URL=${REDIS_URL:-redis://172.17.0.1:6379/5}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - ceres-network
+
+  # UI de BullMQ
+  queues-ui:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        - NEXT_PUBLIC_BASE_URL=${NEXT_PUBLIC_BASE_URL}
+        - NEXTAUTH_URL=${NEXTAUTH_URL}
+        - DATABASE_URL=${DATABASE_URL}
+    container_name: ceres-queues-ui
+    restart: unless-stopped
+    command: node dist/scripts/queues-ui.js
+    ports:
+      - "3013:3001"
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=production
+      - REDIS_URL=${REDIS_URL:-redis://172.17.0.1:6379/5}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - ceres-network
+
+volumes:
+  redis_data:
+
+networks:
+  ceres-network:
+    driver: bridge
