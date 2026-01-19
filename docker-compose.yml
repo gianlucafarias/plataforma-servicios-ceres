@@ -48,13 +48,9 @@ services:
 
   # Worker de BullMQ
   worker:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      args:
-        - NEXT_PUBLIC_BASE_URL=${NEXT_PUBLIC_BASE_URL}
-        - NEXTAUTH_URL=${NEXTAUTH_URL}
-        - DATABASE_URL=${DATABASE_URL}
+    image: plataforma-servicios-ceres-app
+    depends_on:
+      - app
     container_name: ceres-worker
     restart: unless-stopped
     command: node dist/scripts/worker.js
@@ -70,13 +66,9 @@ services:
 
   # UI de BullMQ
   queues-ui:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      args:
-        - NEXT_PUBLIC_BASE_URL=${NEXT_PUBLIC_BASE_URL}
-        - NEXTAUTH_URL=${NEXTAUTH_URL}
-        - DATABASE_URL=${DATABASE_URL}
+    image: plataforma-servicios-ceres-app
+    depends_on:
+      - app
     container_name: ceres-queues-ui
     restart: unless-stopped
     command: node dist/scripts/queues-ui.js
