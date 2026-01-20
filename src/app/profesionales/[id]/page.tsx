@@ -904,7 +904,11 @@ export default async function ProfessionalDetailPage({ params }: { params: Promi
                   )}
                   {p.cv && (
                     <a
-                      href={`/uploads/profiles/${p.cv}`}
+                      href={
+                        p.cv.startsWith('http')
+                          ? p.cv
+                          : `/uploads/profiles/${p.cv}`
+                      }
                       target="_blank"
                       rel="noopener noreferrer"
                       className="flex items-center gap-3 p-2.5 rounded-lg hover:bg-gray-50 transition-colors"

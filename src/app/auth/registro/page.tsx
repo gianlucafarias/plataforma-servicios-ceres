@@ -1087,7 +1087,10 @@ export default function RegistroPage() {
                       
                       const result = await response.json();
                       if (result.success) {
-                        handleInputChange('picture', result.filename);
+                        handleInputChange(
+                          'picture',
+                          result.url || result.path || result.filename
+                        );
                         setErrors(prev => {
                           const newErrors = {...prev};
                           delete newErrors.picture;
@@ -1133,7 +1136,10 @@ export default function RegistroPage() {
                       
                       const result = await response.json();
                       if (result.success) {
-                        handleInputChange('cv', result.filename);
+                        handleInputChange(
+                          'cv',
+                          result.url || result.path || result.filename
+                        );
                         setErrors(prev => {
                           const newErrors = {...prev};
                           delete newErrors.cv;

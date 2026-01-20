@@ -8,14 +8,10 @@ import { Label } from "@/components/ui/label";
 import Link from "next/link";
 import { Lock, ArrowLeft } from "lucide-react";
 
-export default function ResetPasswordPage({
-  searchParams,
-}: {
-  searchParams: { token?: string };
-}) {
+export default function ResetPasswordPage() {
   const router = useRouter();
   const params = useSearchParams();
-  const tokenFromUrl = searchParams.token || params.get("token") || "";
+  const tokenFromUrl = params.get("token") || "";
 
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");

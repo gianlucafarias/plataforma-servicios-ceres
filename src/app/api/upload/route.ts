@@ -4,6 +4,7 @@ import { join } from 'path';
 import { existsSync, mkdirSync } from 'fs';
 import { enqueueOptimizeProfileImage, enqueueValidateCV } from '@/jobs/files.producer';
 import { validateUploadServer, detectFileType } from '@/lib/uploadValidator';
+import { isR2Configured, uploadToR2, getR2PublicUrl } from '@/lib/r2';
 
 export async function POST(request: NextRequest) {
   try {
@@ -37,36 +38,60 @@ export async function POST(request: NextRequest) {
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
 
-    // Crear directorio si no existe
-    const uploadsDir = join(process.cwd(), 'public', 'uploads', 'profiles');
-    if (!existsSync(uploadsDir)) {
-      mkdirSync(uploadsDir, { recursive: true });
-    }
-
-    // Generar nombre único para el archivo
-    const timestamp = Date.now();
     const originalName = file.name;
-    const extension = originalName.split('.').pop();
-    const filename = `${timestamp}.${extension}`;
-    
-    const path = join(uploadsDir, filename);
-    
-    await writeFile(path, buffer);
+    const extension = originalName.split('.').pop() || '';
+    const timestamp = Date.now();
 
-    // Encolar post-proceso según tipo
-    const lower = (extension || '').toLowerCase();
-    if (['jpg','jpeg','png','webp'].includes(lower)) {
-      // Optimización a WebP en background (idempotente por filename)
-      enqueueOptimizeProfileImage({ path: `/uploads/profiles/${filename}` }).catch(()=>{});
-    } else if (lower === 'pdf') {
-      enqueueValidateCV({ path: `/uploads/profiles/${filename}` }).catch(()=>{});
+    // Key estándar para almacenamiento remoto/local
+    const safeExtension = extension.toLowerCase();
+    const key = `profiles/${timestamp}.${safeExtension || 'bin'}`;
+
+    let finalUrl: string;
+    let storage: 'r2' | 'local' = 'local';
+    let storedFilename: string = key;
+
+    if (isR2Configured()) {
+      // Subida a R2
+      const contentType = file.type || 'application/octet-stream';
+      const result = await uploadToR2({
+        key,
+        contentType,
+        body: buffer,
+      });
+
+      finalUrl = result.url;
+      storage = 'r2';
+    } else {
+      // Fallback local: mismo path de siempre para compatibilidad
+      const uploadsDir = join(process.cwd(), 'public', 'uploads', 'profiles');
+      if (!existsSync(uploadsDir)) {
+        mkdirSync(uploadsDir, { recursive: true });
+      }
+
+      const localFilename = `${timestamp}.${safeExtension || 'bin'}`;
+      const pathOnDisk = join(uploadsDir, localFilename);
+
+      await writeFile(pathOnDisk, buffer);
+
+      storedFilename = localFilename;
+      finalUrl = `/uploads/profiles/${localFilename}`;
+
+      // Encolar post-proceso según tipo SOLO para almacenamiento local
+      const lower = safeExtension;
+      if (['jpg','jpeg','png','webp'].includes(lower)) {
+        enqueueOptimizeProfileImage({ path: `/uploads/profiles/${localFilename}` }).catch(()=>{});
+      } else if (lower === 'pdf') {
+        enqueueValidateCV({ path: `/uploads/profiles/${localFilename}` }).catch(()=>{});
+      }
     }
 
     return NextResponse.json({ 
       success: true, 
-      filename,
+      filename: storedFilename, // mantenemos por compatibilidad
       originalName,
-      path: `/uploads/profiles/${filename}`
+      path: finalUrl,
+      url: finalUrl,
+      storage,
     });
 
   } catch (error) {
