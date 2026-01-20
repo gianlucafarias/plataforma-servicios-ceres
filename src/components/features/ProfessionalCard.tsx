@@ -5,6 +5,7 @@ import WhatsAppIcon from "../ui/whatsapp";
 import { Clock, MapPin } from "lucide-react";
 import Image from "next/image";
 import { LOCATIONS } from "@/lib/taxonomy";
+import { buildWhatsAppLink } from "@/lib/whatsapp";
 import { useRouter } from "next/navigation";
 
 
@@ -20,6 +21,8 @@ interface ProfessionalCardProps {
     socialNetworks?: {
       profilePicture?: string;
     };
+    whatsapp?: string;
+    phone?: string;
   };
 }
 
@@ -35,6 +38,11 @@ export function ProfessionalCard({ professional }: ProfessionalCardProps) {
     return raw;
   })();
 
+  const whatsappUrl = buildWhatsAppLink(
+    professional.whatsapp || professional.phone,
+    "Hola, vi tu perfil en Ceres en Red y me interesa contactarte."
+  );
+
   return (
     <Card className="group hover:shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:border-green-100/50 transition-all duration-300 rounded-2xl border border-gray-100 bg-white">
         <CardHeader className="pb-3">
@@ -48,7 +56,7 @@ export function ProfessionalCard({ professional }: ProfessionalCardProps) {
                       alt={professional.user.name}
                       width={56}
                       height={56}
-                      className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
+                      className="w-full h-full object-cover transition-transform duration-300"
                     />
                   </div>
                 </Avatar>
@@ -62,7 +70,7 @@ export function ProfessionalCard({ professional }: ProfessionalCardProps) {
               <div>
                 <div className="flex items-center space-x-1">
                   <h3
-                    className="font-semibold text-lg text-gray-900 group-hover:text-[var(--gov-green)] transition-colors cursor-pointer"
+                    className="font-bold text-lg text-gray-900 group-hover:text-[var(--gov-green)] transition-colors cursor-pointer"
                     onClick={() => router.push(`/profesionales/${professional.id}`)}
                   >
                     {professional.user.name}
@@ -109,15 +117,16 @@ export function ProfessionalCard({ professional }: ProfessionalCardProps) {
             >
               Ver Perfil
             </Link>
-            <a
-              href={`https://wa.me/+5403491456789?text=Hola, vi tu perfil en Servicios Ceres y me interesa contactarte.`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="bg-[#25D366] hover:bg-[#20BD5C] text-white px-4 py-2 rounded-full font-medium text-sm transition-all duration-200 flex items-center shadow-sm hover:shadow-md hover:-translate-y-0.5"
-            >
-              <WhatsAppIcon className="h-4 w-4 " />
-              
-            </a>
+            {whatsappUrl && (
+              <a
+                href={whatsappUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="bg-[#25D366] hover:bg-[#20BD5C] text-white px-4 py-2 rounded-full font-medium text-sm transition-all duration-200 flex items-center shadow-sm hover:shadow-md"
+              >
+                <WhatsAppIcon className="h-4 w-4" />
+              </a>
+            )}
           </div>
         </div>
       </CardContent>

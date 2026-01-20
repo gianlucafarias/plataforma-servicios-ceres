@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
     try {
       await sendMail({
         to: email,
-        subject: 'Reenvío: Confirmá tu cuenta - Plataforma de Servicios Ceres',
+        subject: 'Reenvío: Confirmá tu cuenta - Ceres en Red',
         html: `
           <p>Para activar tu cuenta, hacé clic en el siguiente enlace:</p>
           <p><a href="${verifyUrl}">Confirmar mi cuenta</a></p>

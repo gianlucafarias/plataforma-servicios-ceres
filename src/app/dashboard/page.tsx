@@ -32,7 +32,6 @@ import {
 import { Professional, Service } from "@/types";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SUBCATEGORIES_OFICIOS, AREAS_OFICIOS } from "@/lib/taxonomy";
@@ -91,6 +90,7 @@ type Stats = {
     status: string;
     experienceYears: number;
     locations: number;
+    views: number;
     since: string;
   };
 };
@@ -115,6 +115,7 @@ export default function DashboardPage() {
   const [newService, setNewService] = useState({ categorySlug: "", title: "", description: "", priceRange: "" });
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editData, setEditData] = useState({ title: "", description: "", priceRange: "" });
+  const [editCategorySlug, setEditCategorySlug] = useState<string>("");
   
   // Estados para certificaciones
   type Certification = {
@@ -147,6 +148,10 @@ export default function DashboardPage() {
   const [scheduleData, setScheduleData] = useState<Record<string, ScheduleData>>({});
   const [scheduleSaving, setScheduleSaving] = useState(false);
   const [scheduleHasChanges, setScheduleHasChanges] = useState(false);
+
+  // Estado para confirmar desactivación de servicios
+  const [serviceToDisable, setServiceToDisable] = useState<DashboardService | null>(null);
+  const [disableDialogOpen, setDisableDialogOpen] = useState(false);
 
   // Tips profesionales
   const professionalTips: ProfessionalTip[] = [
@@ -875,23 +880,7 @@ export default function DashboardPage() {
                   </CardContent>
                 </Card>
 
-                    {/* Experiencia */}
-                    <Card className="rounded-2xl border border-gray-100 hover:shadow-lg transition-shadow">
-                  <CardContent className="p-6">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="text-sm font-medium text-gray-600 mb-1">Años de experiencia</p>
-                            <p className="text-3xl font-bold text-gray-900">
-                              {stats.profile.experienceYears || 0}
-                            </p>
-                            <p className="text-xs text-gray-500 mt-1">según tu perfil</p>
-                      </div>
-                          <div className="p-3 rounded-2xl bg-blue-100">
-                            <Briefcase className="h-6 w-6 text-blue-600" />
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
+                  
 
                     {/* Cobertura geográfica */}
                     <Card className="rounded-2xl border border-gray-100 hover:shadow-lg transition-shadow">
@@ -906,6 +895,24 @@ export default function DashboardPage() {
                           </div>
                           <div className="p-3 rounded-2xl bg-emerald-100">
                             <MapPin className="h-6 w-6 text-emerald-600" />
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    {/* Visitas al perfil */}
+                    <Card className="rounded-2xl border border-gray-100 hover:shadow-lg transition-shadow">
+                      <CardContent className="p-6">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-sm font-medium text-gray-600 mb-1">Visitas a tu perfil</p>
+                            <p className="text-3xl font-bold text-gray-900">
+                              {stats.profile.views}
+                            </p>
+                            <p className="text-xs text-gray-500 mt-1">clicks en tus servicios</p>
+                          </div>
+                          <div className="p-3 rounded-2xl bg-purple-100">
+                            <Eye className="h-6 w-6 text-purple-600" />
                           </div>
                         </div>
                       </CardContent>
@@ -1127,23 +1134,52 @@ export default function DashboardPage() {
                             {service.category?.name || 'Sin categoría'}
                           </Badge>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <Checkbox
+                        <div className="flex flex-col items-end gap-1">
+                          <Switch
                             checked={service.available}
                             onCheckedChange={async (checked) => {
-                              const res = await fetch(`/api/services/${service.id}`, {
-                                method: 'PATCH',
-                                headers: { 'Content-Type': 'application/json' },
-                                credentials: 'include',
-                                body: JSON.stringify({ available: !!checked }),
-                              });
-                              const json = await res.json();
-                              if (json.success) {
-                                setMe(prev => prev ? { ...prev, services: prev.services?.map((s) => s.id === service.id ? { ...s, available: !!checked } : s) } : prev);
+                              // Si se intenta desactivar, abrir diálogo de confirmación
+                              if (!checked) {
+                                setServiceToDisable(service);
+                                setDisableDialogOpen(true);
+                                return;
+                              }
+
+                              // Activar directamente sin confirmación adicional
+                              try {
+                                const res = await fetch(`/api/services/${service.id}`, {
+                                  method: 'PATCH',
+                                  headers: { 'Content-Type': 'application/json' },
+                                  credentials: 'include',
+                                  body: JSON.stringify({ available: true }),
+                                });
+                                const json = await res.json();
+                                if (json.success) {
+                                  setMe(prev =>
+                                    prev
+                                      ? {
+                                          ...prev,
+                                          services: prev.services?.map((s) =>
+                                            s.id === service.id ? { ...s, available: true } : s
+                                          ),
+                                        }
+                                      : prev
+                                  );
+                                } else {
+                                  toast.error(json.message || 'Error al actualizar el servicio');
+                                }
+                              } catch (error) {
+                                console.error('Error actualizando servicio:', error);
+                                toast.error('Error al actualizar el servicio');
                               }
                             }}
                           />
-                          <span className="text-xs text-gray-600">{service.available ? 'Activo' : 'Inactivo'}</span>
+                          <span className="text-xs text-gray-600">
+                            {service.available ? 'Activo' : 'Inactivo'}
+                          </span>
+                          <span className="text-[11px] text-gray-500">
+                            {service.available ? 'Visible en tu perfil' : 'Oculto en tu perfil'}
+                          </span>
                         </div>
 
                       </div>
@@ -1155,10 +1191,34 @@ export default function DashboardPage() {
                       <div className="text-sm text-gray-500 mb-4">{service.priceRange}</div>
 
                       <div className="flex space-x-2">
-                        
-                        <Dialog open={editingId === service.id} onOpenChange={(open) => { setEditingId(open ? service.id : null); if (!open) setEditData({ title: '', description: '', priceRange: '' }); }}>
+                        <Dialog
+                          open={editingId === service.id}
+                          onOpenChange={(open) => {
+                            setEditingId(open ? service.id : null);
+                            if (!open) {
+                              setEditData({ title: '', description: '', priceRange: '' });
+                              setEditCategorySlug("");
+                            }
+                          }}
+                        >
                           <DialogTrigger asChild>
-                            <Button onClick={() => { setEditData({ title: service.title, description: service.description, priceRange: service.priceRange || '' }); }} variant="outline" size="sm" className="flex-1 rounded-xl">
+                            <Button
+                              onClick={() => {
+                                setEditData({
+                                  title: service.title,
+                                  description: service.description,
+                                  priceRange: service.priceRange || '',
+                                });
+                                // Inferir el slug de la categoría a partir del nombre, igual que en ajustes
+                                const matchedCategory = SUBCATEGORIES_OFICIOS.find(
+                                  (cat) => cat.name === service.category?.name
+                                );
+                                setEditCategorySlug(matchedCategory?.slug || '');
+                              }}
+                              variant="outline"
+                              size="sm"
+                              className="flex-1 rounded-xl"
+                            >
                               <Edit className="h-3 w-3 mr-1" />
                               Editar
                             </Button>
@@ -1167,14 +1227,70 @@ export default function DashboardPage() {
                             <DialogHeader>
                               <DialogTitle>Editar Servicio</DialogTitle>
                             </DialogHeader>
-                            <div className="space-y-4">
+                            <div className="space-y-4 py-2">
+                              <div>
+                                <Label htmlFor={`edit-category-${service.id}`}>Categoría *</Label>
+                                <Select
+                                  value={editCategorySlug}
+                                  onValueChange={(v) => {
+                                    const selectedCategory = SUBCATEGORIES_OFICIOS.find(
+                                      (cat) => cat.slug === v
+                                    );
+                                    setEditCategorySlug(v);
+                                    setEditData((prev) => ({
+                                      ...prev,
+                                      // Autocompletar título solo si no hay uno personalizado
+                                      title: prev.title || selectedCategory?.name || '',
+                                    }));
+                                  }}
+                                >
+                                  <SelectTrigger
+                                    id={`edit-category-${service.id}`}
+                                    className="rounded-xl mt-1"
+                                  >
+                                    <SelectValue placeholder="Seleccionar categoría" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {AREAS_OFICIOS.map((area) => {
+                                      const subcategories = SUBCATEGORIES_OFICIOS.filter(
+                                        (sub) => sub.areaSlug === area.slug
+                                      );
+                                      if (subcategories.length === 0) return null;
+                                      return (
+                                        <div key={area.slug}>
+                                          <div className="px-2 py-1.5 text-xs font-semibold text-gray-500 uppercase">
+                                            {area.name}
+                                          </div>
+                                          {subcategories.map((cat) => (
+                                            <SelectItem
+                                              key={cat.slug}
+                                              value={cat.slug}
+                                              className="pl-6"
+                                            >
+                                              {cat.name}
+                                            </SelectItem>
+                                          ))}
+                                        </div>
+                                      );
+                                    })}
+                                  </SelectContent>
+                                </Select>
+                              </div>
                               <div>
                                 <Label htmlFor="edit-title">Título personalizado (opcional)</Label>
-                                <Input 
+                                <Input
                                   id="edit-title"
-                                  placeholder={service.category?.name || 'Título del servicio'} 
-                                  value={editData.title} 
-                                  onChange={(e) => setEditData(d => ({ ...d, title: e.target.value }))}
+                                  placeholder={
+                                    editCategorySlug
+                                      ? SUBCATEGORIES_OFICIOS.find(
+                                          (c) => c.slug === editCategorySlug
+                                        )?.name || 'Título del servicio'
+                                      : 'Seleccioná una categoría primero'
+                                  }
+                                  value={editData.title}
+                                  onChange={(e) =>
+                                    setEditData((d) => ({ ...d, title: e.target.value }))
+                                  }
                                   className="rounded-xl mt-1"
                                 />
                                 <p className="text-xs text-gray-500 mt-1">
@@ -1187,17 +1303,21 @@ export default function DashboardPage() {
                                   id="edit-description"
                                   placeholder="Describe tu servicio en detalle..."
                                   value={editData.description}
-                                  onChange={(e) => setEditData(d => ({ ...d, description: e.target.value }))}
+                                  onChange={(e) =>
+                                    setEditData((d) => ({ ...d, description: e.target.value }))
+                                  }
                                   className="rounded-xl mt-1 min-h-[100px]"
                                 />
                               </div>
                               <div>
                                 <Label htmlFor="edit-priceRange">Rango de precio (opcional)</Label>
-                                <Input 
+                                <Input
                                   id="edit-priceRange"
-                                  placeholder="Ej: $5000 - $10000" 
-                                  value={editData.priceRange} 
-                                  onChange={(e) => setEditData(d => ({ ...d, priceRange: e.target.value }))}
+                                  placeholder="Ej: $5000 - $10000"
+                                  value={editData.priceRange}
+                                  onChange={(e) =>
+                                    setEditData((d) => ({ ...d, priceRange: e.target.value }))
+                                  }
                                   className="rounded-xl mt-1"
                                 />
                               </div>
@@ -1211,7 +1331,10 @@ export default function DashboardPage() {
                                   }
                                   const payload: Record<string, string> = {};
                                   // Si hay título personalizado, usarlo; sino usar el nombre de la categoría
-                                  const categoryName = service.category?.name || '';
+                                  const categoryName =
+                                    SUBCATEGORIES_OFICIOS.find(
+                                      (c) => c.slug === editCategorySlug
+                                    )?.name || service.category?.name || '';
                                   payload.title = editData.title.trim() || categoryName;
                                   payload.description = editData.description;
                                   if (editData.priceRange) payload.priceRange = editData.priceRange;
@@ -1515,6 +1638,76 @@ export default function DashboardPage() {
               </Card>
             </TabsContent>
           </Tabs>
+
+          {/* Diálogo de confirmación para desactivar servicio */}
+          <Dialog open={disableDialogOpen} onOpenChange={setDisableDialogOpen}>
+            <DialogContent className="sm:max-w-md">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <AlertCircle className="h-5 w-5 text-orange-500" />
+                  Desactivar servicio
+                </DialogTitle>
+              </DialogHeader>
+              <div className="space-y-3 py-2">
+                <p className="text-sm text-gray-700">
+                  ¿Estás seguro de que querés desactivar este servicio?
+                </p>
+                <p className="text-sm text-gray-600">
+                  <span className="font-semibold">
+                    {serviceToDisable?.title || serviceToDisable?.category?.name}
+                  </span>
+                  {" "}dejará de estar visible en tu perfil público y en los resultados de búsqueda.
+                </p>
+              </div>
+              <DialogFooter className="flex justify-end gap-2">
+                <Button
+                  variant="outline"
+                  className="rounded-xl"
+                  onClick={() => setDisableDialogOpen(false)}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  className="rounded-xl bg-red-600 hover:bg-red-700 text-white"
+                  onClick={async () => {
+                    if (!serviceToDisable) return;
+                    try {
+                      const res = await fetch(`/api/services/${serviceToDisable.id}`, {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json' },
+                        credentials: 'include',
+                        body: JSON.stringify({ available: false }),
+                      });
+                      const json = await res.json();
+                      if (json.success) {
+                        setMe(prev =>
+                          prev
+                            ? {
+                                ...prev,
+                                services: prev.services?.map((s) =>
+                                  s.id === serviceToDisable.id ? { ...s, available: false } : s
+                                ),
+                              }
+                            : prev
+                        );
+                        toast.success('Servicio desactivado. Ya no es visible en la plataforma.');
+                      } else {
+                        toast.error(json.message || 'Error al desactivar el servicio');
+                      }
+                    } catch (error) {
+                      console.error('Error desactivando servicio:', error);
+                      toast.error('Error al desactivar el servicio');
+                    } finally {
+                      setDisableDialogOpen(false);
+                      setServiceToDisable(null);
+                    }
+                  }}
+                >
+                  Sí, desactivar
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
     </div>

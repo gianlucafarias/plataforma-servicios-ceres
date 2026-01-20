@@ -62,17 +62,7 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
       return NextResponse.json({ success: false, error: 'not_found' }, { status: 404 });
     }
 
-    // Si el profesional está activo, devolverlo normalmente
-    if (professional.status === 'active') {
-      return NextResponse.json({ success: true, data: professional });
-    }
-
-    // Si no está activo, solo permitir acceso si es el dueño
-    const isOwner = session?.user?.id === professional.userId;
-    if (!isOwner) {
-      return NextResponse.json({ success: false, error: 'not_found' }, { status: 404 });
-    }
-
-    // El dueño puede ver su perfil aunque esté pendiente
+    // Devolver siempre el profesional, independientemente de su estado.
+    // El control de indexación pública se maneja en la página (robots, listados, etc.).
     return NextResponse.json({ success: true, data: professional });
   }

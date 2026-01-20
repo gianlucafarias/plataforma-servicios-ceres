@@ -21,11 +21,6 @@ export default function Home() {
     const handleSuggestionClick = (suggestionName: string) => {
     setSearchQuery(suggestionName);
     setShowSuggestions(false);
-
-    setTimeout(() => {
-      const input = document.getElementById('q') as HTMLInputElement;
-      if (input) input.focus();
-    }, 100);
   };
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -42,9 +37,9 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen bg-background-light dark:bg-background-dark text-gray-800 dark:text-gray-200 transition-colors duration-300">
+    <div className="min-h-screen bg-[#f8f9fa] dark:bg-background-dark text-gray-800 dark:text-gray-200 transition-colors duration-300">
       {/* Hero Section */}
-      <header className="relative overflow-hidden">
+      <header className="relative">
         <div className="absolute inset-0 bg-[#EBE4C0]">
           {/* Fondo base */}
           <Image
@@ -95,7 +90,7 @@ export default function Home() {
         
         <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-background-light dark:to-background-dark z-0"></div>
         <div className="relative z-10 max-w-5xl mx-auto px-4 pt-20 pb-24 text-center">
-          <h2 className="text-3xl md:text-5xl font-semibold text-gray-900 dark:text-white mb-6">
+          <h2 className="text-4xl md:text-5xl font-semibold text-gray-900 dark:text-white mb-6">
             ¿Buscás un técnico? ¿Profesional?<br/>
             <span className="text-primary font-extrabold">¡Encontralo acá!</span>
           </h2>
@@ -108,7 +103,7 @@ export default function Home() {
             role="search"
             aria-label="Buscar servicios"
             onSubmit={handleSearchSubmit}
-            className="bg-white dark:bg-gray-800 p-2 rounded-full shadow-soft max-w-3xl mx-auto flex items-center border border-gray-100 dark:border-gray-700 mb-6 shadow-lg"
+            className="relative bg-white dark:bg-gray-800 p-2 rounded-full shadow-soft max-w-3xl mx-auto flex items-center border border-gray-100 dark:border-gray-700 shadow-lg"
           >
             <label htmlFor="q" className="sr-only">Buscar servicios</label>
             <input
@@ -121,24 +116,24 @@ export default function Home() {
               placeholder="¿Qué servicio necesitas? Ej: plomero, electricista..."
               aria-label="¿Qué servicio necesitas?"
               autoComplete="off"
-              className="flex-grow bg-transparent border-none focus:ring-0 text-gray-700 dark:text-gray-200 px-6 py-3 placeholder-gray-400"
+              className="flex-grow bg-transparent border-none focus:ring-0 focus:outline-none focus-visible:outline-none text-gray-700 dark:text-gray-200 px-6 py-3 placeholder-gray-400"
             />
+            <div className="absolute left-0 right-14 top-full mt-1">
+              <SearchSuggestions
+                query={searchQuery}
+                isVisible={showSuggestions}
+                onSelect={handleSuggestionClick}
+                onClose={() => setShowSuggestions(false)}
+              />
+            </div>
             <button 
               type="submit" 
               aria-label="Buscar" 
               className="bg-primary hover:bg-emerald-800 text-white rounded-full p-3 w-12 h-12 flex items-center justify-center transition-colors shadow-lg"
             >
-              <Search className="h-5 w-5" />
+              <Search className="h-5 w-5 cursor-pointer" />
             </button>
           </form>
-          <div className="relative max-w-3xl mx-auto">
-            <SearchSuggestions
-              query={searchQuery}
-              isVisible={showSuggestions}
-              onSelect={handleSuggestionClick}
-              onClose={() => setShowSuggestions(false)}
-            />
-          </div>
           
           {/* Sugerencias rápidas */}
           <div className="flex flex-wrap justify-center gap-2 mt-6 text-sm">
@@ -150,14 +145,14 @@ export default function Home() {
           <div className="flex flex-col sm:flex-row justify-center gap-4 mt-10">
             <Link 
               href="/servicios" 
-              className="px-8 py-3 bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-semibold rounded-full shadow-sm hover:shadow-md transition-all border border-gray-200 dark:border-gray-600 flex items-center justify-center gap-2"
+              className="group px-8 py-3 bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-semibold rounded-full shadow-sm hover:shadow-md transition-all border border-gray-200 dark:border-gray-600 flex items-center justify-center gap-2"
             >
               Ver todos los servicios
-              <ArrowRight className="h-4 w-4" />
+              <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
             </Link>
             <Link 
               href="/auth/registro" 
-              className="px-8 py-3 font-semibold rounded-full shadow-lg bg-amber-600 text-white transition-all transform hover:-translate-y-0.5"
+              className="px-8 py-3 font-semibold rounded-full shadow-lg bg-amber-600 text-white transition-all transform hover:bg-amber-700"
             >
               Ofrecer mis servicios
             </Link>
@@ -169,22 +164,22 @@ export default function Home() {
       <section className="bg-primary text-white py-12">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-8 text-center md:text-left">
-            <div className="flex flex-col items-center md:items-start p-4 rounded-xl hover:bg-white/10 transition-colors cursor-default">
+            <div className="flex flex-col items-center md:items-start p-4 rounded-xl cursor-default">
               <Verified className="h-10 w-10 mb-3 opacity-90" />
               <h3 className="font-bold text-lg mb-1">Desarrollo local</h3>
               <p className="text-sm opacity-80 text-center md:text-left">Iniciativa del Gobierno de la Ciudad de Ceres</p>
             </div>
-            <div className="flex flex-col items-center md:items-start p-4 rounded-xl hover:bg-white/10 transition-colors cursor-default">
+            <div className="flex flex-col items-center md:items-start p-4 rounded-xl cursor-default">
               <Rocket className="h-10 w-10 mb-3 opacity-90" />
               <h3 className="font-bold text-lg mb-1">Rápido y simple</h3>
               <p className="text-sm opacity-80 text-center md:text-left">Buscá, elegí y coordiná en minutos</p>
             </div>
-            <div className="flex flex-col items-center md:items-start p-4 rounded-xl hover:bg-white/10 transition-colors cursor-default">
+            <div className="flex flex-col items-center md:items-start p-4 rounded-xl cursor-default">
               <MessageCircle className="h-10 w-10 mb-3 opacity-90" />
               <h3 className="font-bold text-lg mb-1">Contacto directo</h3>
               <p className="text-sm opacity-80 text-center md:text-left">Coordiná por WhatsApp o teléfono</p>
             </div>
-            <div className="flex flex-col items-center md:items-start p-4 rounded-xl hover:bg-white/10 transition-colors cursor-default">
+            <div className="flex flex-col items-center md:items-start p-4 rounded-xl cursor-default">
               <MapPin className="h-10 w-10 mb-3 opacity-90" />
               <h3 className="font-bold text-lg mb-1">Enfocado en la región</h3>
               <p className="text-sm opacity-80 text-center md:text-left">Profesionales de Ceres y la zona</p>
@@ -211,7 +206,7 @@ export default function Home() {
                   container.scrollBy({ left: -itemWidth, behavior: "smooth" });
                 }
               }}
-              className="w-10 h-10 rounded-full border border-gray-200 dark:border-gray-700 flex items-center justify-center hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-300 transition-colors"
+              className="cursor-pointer w-10 h-10 rounded-full border border-gray-200 dark:border-gray-700 flex items-center justify-center hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-300 transition-colors"
               aria-label="Anterior"
             >
               <ArrowRight className="h-5 w-5 rotate-180" />
@@ -224,7 +219,7 @@ export default function Home() {
                   container.scrollBy({ left: itemWidth, behavior: "smooth" });
                 }
               }}
-              className="w-10 h-10 rounded-full border border-gray-200 dark:border-gray-700 flex items-center justify-center hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-300 transition-colors"
+              className="cursor-pointer w-10 h-10 rounded-full border border-gray-200 focus:outline-none flex items-center justify-center hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-300 transition-colors"
               aria-label="Siguiente"
             >
               <ArrowRight className="h-5 w-5" />
@@ -338,6 +333,8 @@ export default function Home() {
                       socialNetworks: {
                         profilePicture: (prof as unknown as { ProfilePicture?: string | null }).ProfilePicture || undefined,
                       },
+                      whatsapp: (prof as unknown as { whatsapp?: string | null }).whatsapp || undefined,
+                      phone: (prof.user as unknown as { phone?: string | null }).phone || undefined,
                     }}
                   />
                 );

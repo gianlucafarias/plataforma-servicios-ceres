@@ -126,29 +126,11 @@ export default function LoginPage() {
     <div className="min-h-screen flex">
       {/* Panel izquierdo - Hero */}
       <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-[#006F4B] via-[#008255] to-[#004d35] relative overflow-hidden">
-        {/* Patrón de fondo */}
-        <div className="absolute inset-0 opacity-10">
-          <div className="absolute top-20 left-20 w-64 h-64 rounded-full border-2 border-white/30"></div>
-          <div className="absolute bottom-40 right-10 w-48 h-48 rounded-full border-2 border-white/20"></div>
-          <div className="absolute top-1/2 left-1/3 w-32 h-32 rounded-full bg-white/5"></div>
-        </div>
+       
 
-        <div className="relative z-10 flex flex-col justify-between p-12 text-white">
-          {/* Logo */}
-          <Link href="/" className="flex items-center gap-3">
-            <Image
-              src="/gob_iso.png"
-              alt="Logo"
-              width={48}
-              height={48}
-              className="brightness-0 invert"
-            />
-            <div>
-              <span className="font-bold text-lg">Portal de Servicios</span>
-              <p className="text-white/70 text-sm">Gobierno de Ceres</p>
-            </div>
-          </Link>
-
+        <div className="relative z-10 flex flex-col justify-center p-12 text-white">
+         
+           
           {/* Contenido central */}
           <div className="space-y-8">
             <div>
@@ -183,34 +165,16 @@ export default function LoginPage() {
             </div>
           </div>
 
-          {/* Footer */}
-          <p className="text-white/60 text-sm">
-            © 2025 Municipalidad de Ceres
-          </p>
+         
         </div>
       </div>
 
       {/* Panel derecho - Formulario */}
       <div className="w-full lg:w-1/2 flex flex-col">
-        {/* Header móvil */}
-        <div className="lg:hidden bg-[#006F4B] p-4">
-          <Link href="/" className="flex items-center gap-3 text-white">
-            <Image
-              src="/gob_iso.png"
-              alt="Logo"
-              width={40}
-              height={40}
-              className="brightness-0 invert"
-            />
-            <div>
-              <span className="font-bold">Portal de Servicios</span>
-              <p className="text-white/70 text-xs">Gobierno de Ceres</p>
-            </div>
-          </Link>
-        </div>
+        
 
         {/* Formulario centrado */}
-        <div className="flex-1 flex items-center justify-center p-6 md:p-12 bg-gray-50">
+        <div className="flex-1 flex items-start md:items-center justify-center pt-6 pb-5 px-4 md:p-12 bg-gray-50">
           <div className="w-full max-w-md">
             <div className="bg-white rounded-2xl shadow-xl p-8 border border-gray-100">
               {/* Header */}
@@ -253,7 +217,7 @@ export default function LoginPage() {
                     <Input
                       id="email"
                       type="email"
-                      placeholder="correo@ejemplo.com"
+                      placeholder="tucorreo@gmail.com"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       required
@@ -299,7 +263,7 @@ export default function LoginPage() {
 
                 <Button
                   type="submit"
-                  className="w-full h-12 bg-[#006F4B] hover:bg-[#005a3d] text-white rounded-xl font-semibold text-base transition-all shadow-lg shadow-[#006F4B]/20"
+                  className="cursor-pointer w-full h-12 bg-[#006F4B] hover:bg-[#005a3d] text-white rounded-xl font-semibold text-base transition-all shadow-lg shadow-[#006F4B]/20"
                   disabled={loading}
                 >
                   {loading ? (
@@ -319,7 +283,7 @@ export default function LoginPage() {
               {/* Divider */}
               <div className="my-6 flex items-center gap-4">
                 <div className="flex-1 h-px bg-gray-200"></div>
-                <span className="text-gray-400 text-sm">o continuá con</span>
+                <span className="text-gray-400 text-sm">o ingresa con</span>
                 <div className="flex-1 h-px bg-gray-200"></div>
               </div>
 
@@ -330,7 +294,7 @@ export default function LoginPage() {
                   variant="outline"
                   onClick={() => handleSocialLogin("google")}
                   disabled={loading || socialLoading !== null}
-                  className="h-12 rounded-xl border-2 border-gray-200 hover:border-gray-300 hover:bg-gray-50 font-medium transition-all"
+                  className="cursor-pointer h-12 rounded-xl border-2 border-gray-200 hover:border-gray-300 hover:bg-gray-50 font-medium transition-all"
                 >
                   {socialLoading === "google" ? (
                     <div className="w-5 h-5 border-2 border-gray-300 border-t-gray-600 rounded-full animate-spin" />
@@ -346,7 +310,7 @@ export default function LoginPage() {
                   variant="outline"
                   onClick={() => handleSocialLogin("facebook")}
                   disabled={loading || socialLoading !== null}
-                  className="h-12 rounded-xl border-2 border-gray-200 hover:border-[#1877F2] hover:bg-blue-50 font-medium transition-all"
+                  className="cursor-pointer h-12 rounded-xl border-2 border-gray-200 hover:border-[#1877F2] hover:bg-blue-50 font-medium transition-all"
                 >
                   {socialLoading === "facebook" ? (
                     <div className="w-5 h-5 border-2 border-blue-300 border-t-blue-600 rounded-full animate-spin" />
@@ -371,7 +335,7 @@ export default function LoginPage() {
                 <Link href="/auth/registro">
                   <Button
                     variant="outline"
-                    className="w-full h-12 rounded-xl border-2 border-[#006F4B] text-[#006F4B] hover:bg-[#006F4B]/5 font-semibold"
+                    className="cursor-pointer w-full h-12 rounded-xl border-2 border-[#006F4B] text-[#006F4B] hover:bg-[#006F4B]/2 font-semibold"
                   >
                     Registrarme como profesional
                   </Button>

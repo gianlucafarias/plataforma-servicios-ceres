@@ -1,7 +1,8 @@
 "use client"
 
 import { Subcategory } from "@/lib/taxonomy"
-import { useMemo, useCallback, memo } from "react";
+import { useMemo, useCallback, memo, useState } from "react";
+import { useRouter } from "next/navigation";
 
 interface CategorySuggestProps {
     handleSuggestionClick: (suggestionName: string) => void;
@@ -38,12 +39,15 @@ function seededShuffle<T>(array: T[], seed: number): T[] {
 }
 
 function CategorySuggestComponent({ handleSuggestionClick, randomSuggestionsNumber = 6, categories, query }: CategorySuggestProps) {
+    const router = useRouter();
+    // Seed aleatorio por montaje para que las sugerencias cambien entre recargas
+    const [seed] = useState(() => Math.floor(Math.random() * 1_000_000));
+
     // Memoizar el shuffle - solo recalcular si categories cambia
-    // Usamos un seed fijo para que SSR y cliente coincidan
     const randomSuggestions = useMemo(() => {
-      const shuffled = seededShuffle(categories, 42);
+      const shuffled = seededShuffle(categories, seed);
       return shuffled.slice(0, randomSuggestionsNumber);
-    }, [categories, randomSuggestionsNumber]);
+    }, [categories, randomSuggestionsNumber, seed]);
 
     // Memoizar la lista filtrada
     const list = useMemo(() => {
@@ -60,18 +64,26 @@ function CategorySuggestComponent({ handleSuggestionClick, randomSuggestionsNumb
       handleSuggestionClick(name);
     }, [handleSuggestionClick]);
 
-    // Ya no necesitamos skeleton porque usamos seed determinístico
     return (
       <div className="flex flex-wrap gap-2 items-center justify-center">
         {list.map((s) => (
           <button
             key={s.slug}
             onClick={() => onBadgeClick(s.name)}
-            className="px-4 py-1.5 bg-white dark:bg-gray-700 rounded-full text-gray-600 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 shadow-sm border border-gray-200 dark:border-gray-600 transition-all text-sm"
+            className="cursor-pointer px-4 py-1.5 bg-white dark:bg-gray-700 rounded-full text-gray-600 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 shadow-sm border border-gray-200 dark:border-gray-600 transition-all text-sm"
           >
             {s.name}
           </button>
         ))}
+        {categories.length > 0 && (
+          <button
+            type="button"
+            onClick={() => router.push("/categorias")}
+            className="cursor-pointer px-4 py-1.5 bg-white dark:bg-gray-700 rounded-full text-gray-600 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 shadow-sm border border-gray-200 dark:border-gray-600 transition-all text-sm font-semibold"
+          >
+            +{categories.length} más
+          </button>
+        )}
       </div>
     );
 }

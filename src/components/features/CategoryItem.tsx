@@ -9,7 +9,7 @@ interface CategoryItemProps {
   slug: string;
   icon: LucideIcon | null;
   isActive: boolean;
-  subcategories: Array<{ slug: string; name: string }>;
+  subcategories: Array<{ slug: string; name: string; count?: number }>;
   selectedSubcategory?: string;
   onSelect: () => void;
   onSelectSubcategory: (slug: string) => void;
@@ -74,6 +74,11 @@ export function CategoryItem({
                 }`}
               >
                 <span className="truncate">{subcategory.name}</span>
+                {typeof subcategory.count === 'number' && subcategory.count > 0 && (
+                  <span className="text-xs text-gray-400 dark:text-gray-500">
+                    {subcategory.count}
+                  </span>
+                )}
               </button>
             );
           })}

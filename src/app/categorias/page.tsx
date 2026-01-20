@@ -23,10 +23,10 @@ export const metadata: Metadata = {
     canonical: getAbsoluteUrl("/categorias"),
   },
   openGraph: {
-    title: "Categorías de Servicios en Ceres | Servicios Ceres",
+    title: "Categorías de Servicios en Ceres | Ceres en Red",
     description: "Explora todas las categorías de servicios profesionales disponibles en Ceres. Encuentra exactamente lo que necesitas.",
     url: getAbsoluteUrl("/categorias"),
-    siteName: "Servicios Ceres",
+    siteName: "Ceres en Red",
     locale: "es_AR",
     type: "website",
   },
