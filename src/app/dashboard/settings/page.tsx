@@ -1049,7 +1049,11 @@ export default function SettingsPage() {
                       {formData.picture ? (
                         <>
                           <Image
-                            src={`/uploads/profiles/${formData.picture}`}
+                            src={
+                              formData.picture.startsWith('http')
+                                ? formData.picture
+                                : `/uploads/profiles/${formData.picture}`
+                            }
                             alt="Foto de perfil"
                             fill
                             className="object-cover"
@@ -1121,7 +1125,11 @@ export default function SettingsPage() {
                     <div className="flex-shrink-0">
                       {formData.cv ? (
                         <a
-                          href={`/uploads/profiles/${formData.cv}`}
+                          href={
+                            formData.cv.startsWith('http')
+                              ? formData.cv
+                              : `/uploads/profiles/${formData.cv}`
+                          }
                           target="_blank"
                           rel="noopener noreferrer"
                           className="flex flex-col items-center justify-center h-32 w-32 rounded-xl border-2 border-[#006F4B] bg-white hover:bg-[#006F4B] hover:text-white transition-all shadow-md group"
@@ -1159,7 +1167,10 @@ export default function SettingsPage() {
                                 
                                 const result = await response.json();
                                 if (result.success) {
-                                  handleInputChange('cv', result.filename);
+                                  handleInputChange(
+                                    'cv',
+                                    result.url || result.path || result.filename
+                                  );
                                   toast.success('CV subido correctamente');
                                 } else {
                                   toast.error(result.error || 'Error al subir el CV');
@@ -1411,7 +1422,10 @@ export default function SettingsPage() {
             
             const result = await response.json();
             if (result.success) {
-              handleInputChange('picture', result.filename);
+              handleInputChange(
+                'picture',
+                result.url || result.path || result.filename
+              );
               toast.success('Imagen recortada y subida correctamente');
               setImageToCrop("");
             } else {
