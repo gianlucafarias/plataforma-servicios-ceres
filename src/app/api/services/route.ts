@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { Prisma, CategoryGroupId } from '@prisma/client';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/app/api/auth/options';
-import { SUBCATEGORIES_OFICIOS, SUBCATEGORIES_PROFESIONES } from '@/lib/taxonomy';
+import { AREAS_OFICIOS, SUBCATEGORIES_OFICIOS, SUBCATEGORIES_PROFESIONES } from '@/lib/taxonomy';
 import { prisma } from '@/lib/prisma';
 
 export async function GET(request: NextRequest) {
@@ -13,8 +13,9 @@ export async function GET(request: NextRequest) {
     const page = Math.max(Number(searchParams.get('page')) || 1, 1);
     const q = (searchParams.get('q') || '').trim();
 
-    const grupo = searchParams.get('grupo') as 'oficios' | 'profesiones' | null;
-    const categoriaSlug = searchParams.get('categoria') || null;
+    let grupo = searchParams.get('grupo') as 'oficios' | 'profesiones' | null;
+    const subcategoriaSlug = searchParams.get('subcategoria');
+    let categoriaSlug = searchParams.get('categoria') || null;
     const location = searchParams.get('location') || null;
 
     const where: Prisma.ServiceWhereInput = {
@@ -24,6 +25,29 @@ export async function GET(request: NextRequest) {
         user: { verified: true },
       },
     };
+
+    // Si viene subcategoría explícita en la URL, tiene prioridad sobre "categoria"
+    if (subcategoriaSlug) {
+      categoriaSlug = subcategoriaSlug;
+    }
+
+    // Si no vino categoría explícita pero el término de búsqueda coincide con alguna
+    // subcategoría de la taxonomía, usarla como filtro de categoría/grupo.
+    if (q && !categoriaSlug) {
+      const normalized = q.toLowerCase();
+      const allTaxonomy = [...SUBCATEGORIES_OFICIOS, ...SUBCATEGORIES_PROFESIONES];
+      const matched = allTaxonomy.find((subcat) =>
+        subcat.name.toLowerCase().includes(normalized) ||
+        subcat.slug.toLowerCase().includes(normalized)
+      );
+
+      if (matched) {
+        categoriaSlug = matched.slug;
+        if (!grupo) {
+          grupo = matched.group as 'oficios' | 'profesiones';
+        }
+      }
+    }
 
     // Filtrar por grupo del profesional (oficios/profesiones)
     if (grupo) {
@@ -37,7 +61,24 @@ export async function GET(request: NextRequest) {
 
     // Filtrar por categoría específica
     if (categoriaSlug) {
-      where.category = { slug: categoriaSlug };
+      // Si el slug coincide con un ÁREA de oficios, filtrar por todas sus subcategorías
+      const areaMatch = AREAS_OFICIOS.find((area) => area.slug === categoriaSlug);
+
+      if (areaMatch) {
+        const subSlugs = SUBCATEGORIES_OFICIOS
+          .filter((sub) => sub.areaSlug === areaMatch.slug)
+          .map((sub) => sub.slug);
+
+        if (subSlugs.length > 0) {
+          where.category = { slug: { in: subSlugs } };
+        } else {
+          // Fallback defensivo: si por alguna razón no hay subcategorías, usar el slug tal cual
+          where.category = { slug: categoriaSlug };
+        }
+      } else {
+        // Caso normal: slug de subcategoría
+        where.category = { slug: categoriaSlug };
+      }
     }
 
     // Filtrar por ubicación del profesional
@@ -88,7 +129,8 @@ export async function GET(request: NextRequest) {
               rating: true,
               reviewCount: true,
               ProfilePicture: true,
-              user: { select: { firstName: true, lastName: true, verified: true, location: true } },
+              whatsapp: true,
+              user: { select: { firstName: true, lastName: true, verified: true, location: true, phone: true } },
             },
           },
         },
@@ -106,6 +148,8 @@ export async function GET(request: NextRequest) {
       professional: {
         id: s.professional.id,
         location: s.professional.location ?? s.professional.user.location ?? null,
+        whatsapp: s.professional.whatsapp ?? null,
+        phone: s.professional.user.phone ?? null,
         user: { 
           name: `${s.professional.user.firstName} ${s.professional.user.lastName}`.trim(),
           location: s.professional.user.location ?? null,

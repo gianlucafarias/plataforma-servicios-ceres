@@ -24,6 +24,7 @@ export async function GET() {
         status: true,
         experienceYears: true,
         serviceLocations: true,
+        profileViews: true,
         createdAt: true,
         _count: {
           select: {
@@ -66,6 +67,7 @@ export async function GET() {
         status: professional.status,
         experienceYears: professional.experienceYears ?? 0,
         locations: professional.serviceLocations?.length ?? 0,
+        views: professional.profileViews ?? 0,
         since: professional.createdAt.toISOString(),
       }
     };

@@ -1,21 +1,24 @@
 import Link from "next/link";
-import { Mail, Phone, MapPin } from "lucide-react";
+import Image from "next/image";
 
 export function Footer() {
   return (
-    <footer className="bg-white dark:bg-gray-900 border-t border-gray-100 dark:border-gray-800 pt-16 pb-8">
+    <footer className="bg-gray-900 border-t border-gray-100 dark:border-gray-800 pt-16 pb-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12 mb-12">
           {/* Información de la municipalidad */}
           <div>
             <div className="flex items-center gap-3 mb-6">
-              <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center text-white font-bold text-sm">C</div>
-              <h5 className="font-bold text-gray-900 dark:text-white">Gobierno de la Ciudad de Ceres</h5>
+              <Image src="/gob_iso.png" alt="Gobierno de la Ciudad de Ceres" width={32} height={32} />
+              <h5 className="font-bold text-white">Gobierno de la
+                 <br />
+                 Ciudad de Ceres</h5>
             </div>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mb-4 leading-relaxed">
+            <p className="text-sm text-gray-400 dark:text-gray-400 mb-4 leading-relaxed">
               Plataforma oficial de servicios profesionales para Ceres y la zona. Conectando talento local con necesidades reales.
             </p>
-            <ul className="text-sm text-gray-500 dark:text-gray-400 space-y-2">
+            {/* Contacto 
+            <ul className="text-sm text-gray-400 dark:text-gray-400 space-y-2">
               <li className="flex items-center gap-2">
                 <MapPin className="text-base" />
                 Ceres, Santa Fe, Argentina
@@ -29,12 +32,13 @@ export function Footer() {
                 servicios@ceres.gob.ar
               </li>
             </ul>
+            */}
           </div>
 
           {/* Enlaces rápidos */}
           <div>
-            <h5 className="font-bold text-gray-900 dark:text-white mb-4">Enlaces Rápidos</h5>
-            <ul className="space-y-3 text-sm text-gray-600 dark:text-gray-400">
+            <h5 className="font-bold text-gray-200 dark:text-white mb-4">Enlaces Rápidos</h5>
+            <ul className="space-y-3 text-sm text-gray-400 dark:text-gray-400">
               <li>
                 <Link href="/servicios" className="hover:text-primary transition-colors">
                   Buscar Servicios
@@ -60,8 +64,8 @@ export function Footer() {
 
           {/* Para profesionales */}
           <div>
-            <h5 className="font-bold text-gray-900 dark:text-white mb-4">Para Profesionales</h5>
-            <ul className="space-y-3 text-sm text-gray-600 dark:text-gray-400">
+            <h5 className="font-bold text-gray-200 dark:text-white mb-4">Para Profesionales</h5>
+            <ul className="space-y-3 text-sm text-gray-400 dark:text-gray-400">
               <li>
                 <Link href="/auth/registro" className="hover:text-primary transition-colors">
                   Registrarse
@@ -87,8 +91,8 @@ export function Footer() {
 
           {/* Soporte */}
           <div>
-            <h5 className="font-bold text-gray-900 dark:text-white mb-4">Soporte</h5>
-            <ul className="space-y-3 text-sm text-gray-600 dark:text-gray-400">
+            <h5 className="font-bold text-gray-200 dark:text-white mb-4">Soporte</h5>
+            <ul className="space-y-3 text-sm text-gray-400 dark:text-gray-400">
               <li>
                 <Link href="/contacto" className="hover:text-primary transition-colors">
                   Contactar Soporte
@@ -114,7 +118,7 @@ export function Footer() {
         </div>
 
         <div className="border-t border-gray-100 dark:border-gray-800 pt-8 flex flex-col md:flex-row justify-between items-center gap-4 text-xs text-gray-400">
-          <p>© 2025 Municipalidad de Ceres. Todos los derechos reservados.</p>
+          <p>© 2026 Gobierno de la Ciudad de Ceres. Todos los derechos reservados.</p>
           <div className="flex gap-6">
             <Link href="/accesibilidad" className="hover:text-gray-600 dark:hover:text-gray-300">
               Accesibilidad

@@ -1,10 +1,11 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Search, ArrowRight, Verified, Zap, MapPin, Wrench, Snowflake, Bolt, Car, TreePine, type LucideIcon } from "lucide-react";
 import { useServices } from "@/hooks/useServices";
+import { useServiceCounts } from "@/hooks/useServiceCounts";
 import { ProfessionalCard } from "@/components/features/ProfessionalCard";
 import { AREAS_OFICIOS, SUBCATEGORIES_OFICIOS, SUBCATEGORIES_PROFESIONES, LOCATIONS } from "@/lib/taxonomy";
 import { CategoryItem } from "@/components/features/CategoryItem";
@@ -19,12 +20,10 @@ export default function ServiciosPage() {
   const [barSearchQuery, setBarSearchQuery] = useState("");
   const [page, setPage] = useState(1);
   const [selectedArea, setSelectedArea] = useState<string>("all");        // 'all' | areaSlug | 'profesiones'
-  const [selectedSubcategory] = useState<string>("all"); // 'all' | subcategorySlug
   const [selectedLocation, setSelectedLocation] = useState<string>("all"); // 'all' | locationId
   const [showMobileCategories, setShowMobileCategories] = useState(false);
   const [showVerifiedOnly, setShowVerifiedOnly] = useState(false);
-
-  const router = useRouter();
+  const [ready, setReady] = useState(false); // para evitar el primer fetch sin filtros correctos
 
   const derivedGroup: 'oficios' | 'profesiones' | undefined = useMemo(() => {
     if (selectedArea === 'profesiones') return 'profesiones';
@@ -40,34 +39,37 @@ export default function ServiciosPage() {
     return undefined;
   }, [selectedArea, selectedCategory]);
 
-// Determinar la categoría a filtrar
-const categoriaToFilter = useMemo(() => {
-  if (selectedCategory !== "all") {
-    return selectedCategory;
-  }
-  // Si hay un área seleccionada pero no una subcategoría específica, no filtrar por categoría
-  // (el grupo ya filtra por oficios/profesiones)
-  return undefined;
-}, [selectedCategory]);
+  // Determinar la categoría a filtrar
+  const categoriaToFilter = useMemo(() => {
+    // Si hay una subcategoría seleccionada, usarla directamente
+    if (selectedCategory !== "all") {
+      return selectedCategory;
+    }
 
-const filters = {
-  q: searchTerm || undefined,
-  grupo: derivedGroup,
-  categoria: categoriaToFilter, // API espera slug de subcategoría
-  location: selectedLocation !== "all" ? selectedLocation : undefined,
-  page,
-  limit: 20,
-};
+    // Si no hay subcategoría pero sí un área de oficios seleccionada,
+    // usar el slug del área para que el backend filtre por todas sus subcategorías.
+    const areaMatch = AREAS_OFICIOS.find((area) => area.slug === selectedArea);
+    if (areaMatch) {
+      return areaMatch.slug;
+    }
+
+    // Sin categoría ni área concreta => sin filtro de categoría
+    return undefined;
+  }, [selectedCategory, selectedArea]);
+
+  const filters = {
+    q: searchTerm || undefined,
+    grupo: derivedGroup,
+    categoria: categoriaToFilter, // API espera slug de subcategoría o de área (backend ya lo soporta)
+    location: selectedLocation !== "all" ? selectedLocation : undefined,
+    page,
+    limit: 20,
+    enabled: ready,
+  };
 
 
   const { services, loading, error, total, totalPages } = useServices(filters);
-
-  // const handleSuggestionClick = (suggestionName: string) => {
-  //   setBarSearchQuery(suggestionName);
-  //   setSearchTerm(suggestionName);
-  // };
-
-
+  const { counts: serviceCounts } = useServiceCounts();
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
@@ -75,40 +77,67 @@ const filters = {
     setSearchTerm(value);
   };
 
-  // Leer parámetros de la URL
+  // Leer parámetros de la URL cada vez que cambian (navegaciones desde home, navbar, etc.)
   useEffect(() => {
     const categoria = searchParams.get('categoria');
     const grupo = searchParams.get('grupo');
+    const subcategoria = searchParams.get('subcategoria');
     const q = searchParams.get('q');
     
-    if (categoria) {
-      setSelectedCategory(categoria);
-      // Buscar en áreas de oficios
+    if (subcategoria) {
+      // Priorizar subcategoría si viene explícita (p.ej. desde el autocomplete)
+      setSelectedCategory(subcategoria);
+
+      // Buscar en subcategorías de oficios
+      const subcatOficios = SUBCATEGORIES_OFICIOS.find(s => s.slug === subcategoria);
+      if (subcatOficios) {
+        setSelectedArea(subcatOficios.areaSlug || 'all');
+        setSelectedGroup('oficios');
+      } else {
+        // Buscar en subcategorías de profesiones
+        const subcatProfesiones = SUBCATEGORIES_PROFESIONES.find(s => s.slug === subcategoria);
+        if (subcatProfesiones) {
+          setSelectedArea('profesiones');
+          setSelectedGroup('profesiones');
+        }
+      }
+    } else if (categoria) {
+      // ¿La categoría corresponde a un ÁREA de oficios?
       const area = AREAS_OFICIOS.find(a => a.slug === categoria);
       if (area) {
+        // Filtrar por grupo "oficios" sin fijar una subcategoría concreta
         setSelectedArea(area.slug);
         setSelectedGroup('oficios');
+        setSelectedCategory('all');
       } else {
         // Buscar en subcategorías de oficios
         const subcatOficios = SUBCATEGORIES_OFICIOS.find(s => s.slug === categoria);
         if (subcatOficios) {
           setSelectedArea(subcatOficios.areaSlug || 'all');
           setSelectedGroup('oficios');
+          setSelectedCategory(subcatOficios.slug);
         } else {
           // Buscar en subcategorías de profesiones
           const subcatProfesiones = SUBCATEGORIES_PROFESIONES.find(s => s.slug === categoria);
           if (subcatProfesiones) {
             setSelectedArea('profesiones');
             setSelectedGroup('profesiones');
+            setSelectedCategory(subcatProfesiones.slug);
+          } else {
+            // Si no coincide con nada conocido, limpiar selección de categoría
+            setSelectedCategory('all');
           }
         }
       }
     }
+
     if (grupo) setSelectedGroup(grupo);
     if (q) {
       setSearchTerm(q);
       setBarSearchQuery(q);
     }
+    // Una vez aplicados los parámetros de la URL, habilitamos el fetch
+    setReady(true);
   }, [searchParams]);
 
   useEffect(() => {
@@ -127,16 +156,6 @@ const filters = {
       }
     }
   }, [selectedGroup, selectedCategory]);
-
-  useEffect(() => {
-    const params = new URLSearchParams();
-    if (selectedGroup !== 'all') params.set('grupo', selectedGroup);
-    if (selectedCategory !== 'all') params.set('categoria', selectedCategory);
-    if (searchTerm) params.set('q', searchTerm);
-    if (page > 1) params.set('page', String(page));
-    const qs = params.toString();
-    router.replace(qs ? `/servicios?${qs}` : `/servicios`, { scroll: false });
-  }, [selectedGroup, selectedCategory, searchTerm, page, router]);
 
   // Resetear página cuando cambian los filtros
   useEffect(() => {
@@ -208,10 +227,43 @@ const filters = {
           {/* Categorías */}
           <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-4">Categorías</h4>
           <nav className="space-y-2">
+            {/* "Todos los profesionales" con mismo estilo que un CategoryItem */}
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedArea('all');
+                setSelectedGroup('all');
+                setSelectedCategory('all');
+                setSearchTerm('');
+                setBarSearchQuery('');
+                setSelectedLocation('all');
+                setPage(1);
+              }}
+              className={`w-full flex items-center justify-between gap-3 px-3 py-2 text-sm font-medium rounded-lg transition-colors text-left ${
+                selectedArea === 'all' && selectedGroup === 'all' && selectedCategory === 'all'
+                  ? 'text-primary bg-emerald-50 dark:bg-emerald-900/30'
+                  : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
+              }`}
+            >
+              <div className="flex items-center gap-3 flex-1 min-w-0">
+                <span className={`w-1.5 h-1.5 rounded-full ${
+                  selectedArea === 'all' && selectedGroup === 'all' && selectedCategory === 'all'
+                    ? 'bg-primary'
+                    : 'bg-gray-300 dark:bg-gray-600'
+                }`}></span>
+                <span className="truncate">Todos los profesionales</span>
+              </div>
+            </button>
             {/* Áreas de oficios */}
             {AREAS_OFICIOS.slice(0, 8).map((area) => {
               const isActive = selectedArea === area.slug;
-              const subcategories = SUBCATEGORIES_OFICIOS.filter(s => s.areaSlug === area.slug);
+              const subcategories = SUBCATEGORIES_OFICIOS
+                .filter(s => s.areaSlug === area.slug)
+                .map(s => ({
+                  slug: s.slug,
+                  name: s.name,
+                  count: serviceCounts[s.slug] ?? 0,
+                }));
               const iconMap: Record<string, LucideIcon | null> = {
                 'construccion-mantenimiento': Wrench,
                 'climatizacion': Snowflake,
@@ -228,7 +280,7 @@ const filters = {
                   slug={area.slug}
                   icon={Icon}
                   isActive={isActive}
-                  subcategories={subcategories.map(s => ({ slug: s.slug, name: s.name }))}
+                  subcategories={subcategories}
                   selectedSubcategory={selectedCategory !== 'all' ? selectedCategory : undefined}
                   onSelect={() => handleCategorySelect(area.slug)}
                   onSelectSubcategory={handleSubcategorySelect}
@@ -242,7 +294,11 @@ const filters = {
               slug="profesiones"
               icon={null}
               isActive={selectedArea === 'profesiones'}
-              subcategories={SUBCATEGORIES_PROFESIONES.slice(0, 6).map(s => ({ slug: s.slug, name: s.name }))}
+              subcategories={SUBCATEGORIES_PROFESIONES.slice(0, 6).map(s => ({
+                slug: s.slug,
+                name: s.name,
+                count: serviceCounts[s.slug] ?? 0,
+              }))}
               selectedSubcategory={selectedCategory !== 'all' ? selectedCategory : undefined}
               onSelect={() => handleCategorySelect('profesiones')}
               onSelectSubcategory={handleSubcategorySelect}
@@ -322,12 +378,44 @@ const filters = {
             </button>
             {showMobileCategories && (
               <div className="mt-3 space-y-2 max-h-[380px] overflow-y-auto custom-scroll pr-1">
+                {/* "Todos los profesionales" con mismo estilo que un CategoryItem */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedArea('all');
+                    setSelectedGroup('all');
+                    setSelectedCategory('all');
+                    setSearchTerm('');
+                    setBarSearchQuery('');
+                    setSelectedLocation('all');
+                    setPage(1);
+                  }}
+                  className={`w-full flex items-center justify-between gap-3 px-3 py-2 text-sm font-medium rounded-lg transition-colors text-left ${
+                    selectedArea === 'all' && selectedGroup === 'all' && selectedCategory === 'all'
+                      ? 'text-primary bg-emerald-50 dark:bg-emerald-900/30'
+                      : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
+                  }`}
+                >
+                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                    <span className={`w-1.5 h-1.5 rounded-full ${
+                      selectedArea === 'all' && selectedGroup === 'all' && selectedCategory === 'all'
+                        ? 'bg-primary'
+                        : 'bg-gray-300 dark:bg-gray-600'
+                    }`}></span>
+                    <span className="truncate">Todos los profesionales</span>
+                  </div>
+                </button>
+
                 {/* Áreas de oficios */}
                 {AREAS_OFICIOS.slice(0, 8).map((area) => {
                   const isActive = selectedArea === area.slug;
-                  const subcategories = SUBCATEGORIES_OFICIOS.filter(
-                    (s) => s.areaSlug === area.slug
-                  );
+                  const subcategories = SUBCATEGORIES_OFICIOS
+                    .filter((s) => s.areaSlug === area.slug)
+                    .map((s) => ({
+                      slug: s.slug,
+                      name: s.name,
+                      count: serviceCounts[s.slug] ?? 0,
+                    }));
                   const iconMap: Record<string, LucideIcon | null> = {
                     "construccion-mantenimiento": Wrench,
                     climatizacion: Snowflake,
@@ -344,10 +432,7 @@ const filters = {
                       slug={area.slug}
                       icon={Icon}
                       isActive={isActive}
-                      subcategories={subcategories.map((s) => ({
-                        slug: s.slug,
-                        name: s.name,
-                      }))}
+                      subcategories={subcategories}
                       selectedSubcategory={
                         selectedCategory !== "all" ? selectedCategory : undefined
                       }
@@ -368,7 +453,11 @@ const filters = {
                   icon={null}
                   isActive={selectedArea === "profesiones"}
                   subcategories={SUBCATEGORIES_PROFESIONES.slice(0, 6).map(
-                    (s) => ({ slug: s.slug, name: s.name })
+                    (s) => ({
+                      slug: s.slug,
+                      name: s.name,
+                      count: serviceCounts[s.slug] ?? 0,
+                    })
                   )}
                   selectedSubcategory={
                     selectedCategory !== "all" ? selectedCategory : undefined
@@ -456,21 +545,25 @@ const filters = {
                   });
 
                 return Array.from(grouped.values()).map(({ professional, services: svcList }) => {
+                  if (!professional) return null;
                   const first = svcList[0]!;
                   return (
                     <ProfessionalCard
-                      key={professional!.id}
+                      key={professional.id}
                       professional={{
-                        id: professional!.id,
-                        user: { name: professional!.user!.name! },
+                        id: professional.id,
+                        user: { name: professional.user!.name! },
                         bio: (professional as unknown as { bio?: string }).bio || first.description,
-                        verified: professional!.verified,
+                        verified: professional.verified,
                         specialties: svcList.map(s => s.title),
                         primaryCategory: { name: first.category!.name },
                         location: (professional as unknown as { location?: string | null }).location || undefined,
                         socialNetworks: {
                           profilePicture: (professional as unknown as { ProfilePicture?: string | null }).ProfilePicture || undefined,
                         },
+                        // Datos de contacto reales para WhatsApp / teléfono
+                        whatsapp: (professional as unknown as { whatsapp?: string | null }).whatsapp || undefined,
+                        phone: (professional.user as unknown as { phone?: string | null }).phone || undefined,
                       }}
                     />
                   );

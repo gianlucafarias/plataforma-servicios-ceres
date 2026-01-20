@@ -177,8 +177,8 @@ export function generateOrganizationStructuredData() {
   return {
     "@context": "https://schema.org",
     "@type": "Organization",
-    "name": "Servicios Ceres",
-    "alternateName": "Ceres en Red",
+    "name": "Ceres en Red",
+    "alternateName": "Ceres en Red -Gobierno de la Ciudad de Ceres",
     "url": baseUrl,
     "logo": `${baseUrl}/gob_iso.png`,
     "description": "Plataforma oficial de servicios profesionales del Gobierno de la Ciudad de Ceres",

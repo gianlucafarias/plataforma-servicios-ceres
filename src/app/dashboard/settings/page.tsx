@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -14,13 +15,14 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
 import { getLocations, GROUPS, SUBCATEGORIES_PROFESIONES, SUBCATEGORIES_OFICIOS, AREAS_OFICIOS } from "@/lib/taxonomy";
-import { User, Mail, Phone, MapPin, Calendar, Briefcase, Award, Save, Loader2, Linkedin, Globe, Upload, FileText, X, Store } from "lucide-react";
+import { User, Mail, Phone, MapPin, Calendar, Briefcase, Award, Save, Loader2, Linkedin, Globe, Upload, FileText, X, Store, AlertCircle } from "lucide-react";
 import { Badge as BadgeComponent } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { ImageCropper } from "@/components/ui/image-cropper";
 
 
 export default function SettingsPage() {
+  const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [formData, setFormData] = useState({
@@ -81,6 +83,23 @@ export default function SettingsPage() {
   useEffect(() => {
     loadProfessionalData();
   }, []);
+
+  // Evitar perder cambios al recargar/cerrar pestaña (protección extra)
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (!hasChanges) return;
+      e.preventDefault();
+      e.returnValue = "";
+    };
+
+    if (hasChanges) {
+      window.addEventListener("beforeunload", handleBeforeUnload);
+    }
+
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+    };
+  }, [hasChanges]);
 
   // Sincronizar serviceLocations con la ubicación principal
   useEffect(() => {
@@ -309,6 +328,7 @@ export default function SettingsPage() {
     description: '',
     priceRange: ''
   });
+  const [showLeaveDialog, setShowLeaveDialog] = useState(false);
 
   // Funciones para gestión de servicios
   const handleAddService = () => {
@@ -505,24 +525,41 @@ export default function SettingsPage() {
                     {getProfileType() === "oficios" ? "Oficios" : "Profesiones"}
                   </Badge>
                 )}
-                <Button 
-                  onClick={handleSave} 
-                  disabled={saving || !hasChanges}
-                  size="lg"
-                  className="bg-gradient-to-r from-[#006F4B] to-[#008F5B] text-white rounded-xl hover:from-[#008F5B] hover:to-[#006F4B] flex items-center gap-2 shadow-lg hover:shadow-xl transition-all"
-                >
-                  {saving ? (
-                    <>
-                      <Loader2 className="h-5 w-5 animate-spin" />
-                      Guardando...
-                    </>
-                  ) : (
-                    <>
-                      <Save className="h-5 w-5" />
-                      {hasChanges ? 'Guardar Cambios' : 'Sin cambios'}
-                    </>
-                  )}
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button 
+                    onClick={handleSave} 
+                    disabled={saving || !hasChanges}
+                    size="lg"
+                    className="bg-gradient-to-r from-[#006F4B] to-[#008F5B] text-white rounded-xl hover:from-[#008F5B] hover:to-[#006F4B] flex items-center gap-2 shadow-lg hover:shadow-xl transition-all"
+                  >
+                    {saving ? (
+                      <>
+                        <Loader2 className="h-5 w-5 animate-spin" />
+                        Guardando...
+                      </>
+                    ) : (
+                      <>
+                        <Save className="h-5 w-5" />
+                        {hasChanges ? 'Guardar Cambios' : 'Sin cambios'}
+                      </>
+                    )}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="rounded-xl"
+                    onClick={() => {
+                      if (!hasChanges) {
+                        router.push("/dashboard");
+                        return;
+                      }
+                      setShowLeaveDialog(true);
+                    }}
+                  >
+                    Volver al dashboard
+                  </Button>
+                </div>
               </div>
             </div>
           </div>
@@ -1386,6 +1423,99 @@ export default function SettingsPage() {
           }
         }}
       />
+
+      {/* Aviso flotante de cambios sin guardar (popup propio) */}
+      {hasChanges && (
+        <div className="fixed bottom-4 right-4 z-50">
+          <Card className="shadow-xl border border-amber-200 bg-amber-50 max-w-md">
+            <CardContent className="p-4 flex flex-col gap-3">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="h-5 w-5 text-amber-600 mt-0.5" />
+                <div>
+                  <p className="text-sm font-semibold text-amber-900">
+                    Tenés cambios sin guardar
+                  </p>
+                  <p className="text-xs text-amber-800 mt-1">
+                    Si salís de esta página sin guardar, vas a perder los cambios realizados en tu perfil.
+                  </p>
+                </div>
+              </div>
+              <div className="flex justify-end gap-2 mt-1">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="rounded-xl"
+                  onClick={async () => {
+                    await loadProfessionalData();
+                    setHasChanges(false);
+                    toast.info("Se descartaron los cambios no guardados.");
+                  }}
+                >
+                  Descartar cambios
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  className="rounded-xl bg-[#006F4B] text-white hover:bg-[#005a3d]"
+                  onClick={handleSave}
+                  disabled={saving}
+                >
+                  {saving ? (
+                    <>
+                      <Loader2 className="h-3 w-3 mr-2 animate-spin" />
+                      Guardando...
+                    </>
+                  ) : (
+                    "Guardar ahora"
+                  )}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Diálogo para confirmar salir de la página con cambios sin guardar */}
+      <Dialog open={showLeaveDialog} onOpenChange={setShowLeaveDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 text-amber-500" />
+              Cambios sin guardar
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <p className="text-sm text-gray-700">
+              Tenés cambios sin guardar en tu perfil.
+            </p>
+            <p className="text-sm text-gray-600">
+              Si salís de la página ahora, vas a perder los cambios que todavía no se guardaron.
+            </p>
+          </div>
+          <DialogFooter className="flex justify-end gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              className="rounded-xl"
+              onClick={() => setShowLeaveDialog(false)}
+            >
+              Seguir editando
+            </Button>
+            <Button
+              type="button"
+              className="rounded-xl bg-red-600 hover:bg-red-700 text-white"
+              onClick={() => {
+                setShowLeaveDialog(false);
+                setHasChanges(false);
+                router.push("/dashboard");
+              }}
+            >
+              Salir sin guardar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

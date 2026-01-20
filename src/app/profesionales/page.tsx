@@ -317,6 +317,9 @@ export default function ProfesionalesIndexPage() {
                     socialNetworks: {
                       profilePicture: (p as unknown as { ProfilePicture?: string }).ProfilePicture,
                     },
+                    // Datos de contacto para el botón de WhatsApp en listados de profesionales
+                    whatsapp: (p as unknown as { whatsapp?: string | null }).whatsapp || undefined,
+                    phone: (p.user as unknown as { phone?: string | null }).phone || undefined,
                   }} />
                 </div>
               ))}

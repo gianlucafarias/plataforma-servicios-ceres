@@ -30,6 +30,9 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/options";
 import type { Metadata } from "next";
 import { getBaseUrl, generateProfessionalStructuredData, generateBreadcrumbsStructuredData } from "@/lib/seo";
+import { prisma } from "@/lib/prisma";
+import { buildWhatsAppLink } from "@/lib/whatsapp";
+import { ProfileViewTracker } from "@/components/features/ProfileViewTracker";
 
 type TimeSlot = {
   enabled: boolean;
@@ -82,22 +85,71 @@ type ApiProfessional = {
   }>;
 };
 
-// Función helper para obtener datos del profesional
+// Función helper para obtener datos del profesional directamente desde la BD
 async function getProfessionalData(id: string): Promise<ApiProfessional | null> {
-  try {
-    const baseUrl = getBaseUrl();
-    const res = await fetch(new URL(`/api/professional/${id}`, baseUrl), { 
-      cache: 'no-store',
-      headers: {
-        'Cache-Control': 'no-store',
-      }
-    });
-    const json: { success: boolean; data?: ApiProfessional } = await res.json();
-    return json?.success && json?.data ? json.data : null;
-  } catch (error) {
-    console.error('Error fetching professional:', error);
-    return null;
-  }
+  const professional = await prisma.professional.findUnique({
+    where: { id },
+    select: {
+      id: true,
+      userId: true,
+      status: true,
+      bio: true,
+      experienceYears: true,
+      verified: true,
+      rating: true,
+      reviewCount: true,
+      specialties: true,
+      professionalGroup: true,
+      whatsapp: true,
+      instagram: true,
+      facebook: true,
+      linkedin: true,
+      website: true,
+      portfolio: true,
+      CV: true,
+      ProfilePicture: true,
+      location: true,
+      serviceLocations: true,
+      hasPhysicalStore: true,
+      physicalStoreAddress: true,
+      schedule: true,
+      user: {
+        select: {
+          firstName: true,
+          lastName: true,
+          email: true,
+          phone: true,
+          verified: true,
+          image: true,
+          location: true,
+        },
+      },
+      services: {
+        where: { available: true },
+        orderBy: { createdAt: "asc" },
+        include: {
+          category: { select: { name: true, slug: true } },
+        },
+      },
+      certifications: {
+        where: { status: "approved" },
+        include: {
+          category: {
+            select: {
+              id: true,
+              name: true,
+              slug: true,
+            },
+          },
+        },
+        orderBy: { createdAt: "desc" },
+      },
+    },
+  });
+
+  if (!professional) return null;
+
+  return professional as unknown as ApiProfessional;
 }
 
 // Generar metadata dinámica para SEO
@@ -124,7 +176,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
     : `${baseUrl}/gob_iso.png`;
   
   const pageUrl = `${baseUrl}/profesionales/${id}`;
-  const title = `${professionalName} - ${category} en Ceres | Servicios Ceres`;
+  const title = `${professionalName} - ${category} en Ceres | Ceres en Red`;
   const description = `${bio.substring(0, 155)}${bio.length > 155 ? '...' : ''} | ${location}`;
 
   return {
@@ -137,7 +189,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
       title,
       description,
       url: pageUrl,
-      siteName: "Servicios Ceres",
+      siteName: "Ceres en Red",
       locale: "es_AR",
       type: "profile",
       images: [
@@ -238,6 +290,21 @@ export default async function ProfessionalDetailPage({ params }: { params: Promi
     holidays: data.schedule?.monday?.workOnHolidays || false,
     certifications: data.certifications || [],
   };
+
+  const mainWhatsappLink = buildWhatsAppLink(
+    p.whatsapp,
+    `Hola ${p.name}, vi tu perfil en Ceres en Red y me gustaría contactarte.`
+  );
+
+  const servicesWhatsappLink = buildWhatsAppLink(
+    p.whatsapp,
+    `Hola ${p.name}, vi tu perfil en Ceres en Red y me gustaría consultar por tus servicios.`
+  );
+
+  const scheduleWhatsappLink = buildWhatsAppLink(
+    p.whatsapp,
+    `Hola ${p.name}, quería consultar tu disponibilidad horaria.`
+  );
 
   
   // Formatear horarios
@@ -341,6 +408,9 @@ export default async function ProfessionalDetailPage({ params }: { params: Promi
         </div>
       )}
 
+      {/* Registrar visita al perfil (cliente, throttled) */}
+      <ProfileViewTracker professionalId={data.id} />
+
       {/* Hero compacto */}
       <div className="bg-gradient-to-r from-[#006F4B] to-[#00875A]">
         <div className="container mx-auto px-4 py-6">
@@ -356,7 +426,7 @@ export default async function ProfessionalDetailPage({ params }: { params: Promi
           <div className="flex flex-col lg:flex-row gap-6 items-start">
             {/* Info principal */}
             <div className="flex gap-4 lg:gap-6 flex-1">
-              <div className="relative flex-shrink-0">
+              <div className="relative inline-flex flex-shrink-0 self-start items-center justify-center">
                 <ProfessionalAvatar
                   name={p.name}
                   profilePicture={p.picture}
@@ -400,15 +470,17 @@ export default async function ProfessionalDetailPage({ params }: { params: Promi
 
             {/* CTAs */}
             <div className="flex gap-3 w-full lg:w-auto">
-              <a
-                href={`https://wa.me/${p.whatsapp}?text=Hola ${p.name}, vi tu perfil en Servicios Ceres y me gustaría contactarte.`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex-1 lg:flex-none flex items-center justify-center gap-2 bg-white text-[#006F4B] hover:bg-gray-50 py-3 px-6 rounded-xl font-bold transition-all shadow-lg"
-              >
-                <WhatsAppIcon className="h-5 w-5" />
-                <span>Contactar</span>
-              </a>
+              {mainWhatsappLink && (
+                <a
+                  href={mainWhatsappLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex-1 lg:flex-none flex items-center justify-center gap-2 bg-white text-[#006F4B] hover:bg-gray-50 py-3 px-6 rounded-xl font-bold transition-all shadow-lg"
+                >
+                  <WhatsAppIcon className="h-5 w-5" />
+                  <span>Contactar</span>
+                </a>
+              )}
               <a
                 href={`tel:${p.phone}`}
                 className="flex items-center justify-center gap-2 bg-white/15 hover:bg-white/25 text-white py-3 px-4 rounded-xl font-medium transition-all border border-white/20"
@@ -474,15 +546,17 @@ export default async function ProfessionalDetailPage({ params }: { params: Promi
                     <MessageCircle className="h-4 w-4 inline mr-1.5 text-[#006F4B]" />
                     ¿Necesitas alguno de estos servicios?
                   </p>
-                  <a
-                    href={`https://wa.me/${p.whatsapp}?text=Hola ${p.name}, vi tu perfil en Servicios Ceres y me gustaría consultar por tus servicios.`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-2 bg-[#25D366] text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-[#20BD5C] transition-colors"
-                  >
-                    <WhatsAppIcon className="h-4 w-4" />
-                    Pedir presupuesto
-                  </a>
+                  {servicesWhatsappLink && (
+                    <a
+                      href={servicesWhatsappLink}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 bg-[#25D366] text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-[#20BD5C] transition-colors"
+                    >
+                      <WhatsAppIcon className="h-4 w-4" />
+                      Pedir presupuesto
+                    </a>
+                  )}
                 </div>
               </div>
             </div>
@@ -501,22 +575,6 @@ export default async function ProfessionalDetailPage({ params }: { params: Promi
                       {loc}
                     </span>
                   ))}
-                </div>
-              </div>
-            )}
-
-            {/* Local Físico - Solo si tiene */}
-            {data.hasPhysicalStore && data.physicalStoreAddress && (
-              <div className="bg-white rounded-2xl shadow-sm p-6">
-                <h2 className="font-bold text-gray-900 mb-4 flex items-center gap-2">
-                  <Store className="h-5 w-5 text-[#006F4B]" />
-                  Local Físico
-                </h2>
-                <div className="flex items-start gap-3">
-                  <MapPin className="h-5 w-5 text-gray-400 mt-0.5 flex-shrink-0" />
-                  <div>
-                    <p className="text-gray-900 font-medium">{data.physicalStoreAddress}</p>
-                  </div>
                 </div>
               </div>
             )}
@@ -751,6 +809,22 @@ export default async function ProfessionalDetailPage({ params }: { params: Promi
               </div>
             </div>
 
+            {/* Local Físico - Solo si tiene (moved to sidebar) */}
+            {data.hasPhysicalStore && data.physicalStoreAddress && (
+              <div className="bg-white rounded-2xl shadow-sm p-5">
+                <h3 className="font-bold text-gray-900 mb-4 flex items-center gap-2">
+                  <Store className="h-5 w-5 text-[#006F4B]" />
+                  Ubicación
+                </h3>
+                <div className="flex items-start gap-3">
+                  <MapPin className="h-5 w-5 text-gray-400 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <p className="text-gray-900 font-medium">{data.physicalStoreAddress}</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Horarios */}
             <div className="bg-white rounded-2xl shadow-sm p-5">
               <h3 className="font-bold text-gray-900 mb-4 flex items-center gap-2">
@@ -790,15 +864,17 @@ export default async function ProfessionalDetailPage({ params }: { params: Promi
                 <div className="text-center py-4">
                   <Clock className="h-8 w-8 text-gray-300 mx-auto mb-2" />
                   <p className="text-sm text-gray-500">Consultar disponibilidad</p>
-                  <a
-                    href={`https://wa.me/${p.whatsapp}?text=Hola ${p.name}, quería consultar tu disponibilidad horaria.`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 text-[#006F4B] text-sm font-medium mt-2 hover:underline"
-                  >
-                    <WhatsAppIcon className="h-4 w-4" />
-                    Preguntar
-                  </a>
+                  {scheduleWhatsappLink && (
+                    <a
+                      href={scheduleWhatsappLink}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 text-[#006F4B] text-sm font-medium mt-2 hover:underline"
+                    >
+                      <WhatsAppIcon className="h-4 w-4" />
+                      Preguntar
+                    </a>
+                  )}
                 </div>
               )}
             </div>
@@ -844,7 +920,7 @@ export default async function ProfessionalDetailPage({ params }: { params: Promi
               </div>
             )}
 
-            {/* Sin reseñas aún - mensaje pequeño */}
+            {/* Sin reseñas aún - mensaje pequeño 
             {p.reviews === 0 && (
               <div className="bg-amber-50 border border-amber-100 rounded-2xl p-4 text-center">
                 <Star className="h-6 w-6 text-amber-400 mx-auto mb-2" />
@@ -852,6 +928,7 @@ export default async function ProfessionalDetailPage({ params }: { params: Promi
                 <p className="text-xs text-amber-600 mt-1">Ayuda a otros usuarios compartiendo tu experiencia</p>
               </div>
             )}
+              */}
 
           </div>
         </div>

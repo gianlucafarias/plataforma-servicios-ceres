@@ -6,6 +6,7 @@ import Image from "next/image";
 import { useMemo, memo } from "react";
 import { AvailabilityBadge } from "./AvailabilityBadge";
 import { LOCATIONS } from "@/lib/taxonomy";
+import { buildWhatsAppLink } from "@/lib/whatsapp";
 
 interface ServiceCardProps {
   service: {
@@ -33,6 +34,8 @@ interface ServiceCardProps {
         };
       }[];
       schedule?: Record<string, unknown>;
+      whatsapp?: string | null;
+      phone?: string | null;
     };
     category: {
       name: string;
@@ -42,10 +45,6 @@ interface ServiceCardProps {
     };
   };
 }
-
-// Constante para WhatsApp (evita recrear string en cada render)
-const WHATSAPP_MESSAGE = encodeURIComponent("Hola, vi tu perfil en Servicios Ceres y me interesa contactarte.");
-const WHATSAPP_BASE = "https://wa.me/+5403491456789?text=";
 
 function ServiceCardComponent({ service }: ServiceCardProps) {
   const { professional } = service;
@@ -66,18 +65,6 @@ function ServiceCardComponent({ service }: ServiceCardProps) {
     return raw;
   }, [professional.location, professional.user.location]);
 
-  // Memoizar cálculo de badges de servicios
-  const serviceBadges = useMemo(() => {
-    const fromProp = Array.isArray(professional.services) && professional.services.length > 0
-      ? professional.services.map(s => s.title).filter(Boolean)
-      : [];
-    const fallbackFromCategory = (service.category.services ?? []).map(cs => cs.name);
-    const items = fromProp.length > 0 ? fromProp : fallbackFromCategory;
-    const visible = items.slice(0, 3);
-    const remaining = Math.max(items.length - 3, 0);
-    return { visible, remaining };
-  }, [professional.services, service.category.services]);
-
   // Usar bio del professional si viene, sino description del service
   const displayBio = professional.bio || service.description;
 
@@ -94,6 +81,11 @@ function ServiceCardComponent({ service }: ServiceCardProps) {
     const index = professional.user.name.charCodeAt(0) % colors.length;
     return colors[index];
   }, [professional.user.name]);
+
+  const whatsappUrl = buildWhatsAppLink(
+    professional.whatsapp || professional.phone || '',
+    "Hola, vi tu perfil en Ceres en Red y me interesa contactarte."
+  );
 
   return (
     <div className="bg-white dark:bg-surface-dark p-6 rounded-2xl shadow-soft hover:shadow-soft-hover transition-all border border-gray-100 dark:border-gray-700">
@@ -134,14 +126,16 @@ function ServiceCardComponent({ service }: ServiceCardProps) {
           >
             Ver Perfil
           </Link>
-          <a
-            href={`${WHATSAPP_BASE}${WHATSAPP_MESSAGE}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="w-9 h-9 flex items-center justify-center rounded-full bg-green-500 hover:bg-green-600 text-white shadow-md transition-colors"
-          >
-            <WhatsAppIcon className="h-4 w-4" />
-          </a>
+          {whatsappUrl && (
+            <a
+              href={whatsappUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="w-9 h-9 flex items-center justify-center rounded-full bg-green-500 hover:bg-green-600 text-white shadow-md transition-colors"
+            >
+              <WhatsAppIcon className="h-4 w-4" />
+            </a>
+          )}
         </div>
       </div>
     </div>

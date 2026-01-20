@@ -44,18 +44,18 @@ export function Header() {
   };
 
   return (
-    <nav className="sticky top-0 z-50 bg-white/90 dark:bg-gray-900/90 backdrop-blur-md border-b border-gray-100 dark:border-gray-800">
+    <nav className="sticky top-0 z-50 bg-white/90 dark:bg-gray-900/90 backdrop-blur-md border-b border-gray-100 dark:border-gray-800 shadow-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-20 items-center">
           {/* Logo y marca */}
           <div className="flex items-center gap-3">
             <Link href="/" className="flex items-center gap-3">
               <NextImage src="/gob_iso.png" alt="Logo" className="h-10 w-10 flex-shrink-0" width={40} height={40} />
-              <div className="hidden md:block leading-tight">
+              <div className="leading-tight">
                 <h1 className="text-sm font-bold text-gray-900 dark:text-white uppercase tracking-wide">
-                 Ceres en Red
+                  CERES EN RED
                 </h1>
-                <p className="text-xs text-gray-500 dark:text-gray-400">
+                <p className="hidden md:block text-xs text-gray-500 dark:text-gray-400">
                   Gobierno de la Ciudad de Ceres
                 </p>
               </div>
@@ -143,7 +143,7 @@ export function Header() {
                     Ingresar
                   </Link>
                 </Button>
-                <Button size="sm" asChild className="hidden md:flex bg-amber-600 hover:bg-amber-500 text-white">
+                <Button size="sm" asChild className="hidden md:flex bg-amber-600 hover:bg-amber-700 text-white">
                   <Link href="/auth/registro">
                     Ofrecer Servicios
                   </Link>
@@ -275,7 +275,7 @@ export function Header() {
                 <Link
                   href="/auth/registro"
                   onClick={() => setMobileMenuOpen(false)}
-                  className="flex items-center gap-3 px-3 py-2 text-sm bg-secondary text-white hover:bg-amber-600 rounded-md transition-colors"
+                  className="flex items-center gap-3 px-3 py-2 text-sm bg-amber-600 text-white hover:bg-amber-700 rounded-md transition-colors"
                 >
                   Ofrecer Servicios
                 </Link>

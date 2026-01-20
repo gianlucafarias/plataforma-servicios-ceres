@@ -108,17 +108,19 @@ export async function POST(request: NextRequest) {
 
       // Si vienen datos profesionales, crear el perfil
       if (bio || experienceYears || (services && services.length > 0) || professionalGroup) {
-        const categoryGroupRecord = professionalGroup
-          ? await tx.categoryGroup.upsert({
-              where: { id: professionalGroup },
-              update: {},
-              create: {
-                id: professionalGroup,
-                name: professionalGroup === 'oficios' ? 'Oficios' : 'Profesiones',
-                slug: professionalGroup,
-              },
-            })
-          : null;
+        // Asegurarse de que el grupo de categorías existe
+        // Si no hay professionalGroup, usar 'oficios' por defecto
+        const groupToUse = professionalGroup || 'oficios';
+        
+        const categoryGroupRecord = await tx.categoryGroup.upsert({
+          where: { id: groupToUse },
+          update: {},
+          create: {
+            id: groupToUse,
+            name: groupToUse === 'oficios' ? 'Oficios' : 'Profesiones',
+            slug: groupToUse,
+          },
+        });
 
         // Mapear category slug -> crear/usar Category y devolver su id
         let servicesCreateData: Array<{ categoryId: string; title: string; description: string; categoryGroup?: CategoryGroup }> | undefined = undefined;
@@ -139,7 +141,7 @@ export async function POST(request: NextRequest) {
                     description: '',
                     slug: s.categoryId,
                     active: true,
-                    groupId: categoryGroupRecord ? categoryGroupRecord.id : 'oficios',
+                    groupId: categoryGroupRecord.id, // Usar el ID del grupo que acabamos de crear/obtener
                   },
                   select: { id: true },
                 });

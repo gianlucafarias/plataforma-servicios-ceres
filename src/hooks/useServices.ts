@@ -10,6 +10,7 @@ type Filters = {
   location?: string; // filtro por ubicación
   page?: number;
   limit?: number;
+  enabled?: boolean; // permite controlar si debe ejecutar la carga
 };
 
 export function useServices(filters: Filters = {}) {
@@ -18,9 +19,18 @@ export function useServices(filters: Filters = {}) {
   const [error, setError] = useState<string | null>(null);
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
-  const { q, grupo, categoria, location, page, limit } = filters;
+  const { q, grupo, categoria, location, page, limit, enabled } = filters;
 
   useEffect(() => {
+    // Si explícitamente nos piden no ejecutar, salimos
+    if (enabled === false) {
+      setServices([]);
+      setTotal(0);
+      setTotalPages(1);
+      setLoading(false);
+      return;
+    }
+
     const run = async () => {
       setLoading(true);
       setError(null);
@@ -40,7 +50,7 @@ export function useServices(filters: Filters = {}) {
       }
     };
     run();
-  }, [q, grupo, categoria, location, page, limit]);
+  }, [q, grupo, categoria, location, page, limit, enabled]);
 
   return { services, loading, error, total, totalPages };
 }

@@ -64,6 +64,17 @@ export async function POST(request: NextRequest) {
 
     // Actualizar usuario y crear perfil profesional
     const result = await prisma.$transaction(async (tx) => {
+      // Asegurarse de que el grupo de categorías existe
+      const categoryGroupRecord = await tx.categoryGroup.upsert({
+        where: { id: professionalGroup },
+        update: {},
+        create: {
+          id: professionalGroup,
+          name: professionalGroup === 'oficios' ? 'Oficios' : 'Profesiones',
+          slug: professionalGroup,
+        },
+      });
+
       // Actualizar datos del usuario
       await tx.user.update({
         where: { id: user.id },
@@ -121,7 +132,7 @@ export async function POST(request: NextRequest) {
               description: '',
               slug: service.categoryId,
               active: true,
-              groupId: professionalGroup,
+              groupId: categoryGroupRecord.id, // Usar el ID del grupo que acabamos de crear/obtener
             }
           });
           

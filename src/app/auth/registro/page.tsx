@@ -1326,7 +1326,7 @@ export default function RegistroPage() {
           <div className="absolute bottom-10 right-20 w-24 h-24 rounded-full border-2 border-white/20"></div>
         </div>
         
-        <div className="relative z-10 px-4 py-8">
+        <div className="relative z-10 px-4 pt-8 pb-16">
           <div className="max-w-4xl mx-auto">
             {/* Back link */}
             <Link href="/" className="inline-flex items-center gap-2 text-white/80 hover:text-white mb-6 transition-colors">
@@ -1339,7 +1339,7 @@ export default function RegistroPage() {
                 Registrate como Profesional
               </h1>
               <p className="text-white/80 text-lg max-w-2xl mx-auto">
-                Completá tu perfil y comenzá a ofrecer tus servicios en la plataforma oficial de Ceres
+                Completá tu perfil y comenzá a ofrecer tus servicios en la plataforma oficial de Ceres en Red
               </p>
             </div>
           </div>
@@ -1347,7 +1347,7 @@ export default function RegistroPage() {
       </div>
 
       {/* Form Content */}
-      <div className="max-w-4xl mx-auto px-4 -mt-6 pb-12">
+      <div className="max-w-4xl mx-auto px-4 -mt-8 md:-mt-10 pb-12 relative z-10">
         <Card className="overflow-hidden shadow-xl border-0">
           <CardContent className="p-6 md:p-8">
             {/* Stepper visual */}

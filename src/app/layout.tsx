@@ -12,23 +12,28 @@ const baseUrl = getBaseUrl();
 
 export const metadata: Metadata = {
   title: {
-    default: "Servicios Ceres - Plataforma Oficial",
-    template: "%s | Servicios Ceres"
+    default: "Ceres en Red",
+    template: "%s | Ceres en Red"
   },
   description: "Plataforma oficial de servicios profesionales del Gobierno de Ceres. Encuentra profesionales verificados para todas tus necesidades.",
-  keywords: ["servicios", "profesionales", "Ceres", "plomería", "electricidad", "construcción", "Santa Fe", "Argentina"],
-  authors: [{ name: "Municipalidad de Ceres" }],
+  keywords: ["servicios", "profesionales", "Ceres", "plomería", "electricidad", "construcción", "Santa Fe", "Argentina", "Ceres en Red"],
+  authors: [{ name: "Gobierno de la Ciudad de Ceres" }],
   creator: "Gobierno de la Ciudad de Ceres",
   publisher: "Gobierno de la Ciudad de Ceres",
   metadataBase: new URL(baseUrl),
   alternates: {
     canonical: baseUrl,
   },
+  icons: {
+    icon: "/gob_iso.png",
+    shortcut: "/gob_iso.png",
+    apple: "/gob_iso.png",
+  },
   openGraph: {
-    title: "Servicios Ceres - Plataforma Oficial",
+    title: "Ceres en Red - Plataforma Oficial",
     description: "Encuentra profesionales verificados en Ceres. Plataforma oficial del Gobierno de la Ciudad de Ceres.",
     url: baseUrl,
-    siteName: "Servicios Ceres",
+    siteName: "Ceres en Red",
     locale: "es_AR",
     type: "website",
     images: [
@@ -36,13 +41,13 @@ export const metadata: Metadata = {
         url: `${baseUrl}/gob_iso.png`,
         width: 400,
         height: 400,
-        alt: "Servicios Ceres - Logo",
+        alt: "Ceres en Red - Logo",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Servicios Ceres - Plataforma Oficial",
+    title: "Ceres en Red - Plataforma Oficial",
     description: "Encuentra profesionales verificados en Ceres",
     images: [`${baseUrl}/gob_iso.png`],
   },
