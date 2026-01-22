@@ -1,46 +1,8 @@
 "use strict";
-var __create = Object.create;
-var __defProp = Object.defineProperty;
-var __defProps = Object.defineProperties;
-var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
-var __getOwnPropDescs = Object.getOwnPropertyDescriptors;
 var __getOwnPropNames = Object.getOwnPropertyNames;
-var __getOwnPropSymbols = Object.getOwnPropertySymbols;
-var __getProtoOf = Object.getPrototypeOf;
-var __hasOwnProp = Object.prototype.hasOwnProperty;
-var __propIsEnum = Object.prototype.propertyIsEnumerable;
-var __defNormalProp = (obj, key, value) => key in obj ? __defProp(obj, key, { enumerable: true, configurable: true, writable: true, value }) : obj[key] = value;
-var __spreadValues = (a, b) => {
-  for (var prop in b || (b = {}))
-    if (__hasOwnProp.call(b, prop))
-      __defNormalProp(a, prop, b[prop]);
-  if (__getOwnPropSymbols)
-    for (var prop of __getOwnPropSymbols(b)) {
-      if (__propIsEnum.call(b, prop))
-        __defNormalProp(a, prop, b[prop]);
-    }
-  return a;
-};
-var __spreadProps = (a, b) => __defProps(a, __getOwnPropDescs(b));
 var __commonJS = (cb, mod) => function __require() {
   return mod || (0, cb[__getOwnPropNames(cb)[0]])((mod = { exports: {} }).exports, mod), mod.exports;
 };
-var __copyProps = (to, from, except, desc) => {
-  if (from && typeof from === "object" || typeof from === "function") {
-    for (let key of __getOwnPropNames(from))
-      if (!__hasOwnProp.call(to, key) && key !== except)
-        __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
-  }
-  return to;
-};
-var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__getProtoOf(mod)) : {}, __copyProps(
-  // If the importer is in node compatibility mode or this is not an ESM
-  // file that has been converted to a CommonJS file using a Babel-
-  // compatible transform (i.e. "__esModule" has not been set), then set
-  // "default" to the CommonJS "module.exports" for node compatibility.
-  isNodeMode || !mod || !mod.__esModule ? __defProp(target, "default", { value: mod, enumerable: true }) : target,
-  mod
-));
 
 // node_modules/dotenv/package.json
 var require_package = __commonJS({
@@ -114,7 +76,7 @@ var require_package = __commonJS({
 var require_main = __commonJS({
   "node_modules/dotenv/lib/main.js"(exports2, module2) {
     "use strict";
-    var fs2 = require("fs");
+    var fs = require("fs");
     var path = require("path");
     var os = require("os");
     var crypto = require("crypto");
@@ -256,7 +218,7 @@ var require_main = __commonJS({
       if (options && options.path && options.path.length > 0) {
         if (Array.isArray(options.path)) {
           for (const filepath of options.path) {
-            if (fs2.existsSync(filepath)) {
+            if (fs.existsSync(filepath)) {
               possibleVaultPath = filepath.endsWith(".vault") ? filepath : `${filepath}.vault`;
             }
           }
@@ -266,7 +228,7 @@ var require_main = __commonJS({
       } else {
         possibleVaultPath = path.resolve(process.cwd(), ".env.vault");
       }
-      if (fs2.existsSync(possibleVaultPath)) {
+      if (fs.existsSync(possibleVaultPath)) {
         return possibleVaultPath;
       }
       return null;
@@ -319,7 +281,7 @@ var require_main = __commonJS({
       const parsedAll = {};
       for (const path2 of optionPaths) {
         try {
-          const parsed = DotenvModule.parse(fs2.readFileSync(path2, { encoding }));
+          const parsed = DotenvModule.parse(fs.readFileSync(path2, { encoding }));
           DotenvModule.populate(parsedAll, parsed, options);
         } catch (e) {
           if (debug) {
@@ -488,272 +450,6 @@ var require_cli_options = __commonJS({
   }
 });
 
-// scripts/worker.ts
-var import_bullmq2 = require("bullmq");
-
-// src/lib/redis.ts
-function redisConnection() {
-  const url = process.env.REDIS_URL || "redis://127.0.0.1:6379/5";
-  const prefix = process.env.REDIS_PREFIX || "ceres:queue";
-  const opts = {
-    maxRetriesPerRequest: null,
-    // Requerido por BullMQ
-    enableReadyCheck: true
-  };
-  return {
-    connection: __spreadValues(__spreadValues({}, opts), parseRedisUrl(url)),
-    prefix
-  };
-}
-function parseRedisUrl(url) {
-  try {
-    const parsed = new URL(url);
-    return {
-      host: parsed.hostname,
-      port: parsed.port ? parseInt(parsed.port, 10) : 6379,
-      db: parsed.pathname ? parseInt(parsed.pathname.slice(1), 10) : 0,
-      password: parsed.password || void 0
-    };
-  } catch (e) {
-    console.warn("REDIS_URL mal formada, usando defaults: 127.0.0.1:6379/5");
-    return { host: "127.0.0.1", port: 6379, db: 5 };
-  }
-}
-
-// src/lib/mail.ts
-var import_nodemailer = __toESM(require("nodemailer"));
-var smtpHost = process.env.SMTP_HOST;
-var smtpPort = process.env.SMTP_PORT ? parseInt(process.env.SMTP_PORT, 10) : 465;
-var smtpUser = process.env.SMTP_USER;
-var smtpPass = process.env.SMTP_PASS;
-var smtpFrom = process.env.SMTP_FROM || process.env.SMTP_USER;
-var smtpSecureEnv = process.env.SMTP_SECURE;
-var smtpSecure = typeof smtpSecureEnv === "string" ? smtpSecureEnv.toLowerCase() === "true" : smtpPort === 465;
-var smtpDebug = (process.env.SMTP_DEBUG || "").toLowerCase() === "true";
-if (!smtpHost || !smtpUser || !smtpPass) {
-  console.warn("SMTP no configurado completamente. Define SMTP_HOST, SMTP_USER y SMTP_PASS en el entorno.");
-}
-var mailTransporter = import_nodemailer.default.createTransport({
-  host: smtpHost,
-  port: smtpPort,
-  secure: smtpSecure,
-  // true: SSL (465), false: STARTTLS (587)
-  auth: {
-    user: smtpUser,
-    pass: smtpPass
-  },
-  logger: smtpDebug,
-  debug: smtpDebug
-});
-async function sendMail(options) {
-  const { to, subject, html, text, from } = options;
-  const info = await mailTransporter.sendMail({
-    from: from || smtpFrom,
-    to,
-    subject,
-    html,
-    text
-  });
-  if (process.env.NODE_ENV !== "production") {
-    console.log("[SMTP] Sent mail to", to, "messageId=", info.messageId);
-  }
-  return info;
-}
-
-// src/lib/prisma.ts
-var import_client = require("@prisma/client");
-var prisma = global.prismaGlobal || new import_client.PrismaClient();
-if (process.env.NODE_ENV !== "production") {
-  global.prismaGlobal = prisma;
-}
-
-// src/jobs/email.worker.ts
-async function sendVerificationEmail(data) {
-  const { userId, token, email, firstName } = data;
-  const vt = await prisma.verificationToken.findFirst({
-    where: {
-      userId,
-      token,
-      expiresAt: { gte: /* @__PURE__ */ new Date() }
-      // No vencido
-    }
-  });
-  if (!vt) {
-    console.warn(`[email.worker] Token de verificaci\xF3n no encontrado o vencido para userId=${userId}`);
-    return;
-  }
-  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || process.env.VERCEL_URL || "";
-  const origin = baseUrl.startsWith("http") ? baseUrl : `https://${baseUrl}`;
-  const verifyUrl = `${origin}/auth/verify?token=${encodeURIComponent(token)}&email=${encodeURIComponent(email)}`;
-  await sendMail({
-    to: email,
-    subject: "Confirm\xE1 tu cuenta - Plataforma de Servicios Ceres",
-    html: `
-      <p>Hola ${firstName != null ? firstName : ""},</p>
-      <p>Gracias por registrarte en la <strong>Plataforma de Servicios Ceres</strong>.</p>
-      <p>Para activar tu cuenta, hac\xE9 clic en el siguiente enlace:</p>
-      <p><a href="${verifyUrl}">Confirmar mi cuenta</a></p>
-      <p>Este enlace vence en 24 horas.</p>
-      <p>Si no fuiste vos, ignor\xE1 este correo.</p>
-    `,
-    text: `Hola ${firstName != null ? firstName : ""}, confirm\xE1 tu cuenta ingresando a: ${verifyUrl}`
-  });
-  console.log(`[email.worker] Email de verificaci\xF3n enviado a ${email}`);
-}
-async function sendWelcomeEmail(data) {
-  const { email, firstName } = data;
-  await sendMail({
-    to: email,
-    subject: "\xA1Bienvenido a Plataforma de Servicios Ceres!",
-    html: `
-      <p>Hola ${firstName != null ? firstName : ""},</p>
-      <p>\xA1Tu cuenta ha sido verificada exitosamente!</p>
-      <p>Ya pod\xE9s comenzar a usar todos los servicios de la plataforma.</p>
-      <p><a href="${process.env.NEXT_PUBLIC_BASE_URL || ""}/dashboard">Ir a mi panel</a></p>
-    `,
-    text: `Hola ${firstName != null ? firstName : ""}, tu cuenta ha sido verificada. Visit\xE1: ${process.env.NEXT_PUBLIC_BASE_URL || ""}/dashboard`
-  });
-  console.log(`[email.worker] Email de bienvenida enviado a ${email}`);
-}
-
-// src/jobs/slack.worker.ts
-async function postToSlack(data) {
-  const text = typeof data === "string" ? data : data.text;
-  const url = process.env.SLACK_WEBHOOK_URL;
-  if (!url) {
-    console.warn("[slack.worker] SLACK_WEBHOOK_URL no configurado");
-    return;
-  }
-  try {
-    const response = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text })
-    });
-    if (!response.ok) {
-      throw new Error(`Slack respondi\xF3 con status ${response.status}`);
-    }
-    console.log(`[slack.worker] Alerta enviada a Slack: ${text.substring(0, 50)}...`);
-  } catch (error) {
-    console.error("[slack.worker] Error enviando a Slack:", error);
-  }
-}
-
-// src/jobs/maintenance.worker.ts
-var import_bullmq = require("bullmq");
-
-// src/jobs/slack.producer.ts
-async function enqueueSlackAlert(_key, _text) {
-  return null;
-}
-
-// src/jobs/maintenance.worker.ts
-async function scheduleMaintenance(base2) {
-  const q = new import_bullmq.Queue("maintenance", base2);
-  await q.add("clean-verification-tokens", {}, {
-    jobId: "maintenance:clean-verification-tokens",
-    repeat: {
-      pattern: "0 * * * *",
-      // Cada hora
-      tz: "America/Argentina/Cordoba"
-    },
-    removeOnComplete: true
-  });
-  await q.add("daily-report", {}, {
-    jobId: "maintenance:daily-report",
-    repeat: {
-      pattern: "0 9 * * *",
-      // 09:00 todos los días
-      tz: "America/Argentina/Cordoba"
-    },
-    removeOnComplete: true
-  });
-  console.log("[maintenance.worker] Crons de mantenimiento programados");
-}
-function createMaintenanceWorker(base2) {
-  return new import_bullmq.Worker("maintenance", async (job) => {
-    if (job.name === "clean-verification-tokens") {
-      await cleanExpiredVerificationTokens();
-    } else if (job.name === "daily-report") {
-      await generateDailyReport();
-    }
-  }, __spreadProps(__spreadValues({}, base2), { concurrency: 1 }));
-}
-async function cleanExpiredVerificationTokens() {
-  const result = await prisma.verificationToken.deleteMany({
-    where: {
-      expiresAt: { lt: /* @__PURE__ */ new Date() }
-    }
-  });
-  console.log(`[maintenance.worker] Limpiados ${result.count} tokens de verificaci\xF3n vencidos`);
-  if (result.count > 100) {
-    await enqueueSlackAlert(
-      `maintenance:clean-tokens:${(/* @__PURE__ */ new Date()).toISOString().split("T")[0]}`,
-      `\u{1F9F9} Limpiados ${result.count} tokens de verificaci\xF3n vencidos`
-    );
-  }
-}
-async function generateDailyReport() {
-  const today = /* @__PURE__ */ new Date();
-  today.setHours(0, 0, 0, 0);
-  const [totalUsers, newUsersToday, totalProfessionals] = await Promise.all([
-    prisma.user.count(),
-    prisma.user.count({ where: { createdAt: { gte: today } } }),
-    prisma.professional.count()
-  ]);
-  const report = `\u{1F4CA} Reporte Diario Ceres
-Usuarios totales: ${totalUsers}
-Nuevos hoy: ${newUsersToday}
-Profesionales activos: ${totalProfessionals}`;
-  await enqueueSlackAlert(
-    `maintenance:daily-report:${today.toISOString().split("T")[0]}`,
-    report
-  );
-  console.log("[maintenance.worker] Reporte diario generado");
-}
-
-// src/jobs/files.worker.ts
-var import_sharp = __toESM(require("sharp"));
-var import_path = require("path");
-var import_fs = require("fs");
-var import_fs2 = require("fs");
-async function optimizeProfileImage(data) {
-  const publicRoot = (0, import_path.join)(process.cwd(), "public");
-  const absolute = (0, import_path.join)(publicRoot, data.path.replace(/^\/+/, ""));
-  if (!(0, import_fs.existsSync)(absolute)) {
-    console.warn("[files.worker] Imagen no existe:", absolute);
-    return;
-  }
-  const dir = (0, import_path.dirname)(absolute);
-  const name = (0, import_path.basename)(absolute, (0, import_path.extname)(absolute));
-  const webpOut = (0, import_path.join)(dir, `${name}.webp`);
-  if ((0, import_fs.existsSync)(webpOut)) return;
-  const image = (0, import_sharp.default)(absolute).rotate();
-  const meta = await image.metadata();
-  const needsDownscale = (meta.width || 0) > 3e3;
-  const pipeline = needsDownscale ? image.resize({ width: 2e3, withoutEnlargement: true, fit: "inside" }) : image;
-  const isSmall = (meta.width || 0) > 0 && (meta.width || 0) < 700;
-  await pipeline.webp({
-    quality: isSmall ? 95 : 90,
-    nearLossless: isSmall ? true : false,
-    smartSubsample: true,
-    effort: 5
-  }).toFile(webpOut);
-}
-async function validateCV(data) {
-  const publicRoot = (0, import_path.join)(process.cwd(), "public");
-  const absolute = (0, import_path.join)(publicRoot, data.path.replace(/^\/+/, ""));
-  if (!(0, import_fs.existsSync)(absolute)) {
-    console.warn("[files.worker] CV no existe:", absolute);
-    return;
-  }
-  const stat = await import_fs2.promises.stat(absolute);
-  const tenMB = 10 * 1024 * 1024;
-  if (stat.size > tenMB) {
-    console.warn("[files.worker] CV demasiado grande (>10MB):", absolute);
-  }
-}
-
 // node_modules/dotenv/config.js
 (function() {
   require_main().config(
@@ -766,111 +462,9 @@ async function validateCV(data) {
 })();
 
 // scripts/worker.ts
-var base = redisConnection();
-console.log("[worker] Inicializando workers...");
-console.log("[worker] Redis:", process.env.REDIS_URL);
-console.log("[worker] Prefix:", base.prefix);
-var emailWorker = new import_bullmq2.Worker("email", async (job) => {
-  console.log(`[email.worker] Processing job ${job.id} (${job.name})`);
-  if (job.name === "verify") {
-    await sendVerificationEmail(job.data);
-  } else if (job.name === "welcome") {
-    await sendWelcomeEmail(job.data);
-  } else {
-    console.warn(`[email.worker] Unknown job type: ${job.name}`);
-  }
-}, __spreadProps(__spreadValues({}, base), {
-  concurrency: 5
-  // Procesa hasta 5 emails simultáneos
-}));
-emailWorker.on("completed", (job) => {
-  console.log(`[email.worker] \u2713 Job ${job.id} completado`);
-});
-emailWorker.on("failed", (job, err) => {
-  console.error(`[email.worker] \u2717 Job ${job == null ? void 0 : job.id} fall\xF3:`, err.message);
-});
-var slackWorker = new import_bullmq2.Worker("slack", async (job) => {
-  console.log(`[slack.worker] Processing job ${job.id} (${job.name})`);
-  if (job.name === "alert") {
-    await postToSlack(job.data);
-  } else {
-    console.warn(`[slack.worker] Unknown job type: ${job.name}`);
-  }
-}, __spreadProps(__spreadValues({}, base), {
-  concurrency: 10
-  // Alta concurrencia para alertas
-}));
-slackWorker.on("completed", (job) => {
-  console.log(`[slack.worker] \u2713 Job ${job.id} completado`);
-});
-slackWorker.on("failed", (job, err) => {
-  console.error(`[slack.worker] \u2717 Job ${job == null ? void 0 : job.id} fall\xF3:`, err.message);
-});
-var filesWorker = new import_bullmq2.Worker("files", async (job) => {
-  console.log(`[files.worker] Processing job ${job.id} (${job.name})`);
-  if (job.name === "optimize-profile-image") {
-    await optimizeProfileImage(job.data);
-  } else if (job.name === "validate-cv") {
-    await validateCV(job.data);
-  } else {
-    console.warn(`[files.worker] Unknown job type: ${job.name}`);
-  }
-}, __spreadProps(__spreadValues({}, base), { concurrency: 2 }));
-filesWorker.on("completed", (job) => {
-  console.log(`[files.worker] \u2713 Job ${job.id} completado`);
-});
-filesWorker.on("failed", (job, err) => {
-  console.error(`[files.worker] \u2717 Job ${job == null ? void 0 : job.id} fall\xF3:`, err.message);
-});
-var emailEvents = new import_bullmq2.QueueEvents("email", base);
-emailEvents.on("failed", async ({ jobId, failedReason }) => {
-  const isDLQ = failedReason && failedReason.includes("exceeded");
-  if (isDLQ) {
-    console.error(`[DLQ] Email job ${jobId} agot\xF3 reintentos: ${failedReason}`);
-    await postToSlack({
-      text: `\u{1F525} DLQ Email: Job ${jobId} agot\xF3 reintentos
-${failedReason}`
-    });
-  }
-});
-var slackEvents = new import_bullmq2.QueueEvents("slack", base);
-slackEvents.on("failed", async ({ jobId, failedReason }) => {
-  console.error(`[DLQ] Slack job ${jobId} fall\xF3:`, failedReason);
-});
-var filesEvents = new import_bullmq2.QueueEvents("files", base);
-filesEvents.on("failed", async ({ jobId, failedReason }) => {
-  console.error(`[DLQ] Files job ${jobId} fall\xF3:`, failedReason);
-  await postToSlack({
-    text: `\u{1F525} DLQ Files: Job ${jobId} agot\xF3 reintentos
-${failedReason}`
-  });
-});
-var maintenanceWorker = createMaintenanceWorker(base);
-maintenanceWorker.on("completed", (job) => {
-  console.log(`[maintenance.worker] \u2713 Job ${job.id} completado`);
-});
-maintenanceWorker.on("failed", (job, err) => {
-  console.error(`[maintenance.worker] \u2717 Job ${job == null ? void 0 : job.id} fall\xF3:`, err.message);
-});
-scheduleMaintenance(base).then(() => console.log("[worker] \u2713 Crons de mantenimiento programados")).catch((err) => {
-  console.error("[worker] Error programando crons:", err);
-  process.exit(1);
-});
-var shutdown = async (signal) => {
-  console.log(`
-[worker] Recibido ${signal}, cerrando workers...`);
-  await Promise.all([
-    emailWorker.close(),
-    slackWorker.close(),
-    filesWorker.close(),
-    maintenanceWorker.close(),
-    emailEvents.close(),
-    slackEvents.close(),
-    filesEvents.close()
-  ]);
-  console.log("[worker] Workers cerrados exitosamente");
-  process.exit(0);
-};
-process.on("SIGTERM", () => shutdown("SIGTERM"));
-process.on("SIGINT", () => shutdown("SIGINT"));
-console.log("[worker] \u2713 Workers inicializados y escuchando jobs");
+console.log("========================================");
+console.log("[worker] Workers de BullMQ DESHABILITADOS");
+console.log("[worker] No se inicializan colas ni crons.");
+console.log("[worker] Pod\xE9s eliminar o detener cualquier proceso pm2 que use este script.");
+console.log("========================================");
+process.exit(0);

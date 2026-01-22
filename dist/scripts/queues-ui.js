@@ -1,43 +1,8 @@
 "use strict";
-var __create = Object.create;
-var __defProp = Object.defineProperty;
-var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
 var __getOwnPropNames = Object.getOwnPropertyNames;
-var __getOwnPropSymbols = Object.getOwnPropertySymbols;
-var __getProtoOf = Object.getPrototypeOf;
-var __hasOwnProp = Object.prototype.hasOwnProperty;
-var __propIsEnum = Object.prototype.propertyIsEnumerable;
-var __defNormalProp = (obj, key, value) => key in obj ? __defProp(obj, key, { enumerable: true, configurable: true, writable: true, value }) : obj[key] = value;
-var __spreadValues = (a, b) => {
-  for (var prop in b || (b = {}))
-    if (__hasOwnProp.call(b, prop))
-      __defNormalProp(a, prop, b[prop]);
-  if (__getOwnPropSymbols)
-    for (var prop of __getOwnPropSymbols(b)) {
-      if (__propIsEnum.call(b, prop))
-        __defNormalProp(a, prop, b[prop]);
-    }
-  return a;
-};
 var __commonJS = (cb, mod) => function __require() {
   return mod || (0, cb[__getOwnPropNames(cb)[0]])((mod = { exports: {} }).exports, mod), mod.exports;
 };
-var __copyProps = (to, from, except, desc) => {
-  if (from && typeof from === "object" || typeof from === "function") {
-    for (let key of __getOwnPropNames(from))
-      if (!__hasOwnProp.call(to, key) && key !== except)
-        __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
-  }
-  return to;
-};
-var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__getProtoOf(mod)) : {}, __copyProps(
-  // If the importer is in node compatibility mode or this is not an ESM
-  // file that has been converted to a CommonJS file using a Babel-
-  // compatible transform (i.e. "__esModule" has not been set), then set
-  // "default" to the CommonJS "module.exports" for node compatibility.
-  isNodeMode || !mod || !mod.__esModule ? __defProp(target, "default", { value: mod, enumerable: true }) : target,
-  mod
-));
 
 // node_modules/dotenv/package.json
 var require_package = __commonJS({
@@ -485,52 +450,6 @@ var require_cli_options = __commonJS({
   }
 });
 
-// scripts/queues-ui.ts
-var import_express = __toESM(require("express"));
-var import_express_basic_auth = __toESM(require("express-basic-auth"));
-var import_api = require("@bull-board/api");
-var import_bullMQAdapter = require("@bull-board/api/bullMQAdapter");
-var import_express2 = require("@bull-board/express");
-
-// src/lib/queues.ts
-var import_bullmq = require("bullmq");
-
-// src/lib/redis.ts
-function redisConnection() {
-  const url = process.env.REDIS_URL || "redis://127.0.0.1:6379/5";
-  const prefix = process.env.REDIS_PREFIX || "ceres:queue";
-  const opts = {
-    maxRetriesPerRequest: null,
-    // Requerido por BullMQ
-    enableReadyCheck: true
-  };
-  return {
-    connection: __spreadValues(__spreadValues({}, opts), parseRedisUrl(url)),
-    prefix
-  };
-}
-function parseRedisUrl(url) {
-  try {
-    const parsed = new URL(url);
-    return {
-      host: parsed.hostname,
-      port: parsed.port ? parseInt(parsed.port, 10) : 6379,
-      db: parsed.pathname ? parseInt(parsed.pathname.slice(1), 10) : 0,
-      password: parsed.password || void 0
-    };
-  } catch (e) {
-    console.warn("REDIS_URL mal formada, usando defaults: 127.0.0.1:6379/5");
-    return { host: "127.0.0.1", port: 6379, db: 5 };
-  }
-}
-
-// src/lib/queues.ts
-var base = redisConnection();
-var emailQueue = new import_bullmq.Queue("email", base);
-var slackQueue = new import_bullmq.Queue("slack", base);
-var maintenanceQueue = new import_bullmq.Queue("maintenance", base);
-var filesQueue = new import_bullmq.Queue("files", base);
-
 // node_modules/dotenv/config.js
 (function() {
   require_main().config(
@@ -543,46 +462,9 @@ var filesQueue = new import_bullmq.Queue("files", base);
 })();
 
 // scripts/queues-ui.ts
-var app = (0, import_express.default)();
-var PORT = process.env.QUEUES_UI_PORT || 3050;
-var password = process.env.QUEUES_UI_PASS || "ceres";
-app.use((0, import_express_basic_auth.default)({
-  users: { admin: password },
-  challenge: true,
-  realm: "Ceres Queues Dashboard"
-}));
-console.log("[queues-ui] Basic Auth configurado (usuario: admin)");
-var serverAdapter = new import_express2.ExpressAdapter();
-serverAdapter.setBasePath("/ui");
-(0, import_api.createBullBoard)({
-  queues: [
-    new import_bullMQAdapter.BullMQAdapter(emailQueue),
-    new import_bullMQAdapter.BullMQAdapter(slackQueue),
-    new import_bullMQAdapter.BullMQAdapter(maintenanceQueue),
-    new import_bullMQAdapter.BullMQAdapter(filesQueue)
-  ],
-  serverAdapter
-});
-app.use("/ui", serverAdapter.getRouter());
-app.get("/health", (req, res) => {
-  res.json({ status: "ok", timestamp: (/* @__PURE__ */ new Date()).toISOString() });
-});
-app.get("/", (req, res) => {
-  res.redirect("/ui");
-});
-app.listen(PORT, () => {
-  console.log("========================================");
-  console.log("  \u{1F39B}\uFE0F  Ceres Queues Dashboard");
-  console.log("========================================");
-  console.log(`  URL: http://127.0.0.1:${PORT}/ui`);
-  console.log(`  Usuario: admin`);
-  console.log(`  Contrase\xF1a: ${password === "ceres" ? "ceres (default)" : "***"}`);
-  console.log("========================================");
-});
-var shutdown = async (signal) => {
-  console.log(`
-[queues-ui] Recibido ${signal}, cerrando servidor...`);
-  process.exit(0);
-};
-process.on("SIGTERM", () => shutdown("SIGTERM"));
-process.on("SIGINT", () => shutdown("SIGINT"));
+console.log("========================================");
+console.log("[queues-ui] Dashboard de colas DESHABILITADO");
+console.log("[queues-ui] No se levanta Express ni Bull Board.");
+console.log("[queues-ui] Pod\xE9s eliminar o detener cualquier proceso pm2 que use este script.");
+console.log("========================================");
+process.exit(0);
