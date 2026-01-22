@@ -199,8 +199,7 @@ export async function POST(request: NextRequest) {
     const { password: _dbPassword, ...userWithoutPassword } = result.user as PrismaUser;
     void _dbPassword;
 
-    // Encolar correo de verificación (procesamiento asíncrono)
-    // El worker se encargará de enviarlo con retries automáticos
+    // Envio de correo de verificacion manejado por servicio externo
     try {
       await enqueueEmailVerify({
         userId: userWithoutPassword.id,
