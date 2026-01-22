@@ -4,7 +4,9 @@ import { Service } from "@/types";
 
 
 export function useFeaturedServices(limit = 6) {
-    const { services, loading, error } = useServices({ grupo: 'oficios', limit: 50 });
+    // Pedimos un número acotado de servicios para no cargar demasiada data en home.
+    const fetchLimit = Math.min(Math.max(limit * 3, 12), 30);
+    const { services, loading, error } = useServices({ grupo: 'oficios', limit: fetchLimit });
     const featured = useMemo(() => {
       const seen = new Set<string>();
       const dedup: Service[] = [];

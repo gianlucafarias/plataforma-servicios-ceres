@@ -144,7 +144,7 @@ export default function ProfesionalesIndexPage() {
                       onClick={() => setViewMode("grid")}
                       className="rounded-lg"
                     >
-                      <Grid className="h-4 w-4 mr-1" />
+                      <Grid className="h-4 w-4 mr-1" aria-hidden="true" />
                       Grid
                     </Button>
                     <Button
@@ -153,7 +153,7 @@ export default function ProfesionalesIndexPage() {
                       onClick={() => setViewMode("list")}
                       className="rounded-lg"
                     >
-                      <List className="h-4 w-4 mr-1" />
+                      <List className="h-4 w-4 mr-1" aria-hidden="true" />
                       Lista
                     </Button>
                   </div>
@@ -165,15 +165,18 @@ export default function ProfesionalesIndexPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                   {/* Búsqueda */}
                   <div className="space-y-2 lg:col-span-2">
-                    <label className="text-sm font-medium text-gray-700">Buscar</label>
+                    <label htmlFor="professionals-search" className="text-sm font-medium text-gray-700">Buscar</label>
                     <div className="relative">
-                      <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                      <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" aria-hidden="true" />
                       <Input
+                        id="professionals-search"
+                        name="q"
                         type="search"
-                        placeholder="Nombre, especialidad, servicios..."
+                        placeholder="Nombre, especialidad, servicios."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
-                        className="pl-10 h-9 rounded-lg border-gray-300 focus:border-[#006F4B] focus:ring-2 focus:ring-[#006F4B]/20 transition-all duration-200"
+                        autoComplete="off"
+                        className="pl-10 h-9 rounded-lg border-gray-300 focus:border-[#006F4B] focus:ring-2 focus:ring-[#006F4B]/20 transition-colors duration-200"
                       />
                     </div>
                   </div>
@@ -183,7 +186,7 @@ export default function ProfesionalesIndexPage() {
                     <label className="text-sm font-medium text-gray-700">Categoría</label>
                     <div className="relative">
                       <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-                        <SelectTrigger className="w-full h-12 rounded-lg border-gray-300 focus:border-[#006F4B] focus:ring-2 focus:ring-[#006F4B]/20 transition-all duration-200">
+                        <SelectTrigger className="w-full h-12 rounded-lg border-gray-300 focus:border-[#006F4B] focus:ring-2 focus:ring-[#006F4B]/20 transition-colors duration-200">
                           <SelectValue placeholder="Seleccionar categoría" />
                         </SelectTrigger>
                         <SelectContent>
@@ -200,7 +203,7 @@ export default function ProfesionalesIndexPage() {
                     <label className="text-sm font-medium text-gray-700">Lugar de trabajo</label>
                     <div className="relative">
                       <Select value={selectedLocation} onValueChange={setSelectedLocation}>
-                        <SelectTrigger className="w-full h-12 rounded-lg border-gray-300 focus:border-[#006F4B] focus:ring-2 focus:ring-[#006F4B]/20 transition-all duration-200">
+                        <SelectTrigger className="w-full h-12 rounded-lg border-gray-300 focus:border-[#006F4B] focus:ring-2 focus:ring-[#006F4B]/20 transition-colors duration-200">
                           <SelectValue placeholder="Seleccionar localidad" />
                         </SelectTrigger>
                         <SelectContent>
@@ -225,9 +228,9 @@ export default function ProfesionalesIndexPage() {
                       type="button"
                       aria-label="Desplazar izquierda"
                       onClick={() => scrollChips('left')}
-                      className="absolute left-1 top-1/2 -translate-y-1/2 z-20 rounded-full bg-white/95 shadow-lg border p-2 hover:bg-white hover:shadow-xl transition-all"
+                      className="absolute left-1 top-1/2 -translate-y-1/2 z-20 rounded-full bg-white/95 shadow-lg border p-2 hover:bg-white hover:shadow-xl transition-colors transition-shadow"
                     >
-                      <ChevronLeft className="h-4 w-4 md:h-5 md:w-5" />
+                      <ChevronLeft className="h-4 w-4 md:h-5 md:w-5" aria-hidden="true" />
                     </button>
                   )}
 
@@ -244,10 +247,11 @@ export default function ProfesionalesIndexPage() {
                     {SUBCATEGORIES_PROFESIONES.map((p) => {
                       const active = selectedCategory === p.slug;
                       return (
-                        <div
+                        <button
                           key={p.slug}
+                          type="button"
                           onClick={() => setSelectedCategory(prev => prev === p.slug ? "all" : p.slug)}
-                          className={`group relative h-16 w-40 md:h-24 md:w-56 flex items-center justify-center text-center rounded-2xl text-white transition-all duration-300 ease-out cursor-pointer p-0 transform-gpu will-change-transform overflow-hidden flex-shrink-0 ${
+                          className={`group relative h-16 w-40 md:h-24 md:w-56 flex items-center justify-center text-center rounded-2xl text-white transition-[transform,box-shadow,filter] duration-300 ease-out cursor-pointer p-0 transform-gpu will-change-transform overflow-hidden flex-shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-[#006F4B] ${
                             active 
                               ? "ring-2 shadow-lg scale-105 brightness-110" 
                               : "ring-1 ring-transparent hover:ring-white/20 hover:brightness-115 "
@@ -258,7 +262,6 @@ export default function ProfesionalesIndexPage() {
                               : "linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,111,75,0.6) 30%, rgba(0,111,75,0.95) 100%)",
                             backgroundColor: active ? "#008F5B" : "#006F4B"
                           }}
-                          role="button"
                           aria-pressed={active}
                         >
                           {active && (
@@ -269,7 +272,7 @@ export default function ProfesionalesIndexPage() {
                               {p.name}
                             </div>
                           </div>
-                        </div>
+                        </button>
                       );
                     })}
                   </div>
@@ -279,9 +282,9 @@ export default function ProfesionalesIndexPage() {
                       type="button"
                       aria-label="Desplazar derecha"
                       onClick={() => scrollChips('right')}
-                      className="absolute right-1 top-1/2 -translate-y-1/2 z-20 rounded-full bg-white/95 shadow-lg border p-2 hover:bg-white hover:shadow-xl transition-all"
+                      className="absolute right-1 top-1/2 -translate-y-1/2 z-20 rounded-full bg-white/95 shadow-lg border p-2 hover:bg-white hover:shadow-xl transition-colors transition-shadow"
                     >
-                      <ChevronRight className="h-4 w-4 md:h-5 md:w-5" />
+                      <ChevronRight className="h-4 w-4 md:h-5 md:w-5" aria-hidden="true" />
                     </button>
                   )}
                 </div>
@@ -293,7 +296,7 @@ export default function ProfesionalesIndexPage() {
             <Card className="rounded-2xl border border-gray-100">
               <CardContent className="p-12 text-center">
                 <div className="text-gray-400 mb-4">
-                  <Search className="h-16 w-16 mx-auto" />
+                  <Search className="h-16 w-16 mx-auto" aria-hidden="true" />
                 </div>
                 <h3 className="text-xl font-bold text-gray-900 mb-2">No se encontraron profesionales</h3>
                 <p className="text-gray-600 mb-6">Intenta cambiar los filtros o buscar con otros términos.</p>
@@ -330,7 +333,5 @@ export default function ProfesionalesIndexPage() {
     </div>
   );
 }
-
-
 
 

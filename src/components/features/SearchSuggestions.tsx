@@ -126,9 +126,9 @@ function SearchSuggestionsComponent({ query, isVisible, onSelect, onClose }: Sea
           >
             <div className="flex-shrink-0">
               {isSubcategory ? (
-                <User className="h-4 w-4 text-gray-500" />
+                <User className="h-4 w-4 text-gray-500" aria-hidden="true" />
               ) : (
-                <Building2 className="h-4 w-4 text-gray-500" />
+                <Building2 className="h-4 w-4 text-gray-500" aria-hidden="true" />
               )}
             </div>
             
@@ -148,7 +148,7 @@ function SearchSuggestionsComponent({ query, isVisible, onSelect, onClose }: Sea
               )}
             </div>
             
-            <Search className="h-4 w-4 text-gray-400 flex-shrink-0" />
+            <Search className="h-4 w-4 text-gray-400 flex-shrink-0" aria-hidden="true" />
           </Link>
         );
       })}

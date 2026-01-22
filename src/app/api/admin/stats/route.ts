@@ -8,9 +8,6 @@ export async function GET(request: NextRequest) {
   if (error) return error;
 
   try {
-    const { searchParams } = new URL(request.url);
-    const period = searchParams.get('period') || 'all'; // 'all', 'week', 'month'
-
     // Calcular fechas para métricas de crecimiento
     const now = new Date();
     const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);

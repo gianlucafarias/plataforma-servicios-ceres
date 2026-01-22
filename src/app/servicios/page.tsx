@@ -220,7 +220,7 @@ export default function ServiciosPage() {
               className="w-full py-2 bg-white text-primary font-semibold text-sm rounded-lg hover:bg-emerald-50 transition-colors flex items-center justify-center gap-2"
             >
               Registrarme ahora
-              <ArrowRight className="h-4 w-4" />
+              <ArrowRight className="h-4 w-4" aria-hidden="true" />
             </Link>
           </div>
 
@@ -312,20 +312,24 @@ export default function ServiciosPage() {
           <section className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
             <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
               <div className="relative w-full md:w-1/2">
+                <label htmlFor="services-search" className="sr-only">Buscar servicios.</label>
                 <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Search className="text-gray-400 h-5 w-5" />
+                  <Search className="text-gray-400 h-5 w-5" aria-hidden="true" />
                 </span>
                 <input
-                  type="text"
+                  id="services-search"
+                  name="q"
+                  type="search"
                   value={barSearchQuery}
                   onChange={handleSearchChange}
-                  placeholder="¿Qué servicio estás buscando? ej: Plomero, Electricista..."
-                  className="block w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg leading-5 bg-gray-50 dark:bg-gray-800 placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary sm:text-sm transition-colors"
+                  autoComplete="off"
+                  placeholder="¿Qué servicio estás buscando? Ej: plomero, electricista."
+                  className="block w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg leading-5 bg-gray-50 dark:bg-gray-800 placeholder-gray-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 focus-visible:ring-offset-white focus-visible:border-primary sm:text-sm transition-colors dark:focus-visible:ring-offset-gray-800"
                 />
               </div>
               <div className="flex gap-2 w-full md:w-auto overflow-x-auto pb-1 md:pb-0 no-scrollbar items-center">
                 <div className="relative min-w-[180px]">
-                  <MapPin className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 pointer-events-none z-10" />
+                  <MapPin className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 pointer-events-none z-10" aria-hidden="true" />
                   <Select
                     value={selectedLocation}
                     onValueChange={(value) => {
@@ -333,7 +337,7 @@ export default function ServiciosPage() {
                       setPage(1);
                     }}
                   >
-                    <SelectTrigger className="w-full pl-10 pr-8 py-1.5 rounded-lg border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-xs font-medium focus:ring-4 focus:ring-green-100 focus:border-[#006F4B] transition-all duration-200">
+                    <SelectTrigger className="w-full pl-10 pr-8 py-1.5 rounded-lg border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-xs font-medium focus:ring-4 focus:ring-green-100 focus:border-[#006F4B] transition-colors duration-200">
                       <SelectValue placeholder="Todas las ciudades" />
                     </SelectTrigger>
                     <SelectContent>
@@ -351,13 +355,13 @@ export default function ServiciosPage() {
                     setShowVerifiedOnly(!showVerifiedOnly);
                     setPage(1);
                   }}
-                  className={`flex items-center gap-1 px-3 py-1.5 rounded-lg border-2 text-xs font-medium whitespace-nowrap transition-all duration-200 ${
+                  className={`flex items-center gap-1 px-3 py-1.5 rounded-lg border-2 text-xs font-medium whitespace-nowrap transition-colors duration-200 ${
                     showVerifiedOnly
                       ? 'border-[#006F4B] bg-[#006F4B] text-white focus:ring-4 focus:ring-green-100'
                       : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 focus:ring-4 focus:ring-green-100 focus:border-[#006F4B]'
                   }`}
                 >
-                  <Verified className="h-4 w-4" />
+                  <Verified className="h-4 w-4" aria-hidden="true" />
                   Verificados
                 </button>
               </div>
@@ -478,7 +482,7 @@ export default function ServiciosPage() {
             <div>
               <h2 className="text-xl font-bold text-gray-900 dark:text-white">Profesionales Destacados</h2>
               <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                {loading ? 'Cargando...' : `${total} ${total === 1 ? 'servicio encontrado' : 'servicios encontrados'}`}
+                {loading ? 'Cargando.' : `${total} ${total === 1 ? 'servicio encontrado' : 'servicios encontrados'}`}
               </p>
             </div>
           </div>
@@ -489,7 +493,7 @@ export default function ServiciosPage() {
             <div className="flex items-center justify-center py-12">
               <div className="text-center">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
-                <p className="mt-4 text-gray-600 dark:text-gray-400">Cargando servicios...</p>
+                <p className="mt-4 text-gray-600 dark:text-gray-400">Cargando servicios.</p>
               </div>
             </div>
           ) : error ? (
@@ -505,7 +509,7 @@ export default function ServiciosPage() {
           ) : services.length === 0 ? (
             <div className="col-span-full flex flex-col items-center justify-center py-16 text-center">
               <div className="bg-gray-100 dark:bg-gray-800 p-4 rounded-full mb-4">
-                <Search className="h-8 w-8 text-gray-400" />
+                <Search className="h-8 w-8 text-gray-400" aria-hidden="true" />
               </div>
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white">No encontramos resultados</h3>
               <p className="text-gray-600 dark:text-gray-400 max-w-md mt-2 mb-6">
@@ -618,19 +622,19 @@ export default function ServiciosPage() {
             <div className="relative z-10 flex gap-4">
               <div className="flex flex-col items-center gap-1">
                 <div className="w-10 h-10 rounded-full bg-white dark:bg-gray-700 flex items-center justify-center shadow-sm text-primary">
-                  <Verified className="h-5 w-5" />
+                  <Verified className="h-5 w-5" aria-hidden="true" />
                 </div>
                 <span className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase">Seguro</span>
               </div>
               <div className="flex flex-col items-center gap-1">
                 <div className="w-10 h-10 rounded-full bg-white dark:bg-gray-700 flex items-center justify-center shadow-sm text-primary">
-                  <Zap className="h-5 w-5" />
+                  <Zap className="h-5 w-5" aria-hidden="true" />
                 </div>
                 <span className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase">Rápido</span>
               </div>
               <div className="flex flex-col items-center gap-1">
                 <div className="w-10 h-10 rounded-full bg-white dark:bg-gray-700 flex items-center justify-center shadow-sm text-primary">
-                  <MapPin className="h-5 w-5" />
+                  <MapPin className="h-5 w-5" aria-hidden="true" />
                 </div>
                 <span className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase">Local</span>
               </div>

@@ -9,7 +9,14 @@ export type ServiceFilters = {
   limit?: number
 }
 
-export async function loadServices(filters: ServiceFilters = {}): Promise<{
+type LoadServicesOptions = {
+  signal?: AbortSignal
+}
+
+export async function loadServices(
+  filters: ServiceFilters = {},
+  options: LoadServicesOptions = {}
+): Promise<{
   success: boolean
   data: Service[]
   total: number
@@ -24,7 +31,9 @@ export async function loadServices(filters: ServiceFilters = {}): Promise<{
   params.set('limit', String(filters.limit ?? 20))
   params.set('page', String(filters.page ?? 1))
 
-  const res = await fetch(`/api/services?${params.toString()}`)
+  const res = await fetch(`/api/services?${params.toString()}`, {
+    signal: options.signal,
+  })
   const json = await res.json()
   if (json.success) {
     const data = json.data as Service[]

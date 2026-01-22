@@ -4,7 +4,6 @@
 
 // React 19 movió act de react-dom/test-utils a react
 // Polyfill para compatibilidad con @testing-library/react
-import * as React from 'react'
 import { act } from 'react'
 
 // Exponer act en el lugar donde react-dom/test-utils lo espera

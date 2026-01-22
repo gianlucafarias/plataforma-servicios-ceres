@@ -19,7 +19,7 @@ function CategoryCardComponent({ category, priority = false }: CategoryCardProps
 
   return (
     <Link href={`/servicios?grupo=${category.group}&categoria=${category.slug}`} className="block h-full group">
-      <div className="relative h-full rounded-2xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300">
+      <div className="relative h-full rounded-2xl overflow-hidden shadow-sm hover:shadow-xl transition-shadow duration-300">
         {/* Skeleton mientras carga */}
         {!loaded && <div className="absolute inset-0 bg-gray-200 dark:bg-gray-700 animate-pulse" />}
 
@@ -38,7 +38,7 @@ function CategoryCardComponent({ category, priority = false }: CategoryCardProps
 
         {/* Overlay de gradiente */}
         <div
-          className={`absolute inset-0 bg-gradient-to-t from-black/80 to-transparent flex items-end p-6 transition-all duration-500 ${
+          className={`absolute inset-0 bg-gradient-to-t from-black/80 to-transparent flex items-end p-6 transition-opacity duration-500 ${
             loaded ? "opacity-100" : "opacity-0"
           }`}
         >

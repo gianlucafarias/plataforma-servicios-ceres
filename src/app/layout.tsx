@@ -70,14 +70,25 @@ export default async function RootLayout({ children }: { children: React.ReactNo
 
   return (
     <html lang="es">
-      <body className="font-roboto antialiased min-h-screen flex flex-col">
+      <body className="font-roboto antialiased flex flex-col overflow-x-hidden">
+        <a
+          href="#main-content"
+          className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-md focus:bg-white focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-gray-900 focus:shadow-lg dark:focus:bg-gray-900 dark:focus:text-white"
+        >
+          Saltar al contenido principal
+        </a>
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationData) }}
         />
         <AuthProviders session={session}>
           <Header />
-          <main className="flex-1">
+          <main
+            id="main-content"
+            tabIndex={-1}
+            className="flex-1 w-full overflow-x-hidden"
+            style={{ overflowY: 'auto' }}
+          >
             {children}
           </main>
           <Footer />
