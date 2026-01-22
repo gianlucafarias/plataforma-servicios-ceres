@@ -37,9 +37,9 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen bg-[#f8f9fa] dark:bg-background-dark text-gray-800 dark:text-gray-200 transition-colors duration-300">
+    <div className="bg-[#f8f9fa] dark:bg-background-dark text-gray-800 dark:text-gray-200 transition-colors duration-300">
       {/* Hero Section */}
-      <header className="relative">
+      <header className="relative overflow-hidden">
         <div className="absolute inset-0 bg-[#EBE4C0]">
           {/* Fondo base */}
           <Image
@@ -54,12 +54,11 @@ export default function Home() {
           />
           
           {/* Elementos decorativos izquierda */}
-          <div className="hidden xl:block absolute left-0 top-0 h-full w-1/3 transition-all duration-700 ease-out">
+          <div className="hidden xl:block absolute left-0 top-0 h-full w-1/3 transition-opacity duration-700 ease-out">
             <Image
               src="/elementosizquierda.png"
               alt=""
               fill
-              priority
               sizes="33vw"
               className="object-contain object-left opacity-70"
               placeholder="blur"
@@ -68,12 +67,11 @@ export default function Home() {
           </div>
           
           {/* Elementos decorativos derecha */}
-          <div className="hidden xl:block absolute right-0 top-0 h-full w-1/3 transition-all duration-700 ease-out">
+          <div className="hidden xl:block absolute right-0 top-0 h-full w-1/3 transition-opacity duration-700 ease-out">
             <Image
               src="/elementosderecha.png"
               alt=""
               fill
-              priority
               sizes="33vw"
               className="object-contain object-right opacity-70"
               placeholder="blur"
@@ -89,11 +87,11 @@ export default function Home() {
         </div>
         
         <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-background-light dark:to-background-dark z-0"></div>
-        <div className="relative z-10 max-w-5xl mx-auto px-4 pt-20 pb-24 text-center">
-          <h2 className="text-4xl md:text-5xl font-semibold text-gray-900 dark:text-white mb-6">
+        <div className="relative z-10 max-w-5xl mx-auto px-4 pt-20 pb-20 text-center">
+          <h1 className="text-4xl md:text-5xl font-semibold text-gray-900 dark:text-white mb-6">
             ¿Buscás un técnico? ¿Profesional?<br/>
             <span className="text-primary font-extrabold">¡Encontralo acá!</span>
-          </h2>
+          </h1>
           <p className="text-lg text-gray-600 dark:text-gray-300 mb-10 max-w-2xl mx-auto">
             Plataforma del Gobierno de la Ciudad de Ceres para conectar vecinos con profesionales verificados de manera segura y rápida.
           </p>
@@ -113,10 +111,10 @@ export default function Home() {
               value={searchQuery}
               onChange={handleSearchChange}
               onFocus={() => setShowSuggestions(searchQuery.length > 0)}
-              placeholder="¿Qué servicio necesitas? Ej: plomero, electricista..."
+              placeholder="¿Qué servicio necesitas? Ej: plomero, electricista."
               aria-label="¿Qué servicio necesitas?"
               autoComplete="off"
-              className="flex-grow bg-transparent border-none focus:ring-0 focus:outline-none focus-visible:outline-none text-gray-700 dark:text-gray-200 px-6 py-3 placeholder-gray-400"
+              className="flex-grow bg-transparent border-none text-gray-700 dark:text-gray-200 px-6 py-3 placeholder-gray-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-gray-800"
             />
             <div className="absolute left-0 right-14 top-full mt-1">
               <SearchSuggestions
@@ -131,7 +129,7 @@ export default function Home() {
               aria-label="Buscar" 
               className="bg-primary hover:bg-emerald-800 text-white rounded-full p-3 w-12 h-12 flex items-center justify-center transition-colors shadow-lg"
             >
-              <Search className="h-5 w-5 cursor-pointer" />
+              <Search className="h-5 w-5 cursor-pointer" aria-hidden="true" />
             </button>
           </form>
           
@@ -145,14 +143,14 @@ export default function Home() {
           <div className="flex flex-col sm:flex-row justify-center gap-4 mt-10">
             <Link 
               href="/servicios" 
-              className="group px-8 py-3 bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-semibold rounded-full shadow-sm hover:shadow-md transition-all border border-gray-200 dark:border-gray-600 flex items-center justify-center gap-2"
+              className="group px-8 py-3 bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-semibold rounded-full shadow-sm hover:shadow-md transition-colors transition-shadow border border-gray-200 dark:border-gray-600 flex items-center justify-center gap-2"
             >
               Ver todos los servicios
-              <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
+              <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" aria-hidden="true" />
             </Link>
             <Link 
               href="/auth/registro" 
-              className="px-8 py-3 font-semibold rounded-full shadow-lg bg-amber-600 text-white transition-all transform hover:bg-amber-700"
+              className="px-8 py-3 font-semibold rounded-full shadow-lg bg-amber-600 text-white transition-colors transform hover:bg-amber-700"
             >
               Ofrecer mis servicios
             </Link>
@@ -165,22 +163,22 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-8 text-center md:text-left">
             <div className="flex flex-col items-center md:items-start p-4 rounded-xl cursor-default">
-              <Verified className="h-10 w-10 mb-3 opacity-90" />
+              <Verified className="h-10 w-10 mb-3 opacity-90" aria-hidden="true" />
               <h3 className="font-bold text-lg mb-1">Desarrollo local</h3>
               <p className="text-sm opacity-80 text-center md:text-left">Iniciativa del Gobierno de la Ciudad de Ceres</p>
             </div>
             <div className="flex flex-col items-center md:items-start p-4 rounded-xl cursor-default">
-              <Rocket className="h-10 w-10 mb-3 opacity-90" />
+              <Rocket className="h-10 w-10 mb-3 opacity-90" aria-hidden="true" />
               <h3 className="font-bold text-lg mb-1">Rápido y simple</h3>
               <p className="text-sm opacity-80 text-center md:text-left">Buscá, elegí y coordiná en minutos</p>
             </div>
             <div className="flex flex-col items-center md:items-start p-4 rounded-xl cursor-default">
-              <MessageCircle className="h-10 w-10 mb-3 opacity-90" />
+              <MessageCircle className="h-10 w-10 mb-3 opacity-90" aria-hidden="true" />
               <h3 className="font-bold text-lg mb-1">Contacto directo</h3>
               <p className="text-sm opacity-80 text-center md:text-left">Coordiná por WhatsApp o teléfono</p>
             </div>
             <div className="flex flex-col items-center md:items-start p-4 rounded-xl cursor-default">
-              <MapPin className="h-10 w-10 mb-3 opacity-90" />
+              <MapPin className="h-10 w-10 mb-3 opacity-90" aria-hidden="true" />
               <h3 className="font-bold text-lg mb-1">Enfocado en la región</h3>
               <p className="text-sm opacity-80 text-center md:text-left">Profesionales de Ceres y la zona</p>
             </div>
@@ -206,10 +204,10 @@ export default function Home() {
                   container.scrollBy({ left: -itemWidth, behavior: "smooth" });
                 }
               }}
-              className="cursor-pointer w-10 h-10 rounded-full border border-gray-200 dark:border-gray-700 flex items-center justify-center hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-300 transition-colors"
+              className="cursor-pointer w-10 h-10 rounded-full border border-gray-200 dark:border-gray-700 flex items-center justify-center hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-300 transition-colors focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 focus-visible:ring-offset-[#f8f9fa] dark:focus-visible:ring-offset-gray-900"
               aria-label="Anterior"
             >
-              <ArrowRight className="h-5 w-5 rotate-180" />
+              <ArrowRight className="h-5 w-5 rotate-180" aria-hidden="true" />
             </button>
             <button 
               onClick={() => {
@@ -219,10 +217,10 @@ export default function Home() {
                   container.scrollBy({ left: itemWidth, behavior: "smooth" });
                 }
               }}
-              className="cursor-pointer w-10 h-10 rounded-full border border-gray-200 focus:outline-none flex items-center justify-center hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-300 transition-colors"
+              className="cursor-pointer w-10 h-10 rounded-full border border-gray-200 flex items-center justify-center hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-300 transition-colors focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 focus-visible:ring-offset-[#f8f9fa] dark:focus-visible:ring-offset-gray-900"
               aria-label="Siguiente"
             >
-              <ArrowRight className="h-5 w-5" />
+              <ArrowRight className="h-5 w-5" aria-hidden="true" />
             </button>
           </div>
         </div>
@@ -233,7 +231,7 @@ export default function Home() {
             className="inline-flex items-center gap-2 px-6 py-2 rounded-full border border-gray-300 dark:border-gray-600 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
           >
             Ver todas las categorías
-            <ArrowRight className="h-4 w-4" />
+            <ArrowRight className="h-4 w-4" aria-hidden="true" />
           </Link>
         </div>
       </section>
@@ -273,7 +271,7 @@ export default function Home() {
               className="inline-flex items-center gap-2 px-6 py-2 rounded-full border border-gray-300 dark:border-gray-600 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
             >
               Ver todos los profesionales
-              <ArrowRight className="h-4 w-4" />
+              <ArrowRight className="h-4 w-4" aria-hidden="true" />
             </Link>
           </div>
         </div>
@@ -350,14 +348,14 @@ export default function Home() {
           <div className="grid grid-cols-1 lg:grid-cols-2">
             <div className="p-10 lg:p-16 flex flex-col justify-center text-white z-10">
               <div className="inline-flex items-center gap-2 mb-4 bg-white/20 w-fit px-3 py-1 rounded-full backdrop-blur-sm">
-                <Rocket className="h-4 w-4" />
+                <Rocket className="h-4 w-4" aria-hidden="true" />
                 <span className="text-xs font-semibold uppercase tracking-wide">Crece en Ceres</span>
               </div>
               <h3 className="text-3xl md:text-4xl font-bold mb-6">¿Querés publicar tus servicios?</h3>
               <div className="space-y-6">
                 <div className="flex gap-4">
                   <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0">
-                    <UserPlus className="h-5 w-5" />
+                    <UserPlus className="h-5 w-5" aria-hidden="true" />
                   </div>
                   <div>
                     <h4 className="font-bold text-lg">Registro</h4>
@@ -366,7 +364,7 @@ export default function Home() {
                 </div>
                 <div className="flex gap-4">
                   <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0">
-                    <CheckCircle2 className="h-5 w-5" />
+                    <CheckCircle2 className="h-5 w-5" aria-hidden="true" />
                   </div>
                   <div>
                     <h4 className="font-bold text-lg">Verificación</h4>
@@ -375,7 +373,7 @@ export default function Home() {
                 </div>
                 <div className="flex gap-4">
                   <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0">
-                    <Rocket className="h-5 w-5" />
+                    <Rocket className="h-5 w-5" aria-hidden="true" />
                   </div>
                   <div>
                     <h4 className="font-bold text-lg">¡Listo!</h4>
@@ -386,10 +384,10 @@ export default function Home() {
               <div className="mt-10">
                 <Link
                   href="/auth/registro"
-                  className="bg-white text-primary px-8 py-3 rounded-full font-bold shadow-lg hover:bg-gray-100 transition-all flex items-center gap-2 w-fit"
+                  className="bg-white text-primary px-8 py-3 rounded-full font-bold shadow-lg hover:bg-gray-100 transition-colors transition-shadow flex items-center gap-2 w-fit"
                 >
                   Crea tu perfil gratis
-                  <ArrowRight className="h-4 w-4" />
+                  <ArrowRight className="h-4 w-4" aria-hidden="true" />
                 </Link>
               </div>
             </div>
@@ -399,7 +397,6 @@ export default function Home() {
                 alt="Profesional trabajando"
                 fill
                 className="object-cover"
-                priority
               />
               <div className="absolute inset-0 bg-primary/20 mix-blend-multiply"></div>
               <div className="absolute inset-0 bg-gradient-to-r from-primary via-transparent to-transparent lg:hidden"></div>

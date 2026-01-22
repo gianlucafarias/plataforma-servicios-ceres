@@ -126,11 +126,30 @@
 @layer base {
   html {
     font-family: 'Inter', system-ui, sans-serif;
-    scroll-behavior: smooth;
+    /* Quitar smooth scroll por defecto para evitar problemas en iOS */
+    scroll-behavior: auto;
+    overflow-x: hidden;
+    max-width: 100%;
+    width: 100%;
+    /* Mejorar comportamiento de scroll en iOS */
+    -webkit-overflow-scrolling: touch;
   }
 
   body {
     @apply bg-gray-50 text-gray-900;
+    overflow-x: hidden;
+    max-width: 100%;
+    width: 100%;
+    position: relative;
+    /* Prevenir comportamiento extraño del scroll en iOS */
+    -webkit-overflow-scrolling: touch;
+    /* Prevenir scroll elástico horizontal */
+    overscroll-behavior-x: contain;
+  }
+  
+  /* Solo aplicar smooth scroll cuando se use explícitamente */
+  html.smooth-scroll {
+    scroll-behavior: smooth;
   }
 }
 
@@ -358,9 +377,25 @@
 @layer base {
   * {
     @apply border-border outline-ring/50;
+    box-sizing: border-box;
   }
   body {
     @apply bg-background text-foreground;
+    overflow-x: hidden;
+  }
+  /* Prevenir overflow horizontal en todos los elementos */
+  img, video, iframe, embed, object {
+    max-width: 100%;
+    height: auto;
+  }
+  /* Prevenir desbordamiento en contenedores principales */
+  main, section, article, aside, footer, nav {
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+  /* El header no debe tener overflow hidden para evitar scrolls independientes */
+  header {
+    max-width: 100%;
   }
 }
 

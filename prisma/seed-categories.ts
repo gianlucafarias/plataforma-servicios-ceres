@@ -6,28 +6,7 @@ const prisma = new PrismaClient();
 async function seedCategories() {
   console.log('🌱 Iniciando seed de categorías...');
 
-  // 1. Asegurar que existen los grupos
-  const oficiosGroup = await prisma.categoryGroup.upsert({
-    where: { id: 'oficios' },
-    update: {},
-    create: {
-      id: 'oficios',
-      name: 'Oficios',
-      slug: 'oficios',
-    },
-  });
 
-  const profesionesGroup = await prisma.categoryGroup.upsert({
-    where: { id: 'profesiones' },
-    update: {},
-    create: {
-      id: 'profesiones',
-      name: 'Profesiones',
-      slug: 'profesiones',
-    },
-  });
-
-  console.log('✅ Grupos de categorías creados');
 
   // 2. Crear/actualizar áreas de oficios (categorías padre)
   const areaMap = new Map<string, string>(); // slug -> id

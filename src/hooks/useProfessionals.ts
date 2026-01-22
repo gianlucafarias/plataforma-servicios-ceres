@@ -1,3 +1,5 @@
+'use client';
+
 import { Professional } from '@/types';
 import { useState, useEffect } from 'react';
 
@@ -5,7 +7,7 @@ type Filters = {
   q?: string;
   categoria?: string; // slug
   grupo?: 'oficios' | 'profesiones';
-  location?: string; // filtro por ubicación
+  location?: string; // filtro por ubicacion
   page?: number;
   limit?: number;
   sortBy?: 'name' | 'rating' | 'recent';
@@ -19,6 +21,8 @@ export function useProfessionals(filters: Filters = {}) {
   const [totalPages, setTotalPages] = useState(1);
 
   useEffect(() => {
+    const controller = new AbortController();
+
     const load = async () => {
       setLoading(true);
       setError(null);
@@ -32,8 +36,11 @@ export function useProfessionals(filters: Filters = {}) {
         params.set('page', String(filters.page ?? 1));
         params.set('sortBy', String(filters.sortBy ?? 'recent'));
 
-        const res = await fetch(`/api/professionals?${params.toString()}`);
+        const res = await fetch(`/api/professionals?${params.toString()}`, {
+          signal: controller.signal,
+        });
         const json = await res.json();
+        if (controller.signal.aborted) return;
         if (json.success) {
           setProfessionals(json.data);
           setTotal(json.pagination?.total ?? json.data.length);
@@ -42,12 +49,19 @@ export function useProfessionals(filters: Filters = {}) {
           setError(json.message || 'No se pudieron cargar los profesionales');
         }
       } catch (e) {
+        if (controller.signal.aborted) return;
         setError(e instanceof Error ? e.message : 'Error al obtener profesionales');
       } finally {
-        setLoading(false);
+        if (!controller.signal.aborted) {
+          setLoading(false);
+        }
       }
     };
     load();
+
+    return () => {
+      controller.abort();
+    };
   }, [filters.q, filters.categoria, filters.grupo, filters.location, filters.page, filters.limit, filters.sortBy]);
 
   return { professionals, loading, error, total, totalPages };

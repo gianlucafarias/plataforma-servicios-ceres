@@ -10,25 +10,27 @@ export function useServiceCounts() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    let cancelled = false;
+    const controller = new AbortController();
 
     const run = async () => {
       setLoading(true);
       setError(null);
       try {
-        const res = await fetch('/api/services/stats');
+        const res = await fetch('/api/services/stats', {
+          signal: controller.signal,
+        });
         const json = await res.json();
-        if (!cancelled && json.success) {
+        if (controller.signal.aborted) return;
+        if (json.success) {
           setCounts(json.data ?? {});
-        } else if (!cancelled && !json.success) {
-          setError(json.error || 'No se pudieron obtener las estadísticas');
+        } else {
+          setError(json.error || 'No se pudieron obtener las estadisticas');
         }
       } catch (e) {
-        if (!cancelled) {
-          setError(e instanceof Error ? e.message : 'Error al obtener estadísticas');
-        }
+        if (controller.signal.aborted) return;
+        setError(e instanceof Error ? e.message : 'Error al obtener estadisticas');
       } finally {
-        if (!cancelled) {
+        if (!controller.signal.aborted) {
           setLoading(false);
         }
       }
@@ -37,10 +39,9 @@ export function useServiceCounts() {
     run();
 
     return () => {
-      cancelled = true;
+      controller.abort();
     };
   }, []);
 
   return { counts, loading, error };
 }
-

@@ -7,7 +7,7 @@ type Filters = {
   q?: string;
   grupo?: 'oficios' | 'profesiones';
   categoria?: string; // slug
-  location?: string; // filtro por ubicación
+  location?: string; // filtro por ubicacion
   page?: number;
   limit?: number;
   enabled?: boolean; // permite controlar si debe ejecutar la carga
@@ -22,7 +22,7 @@ export function useServices(filters: Filters = {}) {
   const { q, grupo, categoria, location, page, limit, enabled } = filters;
 
   useEffect(() => {
-    // Si explícitamente nos piden no ejecutar, salimos
+    // Si explicitamente nos piden no ejecutar, salimos
     if (enabled === false) {
       setServices([]);
       setTotal(0);
@@ -31,11 +31,16 @@ export function useServices(filters: Filters = {}) {
       return;
     }
 
+    const controller = new AbortController();
+
     const run = async () => {
       setLoading(true);
       setError(null);
       try {
-        const result = await loadServices({ q, grupo, categoria, location, page, limit });
+        const result = await loadServices(
+          { q, grupo, categoria, location, page, limit },
+          { signal: controller.signal }
+        );
         if (result.success) {
           setServices(result.data);
           setTotal(result.total);
@@ -44,12 +49,19 @@ export function useServices(filters: Filters = {}) {
           setError(result.message || 'No se pudieron cargar los servicios');
         }
       } catch (e) {
+        if (controller.signal.aborted) return;
         setError(e instanceof Error ? e.message : 'Error al obtener servicios');
       } finally {
-        setLoading(false);
+        if (!controller.signal.aborted) {
+          setLoading(false);
+        }
       }
     };
     run();
+
+    return () => {
+      controller.abort();
+    };
   }, [q, grupo, categoria, location, page, limit, enabled]);
 
   return { services, loading, error, total, totalPages };

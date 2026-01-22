@@ -1,12 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
-// Devuelve la cantidad de servicios disponibles (profesionales activos y verificados)
-// agrupados por slug de categoría (subcategorías). Pensado para mostrar contadores
-// en el sidebar sin hacer N consultas.
+const CACHE_TTL_MS = 60_000;
+let cachedCounts: Record<string, number> | null = null;
+let cachedAt = 0;
+
+// Returns counts of available services grouped by category slug.
 export async function GET(_request: NextRequest) {
   try {
-    // Agrupamos en la tabla de servicios para contar solo los que están disponibles
+    const now = Date.now();
+    if (cachedCounts && now - cachedAt < CACHE_TTL_MS) {
+      return NextResponse.json(
+        { success: true, data: cachedCounts },
+        { headers: { 'Cache-Control': 'public, max-age=60, stale-while-revalidate=300' } }
+      );
+    }
+
     const groups = await prisma.service.groupBy({
       by: ['categoryId'],
       _count: { _all: true },
@@ -20,7 +29,12 @@ export async function GET(_request: NextRequest) {
     });
 
     if (groups.length === 0) {
-      return NextResponse.json({ success: true, data: {} });
+      cachedCounts = {};
+      cachedAt = now;
+      return NextResponse.json(
+        { success: true, data: cachedCounts },
+        { headers: { 'Cache-Control': 'public, max-age=60, stale-while-revalidate=300' } }
+      );
     }
 
     const categoryIds = groups.map((g) => g.categoryId);
@@ -39,7 +53,12 @@ export async function GET(_request: NextRequest) {
       countsBySlug[slug] = g._count._all;
     }
 
-    return NextResponse.json({ success: true, data: countsBySlug });
+    cachedCounts = countsBySlug;
+    cachedAt = now;
+    return NextResponse.json(
+      { success: true, data: countsBySlug },
+      { headers: { 'Cache-Control': 'public, max-age=60, stale-while-revalidate=300' } }
+    );
   } catch (error) {
     console.error('GET /api/services/stats error:', error);
     return NextResponse.json(
@@ -48,4 +67,3 @@ export async function GET(_request: NextRequest) {
     );
   }
 }
-
