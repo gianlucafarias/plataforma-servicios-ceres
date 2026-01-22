@@ -11,11 +11,5 @@ module.exports = {
         PORT: 3012
       }
     }
-    // Worker desactivado para ahorrar RAM y moverlo a servicio externo
-    // {
-    //   name: 'ceres-platform-v1-worker',
-    //   script: 'dist/scripts/worker.js',
-    //   ...
-    // }
   ],
 };

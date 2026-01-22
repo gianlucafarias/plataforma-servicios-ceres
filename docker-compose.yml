@@ -1,23 +1,4 @@
 services:
-  # Redis para BullMQ (OPCIONAL - solo si no tienes Redis corriendo)
-  redis:
-    image: redis:7-alpine
-    container_name: ceres-redis
-    restart: unless-stopped
-    command: redis-server --appendonly yes
-    volumes:
-      - redis_data:/data
-    networks:
-      - ceres-network
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    profiles:
-      - redis-internal  # Solo se levanta si usas: docker compose --profile redis-internal up
-
-  # Aplicación Next.js
   app:
     build:
       context: .
@@ -41,19 +22,6 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
-
-  # Worker de BullMQ (DESACTIVADO PARA AHORRAR RAM)
-  # worker:
-  #   image: plataforma-servicios-ceres-app
-  #   ...
-
-  # UI de BullMQ (DESACTIVADO PARA AHORRAR RAM)
-  # queues-ui:
-  #   image: plataforma-servicios-ceres-app
-  #   ...
-
-volumes:
-  redis_data:
 
 networks:
   ceres-network:
