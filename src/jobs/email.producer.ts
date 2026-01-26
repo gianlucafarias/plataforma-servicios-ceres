@@ -3,7 +3,14 @@
 import { Resend } from "resend";
 import { getAbsoluteUrl } from "@/lib/seo";
 
-const resend = new Resend(process.env.RESEND_API_KEY || "");
+// Lazy initialization: solo crear Resend cuando realmente se necesite
+function getResendClient() {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) {
+    return null;
+  }
+  return new Resend(apiKey);
+}
 
 interface EnqueueEmailVerifyParams {
   userId: string;
@@ -23,7 +30,8 @@ export async function enqueueEmailVerify(params: EnqueueEmailVerifyParams) {
   const verifyUrl = getAbsoluteUrl(`/auth/verify?token=${encodeURIComponent(token)}&email=${encodeURIComponent(email)}`);
 
   // Enviar email con Resend
-  if (process.env.RESEND_API_KEY) {
+  const resend = getResendClient();
+  if (resend) {
     try {
       const result = await resend.emails.send({
         from: "Ceres en Red <no-reply@ceresenred.ceres.gob.ar>",
