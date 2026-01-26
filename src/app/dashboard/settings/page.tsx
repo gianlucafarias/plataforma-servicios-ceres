@@ -1050,7 +1050,8 @@ export default function SettingsPage() {
                         <>
                           <Image
                             src={
-                              formData.picture.startsWith('http')
+                              formData.picture.startsWith('http') ||
+                              formData.picture.startsWith('/uploads/profiles/')
                                 ? formData.picture
                                 : `/uploads/profiles/${formData.picture}`
                             }
@@ -1425,10 +1426,9 @@ export default function SettingsPage() {
             
             const result = await response.json();
             if (result.success) {
-              handleInputChange(
-                'picture',
-                result.url || result.path || result.filename
-              );
+              // Usar value si existe (normalizado), sino filename para local o url para R2
+              const pictureValue = result.value || (result.storage === 'r2' ? result.url : result.filename);
+              handleInputChange('picture', pictureValue);
               toast.success('Imagen recortada y subida correctamente');
               setImageToCrop("");
             } else {

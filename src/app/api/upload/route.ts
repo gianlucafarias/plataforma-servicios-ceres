@@ -139,12 +139,19 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Normalizar el valor a retornar: solo el nombre del archivo para almacenamiento local
+    // o la URL completa para R2
+    const returnValue = storage === 'r2' 
+      ? finalUrl // Para R2, retornar URL completa
+      : storedFilename; // Para local, retornar solo el nombre del archivo
+
     return NextResponse.json({ 
       success: true, 
       filename: storedFilename, // mantenemos por compatibilidad
       originalName,
-      path: finalUrl,
-      url: finalUrl,
+      path: finalUrl, // Ruta completa para referencia
+      url: finalUrl, // URL completa para referencia
+      value: returnValue, // Valor normalizado para guardar en BD
       storage,
     });
 
