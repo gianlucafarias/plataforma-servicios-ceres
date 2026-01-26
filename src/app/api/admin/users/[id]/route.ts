@@ -88,7 +88,9 @@ export async function GET(
 /**
  * PUT /api/admin/users/[id]
  * Actualiza información de un usuario
- * Body: { role?, verified?, firstName?, lastName?, email?, phone?, location?, birthDate? }
+ * Body: { role?, verified?, firstName?, lastName?, email?, phone?, location?, birthDate?, suspended? }
+ * 
+ * Nota: Si suspended=true y el usuario tiene un Professional, se suspenderá el Professional también.
  */
 export async function PUT(
   request: NextRequest,
@@ -102,7 +104,10 @@ export async function PUT(
     const body = await request.json();
 
     // Verificar que el usuario existe
-    const existing = await prisma.user.findUnique({ where: { id } });
+    const existing = await prisma.user.findUnique({ 
+      where: { id },
+      include: { professional: true }
+    });
     if (!existing) {
       return NextResponse.json(
         { success: false, error: 'not_found', message: 'Usuario no encontrado' },
@@ -152,36 +157,137 @@ export async function PUT(
       updateData.birthDate = body.birthDate ? new Date(body.birthDate) : null;
     }
 
+    // Si se solicita suspender/activar y el usuario tiene un Professional
+    if (body.suspended !== undefined && existing.professional) {
+      await prisma.professional.update({
+        where: { id: existing.professional.id },
+        data: {
+          status: body.suspended ? 'suspended' : 'active'
+        }
+      });
+    }
+
     const updated = await prisma.user.update({
       where: { id },
       data: updateData,
-      select: {
-        id: true,
-        email: true,
-        firstName: true,
-        lastName: true,
-        name: true,
-        phone: true,
-        role: true,
-        verified: true,
-        emailVerifiedAt: true,
-        birthDate: true,
-        location: true,
-        image: true,
-        createdAt: true,
-        updatedAt: true,
+      include: {
+        professional: {
+          select: {
+            id: true,
+            status: true,
+            verified: true
+          }
+        }
       }
     });
 
     return NextResponse.json({
       success: true,
-      data: updated,
+      data: {
+        id: updated.id,
+        email: updated.email,
+        firstName: updated.firstName,
+        lastName: updated.lastName,
+        name: updated.name,
+        phone: updated.phone,
+        role: updated.role,
+        verified: updated.verified,
+        emailVerifiedAt: updated.emailVerifiedAt,
+        birthDate: updated.birthDate,
+        location: updated.location,
+        image: updated.image,
+        createdAt: updated.createdAt,
+        updatedAt: updated.updatedAt,
+        professional: updated.professional,
+      },
       message: 'Usuario actualizado correctamente'
     });
   } catch (error) {
     console.error('Error actualizando usuario:', error);
     return NextResponse.json(
       { success: false, error: 'server_error', message: 'Error al actualizar usuario' },
+      { status: 500 }
+    );
+  }
+}
+
+/**
+ * DELETE /api/admin/users/[id]
+ * Elimina un usuario permanentemente
+ * 
+ * ADVERTENCIA: Esto eliminará en cascada:
+ * - El Professional asociado (si existe)
+ * - Los servicios del Professional
+ * - Las reviews del usuario
+ * - Los contactRequests del usuario
+ * - Los verificationTokens del usuario
+ * - Las cuentas OAuth del usuario
+ * 
+ * Esta operación es IRREVERSIBLE.
+ */
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { error } = requireAdminApiKey(request);
+  if (error) return error;
+
+  try {
+    const { id } = await params;
+
+    // Verificar que el usuario existe
+    const user = await prisma.user.findUnique({
+      where: { id },
+      include: {
+        professional: {
+          include: {
+            _count: {
+              select: {
+                services: true,
+                reviews: true,
+                contactRequests: true
+              }
+            }
+          }
+        },
+        _count: {
+          select: {
+            reviews: true,
+            contactRequests: true
+          }
+        }
+      }
+    });
+
+    if (!user) {
+      return NextResponse.json(
+        { success: false, error: 'not_found', message: 'Usuario no encontrado' },
+        { status: 404 }
+      );
+    }
+
+    // Eliminar el usuario (esto eliminará en cascada todo lo relacionado)
+    // Prisma maneja automáticamente las relaciones con onDelete: Cascade
+    await prisma.user.delete({
+      where: { id }
+    });
+
+    return NextResponse.json({
+      success: true,
+      data: {
+        id: id,
+        deleted: true,
+        hadProfessional: !!user.professional,
+        professionalServicesCount: user.professional?._count.services || 0,
+        userReviewsCount: user._count.reviews,
+        userContactRequestsCount: user._count.contactRequests
+      },
+      message: 'Usuario eliminado exitosamente'
+    });
+  } catch (error) {
+    console.error('Error eliminando usuario:', error);
+    return NextResponse.json(
+      { success: false, error: 'server_error', message: 'Error al eliminar usuario' },
       { status: 500 }
     );
   }
