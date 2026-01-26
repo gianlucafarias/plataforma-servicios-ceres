@@ -51,16 +51,43 @@ export async function POST(request: NextRequest) {
     let storedFilename: string = key;
 
     if (isR2Configured()) {
-      // Subida a R2
-      const contentType = file.type || 'application/octet-stream';
-      const result = await uploadToR2({
-        key,
-        contentType,
-        body: buffer,
-      });
+      try {
+        // Subida a R2
+        const contentType = file.type || 'application/octet-stream';
+        const result = await uploadToR2({
+          key,
+          contentType,
+          body: buffer,
+        });
 
-      finalUrl = result.url;
-      storage = 'r2';
+        finalUrl = result.url;
+        storage = 'r2';
+        storedFilename = key;
+      } catch (r2Error) {
+        console.error('Error uploading to R2, falling back to local storage:', r2Error);
+        // Fallback a almacenamiento local si R2 falla
+        const uploadsDir = join(process.cwd(), 'public', 'uploads', 'profiles');
+        if (!existsSync(uploadsDir)) {
+          mkdirSync(uploadsDir, { recursive: true });
+        }
+
+        const localFilename = `${timestamp}.${safeExtension || 'bin'}`;
+        const pathOnDisk = join(uploadsDir, localFilename);
+
+        await writeFile(pathOnDisk, buffer);
+
+        storedFilename = localFilename;
+        finalUrl = `/uploads/profiles/${localFilename}`;
+        storage = 'local';
+
+        // Encolar post-proceso según tipo
+        const lower = safeExtension;
+        if (['jpg','jpeg','png','webp'].includes(lower)) {
+          enqueueOptimizeProfileImage({ path: `/uploads/profiles/${localFilename}` }).catch(()=>{});
+        } else if (lower === 'pdf') {
+          enqueueValidateCV({ path: `/uploads/profiles/${localFilename}` }).catch(()=>{});
+        }
+      }
     } else {
       // Fallback local: mismo path de siempre para compatibilidad
       const uploadsDir = join(process.cwd(), 'public', 'uploads', 'profiles');
@@ -96,8 +123,25 @@ export async function POST(request: NextRequest) {
 
   } catch (error) {
     console.error('Error uploading file:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    const errorStack = error instanceof Error ? error.stack : undefined;
+    
+    // Log detallado en producción para debugging
+    if (process.env.NODE_ENV === 'production') {
+      console.error('Upload error details:', {
+        message: errorMessage,
+        stack: errorStack,
+        timestamp: new Date().toISOString(),
+      });
+    }
+    
     return NextResponse.json(
-      { success: false, error: 'Failed to upload file' },
+      { 
+        success: false, 
+        error: 'Failed to upload file',
+        // Solo incluir detalles del error en desarrollo
+        ...(process.env.NODE_ENV !== 'production' && { details: errorMessage })
+      },
       { status: 500 }
     );
   }
