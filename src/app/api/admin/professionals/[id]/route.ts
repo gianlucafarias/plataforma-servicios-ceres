@@ -38,8 +38,16 @@ export async function GET(
         },
         services: {
           include: {
-            category: { select: { name: true, slug: true } }
-          }
+            category: { 
+              select: { 
+                id: true,
+                name: true, 
+                slug: true,
+                groupId: true
+              } 
+            }
+          },
+          orderBy: { createdAt: 'desc' }
         },
         reviews: {
           take: 10,
@@ -73,13 +81,28 @@ export async function GET(
     }
 
     // Remover password y accounts de la respuesta por seguridad
-    const { ...userData } = professional.user;
+    const { password, accounts, ...userData } = professional.user;
+
+    // Formatear servicios según requerimientos
+    const formattedServices = professional.services.map(service => ({
+      id: service.id,
+      professionalId: service.professionalId,
+      categoryId: service.categoryId,
+      title: service.title,
+      description: service.description,
+      priceRange: service.priceRange,
+      available: service.available,
+      categoryGroup: service.categoryGroup,
+      createdAt: service.createdAt,
+      updatedAt: service.updatedAt,
+    }));
 
     return NextResponse.json({ 
       success: true, 
       data: {
         ...professional,
         user: userData,
+        services: formattedServices,
         registrationType
       }
     });
