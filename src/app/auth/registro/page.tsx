@@ -1079,6 +1079,7 @@ export default function RegistroPage() {
                     try {
                       const formData = new FormData();
                       formData.append('file', file);
+                      formData.append('type', 'image'); // Indicar explícitamente que es una imagen
                       
                       const response = await fetch('/api/upload', {
                         method: 'POST',
@@ -1087,10 +1088,9 @@ export default function RegistroPage() {
                       
                       const result = await response.json();
                       if (result.success) {
-                        handleInputChange(
-                          'picture',
-                          result.url || result.path || result.filename
-                        );
+                        // Usar value si existe (normalizado), sino filename para local o url para R2
+                        const pictureValue = result.value || (result.storage === 'r2' ? result.url : result.filename);
+                        handleInputChange('picture', pictureValue);
                         setErrors(prev => {
                           const newErrors = {...prev};
                           delete newErrors.picture;
@@ -1128,6 +1128,7 @@ export default function RegistroPage() {
                     try {
                       const formData = new FormData();
                       formData.append('file', file);
+                      formData.append('type', 'cv'); // Indicar explícitamente que es un CV
                       
                       const response = await fetch('/api/upload', {
                         method: 'POST',

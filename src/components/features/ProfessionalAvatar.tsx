@@ -28,9 +28,19 @@ function ProfessionalAvatarComponent({ name, profilePicture, className }: Profes
   // Determinar la URL de la imagen
   const imageSrc = useMemo(() => {
     if (!profilePicture) return null;
-    return isExternalUrl(profilePicture) 
-      ? profilePicture 
-      : `/uploads/profiles/${profilePicture}`;
+    
+    // Si es URL externa, retornar tal cual
+    if (isExternalUrl(profilePicture)) {
+      return profilePicture;
+    }
+    
+    // Si ya tiene la ruta completa, retornar tal cual
+    if (profilePicture.startsWith('/uploads/profiles/')) {
+      return profilePicture;
+    }
+    
+    // Si es solo el nombre del archivo, agregar la ruta
+    return `/uploads/profiles/${profilePicture}`;
   }, [profilePicture]);
 
   // Marcar como montado solo en el cliente
