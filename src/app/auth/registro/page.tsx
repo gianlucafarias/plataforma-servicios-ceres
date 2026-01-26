@@ -1079,6 +1079,7 @@ export default function RegistroPage() {
                     try {
                       const formData = new FormData();
                       formData.append('file', file);
+                      formData.append('type', 'image'); // Indicar explícitamente que es una imagen
                       
                       const response = await fetch('/api/upload', {
                         method: 'POST',
@@ -1128,6 +1129,7 @@ export default function RegistroPage() {
                     try {
                       const formData = new FormData();
                       formData.append('file', file);
+                      formData.append('type', 'cv'); // Indicar explícitamente que es un CV
                       
                       const response = await fetch('/api/upload', {
                         method: 'POST',

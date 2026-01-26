@@ -12,13 +12,31 @@ export async function POST(request: NextRequest) {
     const file: File | null = data.get('file') as unknown as File;
     const typeHint = data.get('type') as string | null; // 'image' | 'cv' opcional
 
+    // Log para debugging
+    console.log('[upload] Request recibido:', {
+      hasFile: !!file,
+      fileName: file?.name,
+      fileType: file?.type,
+      fileSize: file?.size,
+      typeHint,
+    });
+
     if (!file) {
+      console.error('[upload] Error: No se recibió ningún archivo');
       return NextResponse.json({ success: false, error: 'No se recibió ningún archivo' }, { status: 400 });
     }
 
     // Detectar tipo si no viene en el hint
-    const detectedType = typeHint as 'image' | 'cv' | null || detectFileType(file as unknown as File);
+    // Si viene typeHint, usarlo; si no, detectar automáticamente
+    const detectedType = (typeHint as 'image' | 'cv' | null) || detectFileType(file as unknown as File);
     if (!detectedType) {
+      // Log para debugging
+      console.error('No se pudo detectar el tipo de archivo:', {
+        fileName: file.name,
+        fileType: file.type,
+        fileSize: file.size,
+        typeHint,
+      });
       return NextResponse.json({ 
         success: false, 
         error: 'No se pudo determinar el tipo de archivo. Asegurate de subir una imagen (png, jpg, jpeg, webp) o CV (pdf, doc, docx)' 
@@ -32,8 +50,17 @@ export async function POST(request: NextRequest) {
     );
 
     if (!validation.valid) {
+      console.error('[upload] Validación fallida:', {
+        fileName: file.name,
+        fileType: file.type,
+        fileSize: file.size,
+        detectedType,
+        validationError: validation.error,
+      });
       return NextResponse.json({ success: false, error: validation.error }, { status: 400 });
     }
+
+    console.log('[upload] Validación exitosa, procesando archivo...');
 
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);

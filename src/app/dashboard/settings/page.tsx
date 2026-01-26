@@ -1413,7 +1413,10 @@ export default function SettingsPage() {
         onCropComplete={async (croppedImageBlob) => {
           try {
             const formDataUpload = new FormData();
-            formDataUpload.append('file', croppedImageBlob, 'profile.jpg');
+            // Crear un File desde el Blob para asegurar que tenga el tipo correcto
+            const file = new File([croppedImageBlob], 'profile.jpg', { type: 'image/jpeg' });
+            formDataUpload.append('file', file);
+            formDataUpload.append('type', 'image'); // Indicar explícitamente que es una imagen
             
             const response = await fetch('/api/upload', {
               method: 'POST',
