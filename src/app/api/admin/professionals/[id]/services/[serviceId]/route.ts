@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireAdminApiKey } from '@/lib/auth-helpers';
+import { Prisma, CategoryGroupId } from '@prisma/client';
 
 /**
  * PUT /api/admin/professionals/:professionalId/services/:serviceId
@@ -127,14 +128,7 @@ export async function PUT(
     }
 
     // Construir datos de actualización
-    const updateData: {
-      categoryId?: string;
-      categoryGroup?: string | null;
-      title?: string;
-      description?: string;
-      priceRange?: string;
-      available?: boolean;
-    } = {};
+    const updateData: Prisma.ServiceUncheckedUpdateInput = {};
 
     if (body.categoryId !== undefined) {
       updateData.categoryId = body.categoryId;
@@ -144,8 +138,8 @@ export async function PUT(
           where: { id: body.categoryId },
           select: { groupId: true }
         });
-        if (newCategory) {
-          updateData.categoryGroup = newCategory.groupId;
+        if (newCategory && (newCategory.groupId === 'oficios' || newCategory.groupId === 'profesiones')) {
+          updateData.categoryGroup = newCategory.groupId as CategoryGroupId;
         }
       }
     }
