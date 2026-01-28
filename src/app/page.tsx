@@ -1,57 +1,19 @@
-"use client"
-import { CategoryCarousel } from "@/components/features/CategoryCarousel";
-import { ProfessionalCard } from "@/components/features/ProfessionalCard";
-import { SearchSuggestions } from "@/components/features/SearchSuggestions";
-import { Search, ArrowRight, Rocket, CheckCircle2, UserPlus, MessageCircle, MapPin, Verified } from "lucide-react";
+import { ArrowRight, Rocket, CheckCircle2, UserPlus, MessageCircle, MapPin, Verified } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
-import { SUBCATEGORIES_PROFESIONES, AREAS_OFICIOS, SUBCATEGORIES_OFICIOS } from "@/lib/taxonomy";
-import { useState } from "react";
-import { CategorySuggest } from "@/components/features/CategorySuggest";
-import { useFeaturedServices } from "@/hooks/useFeaturedCategories";
-import { useRouter } from "next/navigation";
+import { SUBCATEGORIES_PROFESIONES } from "@/lib/taxonomy";
+import { HeroSearch } from "@/components/features/HeroSearch";
+import { FeaturedProfessionals } from "@/components/features/FeaturedProfessionals";
+import { CategoryCarouselSection } from "@/components/features/CategoryCarouselSection";
 
 
 export default function Home() {
-  const router = useRouter();
-  const [searchQuery, setSearchQuery] = useState("");
-  const [showSuggestions, setShowSuggestions] = useState(false)
-
-  const { services, loading, error } = useFeaturedServices(6);
-    const handleSuggestionClick = (suggestionName: string) => {
-    setSearchQuery(suggestionName);
-    setShowSuggestions(false);
-  };
-
-  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    setSearchQuery(value);
-    setShowSuggestions(value.length > 0);
-  };
-
-  const handleSearchSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (searchQuery.trim()) {
-      router.push(`/servicios?q=${encodeURIComponent(searchQuery.trim())}`);
-    }
-  };
-
   return (
     <div className="bg-[#f8f9fa] dark:bg-background-dark text-gray-800 dark:text-gray-200 transition-colors duration-300">
       {/* Hero Section */}
       <header className="relative overflow-hidden">
         <div className="absolute inset-0 bg-[#EBE4C0]">
-          {/* Fondo base */}
-          <Image
-            src="/fondosolo.png"
-            alt=""
-            fill
-            priority
-            sizes="100vw"
-            className="object-cover"
-            placeholder="blur"
-            blurDataURL="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMSIgaGVpZ2h0PSIxIiBmaWxsPSIjRTlGNkYwIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciLz4="
-          />
+          
           
           {/* Elementos decorativos izquierda */}
           <div className="hidden xl:block absolute left-0 top-0 h-full w-1/3 transition-opacity duration-700 ease-out">
@@ -96,48 +58,7 @@ export default function Home() {
             Plataforma del Gobierno de la Ciudad de Ceres para conectar vecinos con profesionales verificados de manera segura y rápida.
           </p>
           
-          {/* Barra de búsqueda principal */}
-          <form
-            role="search"
-            aria-label="Buscar servicios"
-            onSubmit={handleSearchSubmit}
-            className="relative bg-white dark:bg-gray-800 p-2 rounded-full shadow-soft max-w-3xl mx-auto flex items-center border border-gray-100 dark:border-gray-700 shadow-lg"
-          >
-            <label htmlFor="q" className="sr-only">Buscar servicios</label>
-            <input
-              id="q"
-              name="q"
-              type="search"
-              value={searchQuery}
-              onChange={handleSearchChange}
-              onFocus={() => setShowSuggestions(searchQuery.length > 0)}
-              placeholder="¿Qué servicio necesitas? Ej: plomero, electricista."
-              aria-label="¿Qué servicio necesitas?"
-              autoComplete="off"
-              className="flex-grow bg-transparent border-none text-gray-700 dark:text-gray-200 px-6 py-3 placeholder-gray-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-gray-800"
-            />
-            <div className="absolute left-0 right-14 top-full mt-1">
-              <SearchSuggestions
-                query={searchQuery}
-                isVisible={showSuggestions}
-                onSelect={handleSuggestionClick}
-                onClose={() => setShowSuggestions(false)}
-              />
-            </div>
-            <button 
-              type="submit" 
-              aria-label="Buscar" 
-              className="bg-primary hover:bg-emerald-800 text-white rounded-full p-3 w-12 h-12 flex items-center justify-center transition-colors shadow-lg"
-            >
-              <Search className="h-5 w-5 cursor-pointer" aria-hidden="true" />
-            </button>
-          </form>
-          
-          {/* Sugerencias rápidas */}
-          <div className="flex flex-wrap justify-center gap-2 mt-6 text-sm">
-            <span className="text-gray-500 dark:text-gray-400 font-medium mr-2 self-center">Busco:</span>
-            <CategorySuggest handleSuggestionClick={handleSuggestionClick} randomSuggestionsNumber={4} categories={SUBCATEGORIES_OFICIOS} />
-          </div>
+          <HeroSearch />
           
           {/* Botones CTA */}
           <div className="flex flex-col sm:flex-row justify-center gap-4 mt-10">
@@ -186,55 +107,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Categorías populares - Oficios */}
-      <section className="py-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="text-center mb-12">
-          <span className="text-primary font-semibold tracking-wider text-sm uppercase mb-2 block">Explorá por categoría</span>
-          <h3 className="text-3xl font-bold text-gray-900 dark:text-white mb-3">¿Qué servicio necesitás?</h3>
-          <p className="text-gray-500 dark:text-gray-400">Encontrá tu solución, ¡con solo un clic!</p>
-        </div>
-        <div className="flex justify-between items-end mb-6">
-          <h4 className="text-2xl font-bold text-gray-800 dark:text-gray-100">Oficios</h4>
-          <div className="flex gap-2">
-            <button 
-              onClick={() => {
-                const container = document.querySelector('.carousel-3d') as HTMLElement;
-                if (container) {
-                  const itemWidth = container.clientWidth * 0.8;
-                  container.scrollBy({ left: -itemWidth, behavior: "smooth" });
-                }
-              }}
-              className="cursor-pointer w-10 h-10 rounded-full border border-gray-200 dark:border-gray-700 flex items-center justify-center hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-300 transition-colors focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 focus-visible:ring-offset-[#f8f9fa] dark:focus-visible:ring-offset-gray-900"
-              aria-label="Anterior"
-            >
-              <ArrowRight className="h-5 w-5 rotate-180" aria-hidden="true" />
-            </button>
-            <button 
-              onClick={() => {
-                const container = document.querySelector('.carousel-3d') as HTMLElement;
-                if (container) {
-                  const itemWidth = container.clientWidth * 0.8;
-                  container.scrollBy({ left: itemWidth, behavior: "smooth" });
-                }
-              }}
-              className="cursor-pointer w-10 h-10 rounded-full border border-gray-200 flex items-center justify-center hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-300 transition-colors focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 focus-visible:ring-offset-[#f8f9fa] dark:focus-visible:ring-offset-gray-900"
-              aria-label="Siguiente"
-            >
-              <ArrowRight className="h-5 w-5" aria-hidden="true" />
-            </button>
-          </div>
-        </div>
-        <CategoryCarousel categories={AREAS_OFICIOS} showViewAll={true} />
-        <div className="text-center mt-8">
-          <Link 
-            href="/categorias"
-            className="inline-flex items-center gap-2 px-6 py-2 rounded-full border border-gray-300 dark:border-gray-600 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-          >
-            Ver todas las categorías
-            <ArrowRight className="h-4 w-4" aria-hidden="true" />
-          </Link>
-        </div>
-      </section>
+      <CategoryCarouselSection />
 
       {/* Profesiones */}
       <section className="py-12 bg-white dark:bg-surface-dark">
@@ -284,62 +157,7 @@ export default function Home() {
           <h3 className="text-3xl font-bold text-gray-900 dark:text-white mb-3">Profesionales destacados</h3>
           <p className="text-gray-500 dark:text-gray-400">Verificados y listos para ayudarte</p>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {loading ? (
-            Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} className="h-40 rounded-2xl bg-gray-100 dark:bg-gray-800 animate-pulse" />
-            ))
-          ) : error ? (
-            <div className="col-span-full text-red-600">{error}</div>
-          ) : services.length === 0 ? (
-            <div className="col-span-full text-muted-foreground">No hay servicios para mostrar aún.</div>
-          ) : (
-            (() => {
-              // Agrupar servicios destacados por profesional para no repetir cards
-              const grouped = new Map<string, typeof services>();
-
-              services
-                .filter(
-                  (service) =>
-                    service.professional &&
-                    service.category &&
-                    service.professional.user &&
-                    service.professional.user.name
-                )
-                .forEach((service) => {
-                  const pid = service.professional!.id;
-                  if (!grouped.has(pid)) {
-                    grouped.set(pid, []);
-                  }
-                  grouped.get(pid)!.push(service);
-                });
-
-              return Array.from(grouped.values()).map((svcList) => {
-                const first = svcList[0]!;
-                const prof = first.professional!;
-                return (
-                  <ProfessionalCard
-                    key={prof.id}
-                    professional={{
-                      id: prof.id,
-                      user: { name: prof.user!.name! },
-                      bio: (prof as unknown as { bio?: string }).bio || first.description,
-                      verified: prof.verified,
-                      specialties: svcList.map((s) => s.title),
-                      primaryCategory: { name: first.category!.name },
-                      location: (prof as unknown as { location?: string | null }).location || undefined,
-                      socialNetworks: {
-                        profilePicture: (prof as unknown as { ProfilePicture?: string | null }).ProfilePicture || undefined,
-                      },
-                      whatsapp: (prof as unknown as { whatsapp?: string | null }).whatsapp || undefined,
-                      phone: (prof.user as unknown as { phone?: string | null }).phone || undefined,
-                    }}
-                  />
-                );
-              });
-            })()
-          )}
-        </div>
+        <FeaturedProfessionals />
       </section>
 
       {/* CTA para profesionales */}

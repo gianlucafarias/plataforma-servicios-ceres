@@ -29,6 +29,7 @@ model User {
   verificationTokens VerificationToken[]
   accounts           Account[]
   bugReports         BugReport[]
+  categorySuggestions CategorySuggestion[]
 
   @@map("users")
 }
@@ -78,6 +79,7 @@ model Category {
   children         Category[]    @relation("CategoryToParent")
   services         Service[]
   certifications   ProfessionalCertification[]
+  categorySuggestions CategorySuggestion[]
 
   @@map("categories")
 }
@@ -228,6 +230,40 @@ enum BugReportSeverity {
   medium
   high
   critical
+}
+
+model CategorySuggestion {
+  id          String              @id @default(uuid())
+  title       String
+  description String?             @db.Text
+  status      CategorySuggestionStatus @default(open)
+  userId      String?
+  userEmail   String?
+  origin      String?
+  url         String?
+  context     Json?
+  adminNotes  String?             @db.Text
+  relatedCategoryId String?
+  perspective       CategorySuggestionPerspective?
+
+  relatedCategory   Category?          @relation(fields: [relatedCategoryId], references: [id], onDelete: SetNull)
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+  user        User?               @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@map("category_suggestions")
+}
+
+enum CategorySuggestionStatus {
+  open
+  in_review
+  approved
+  rejected
+}
+
+enum CategorySuggestionPerspective {
+  provider   // El usuario trabaja de esto / ofrece este servicio
+  seeker     // El usuario está buscando este servicio
 }
 
 model ProfessionalCertification {
