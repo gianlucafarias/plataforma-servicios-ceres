@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Inter } from "next/font/google";
 import "./globals.css";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
@@ -9,6 +10,12 @@ import { Toaster } from "sonner";
 import { getBaseUrl, generateOrganizationStructuredData } from "@/lib/seo";
 
 const baseUrl = getBaseUrl();
+const inter = Inter({
+  subsets: ["latin"],
+  display: "swap",
+  variable: "--font-inter",
+  weight: ["300", "400", "500", "600", "700", "800", "900"],
+});
 
 export const metadata: Metadata = {
   title: {
@@ -69,8 +76,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const organizationData = generateOrganizationStructuredData();
 
   return (
-    <html lang="es">
-      <body className="font-roboto antialiased flex flex-col overflow-x-hidden">
+    <html lang="es" className={inter.variable}>
+      <body className="antialiased flex flex-col overflow-x-hidden">
         <a
           href="#main-content"
           className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-md focus:bg-white focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-gray-900 focus:shadow-lg dark:focus:bg-gray-900 dark:focus:text-white"
