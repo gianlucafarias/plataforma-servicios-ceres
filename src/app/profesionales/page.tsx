@@ -9,6 +9,7 @@ import { ProfessionalCard } from "@/components/features/ProfessionalCard";
 import { Search, Grid, List, ChevronLeft, ChevronRight } from "lucide-react";
 import { SUBCATEGORIES_PROFESIONES, LOCATIONS } from "@/lib/taxonomy";
 import { useProfessionals } from "@/hooks/useProfessionals";
+import { CategorySuggestionModal } from "@/components/features/CategorySuggestionModal";
 // import { Professional } from "@/types";
 
 const mockProfessionals = [
@@ -300,7 +301,24 @@ export default function ProfesionalesIndexPage() {
                 </div>
                 <h3 className="text-xl font-bold text-gray-900 mb-2">No se encontraron profesionales</h3>
                 <p className="text-gray-600 mb-6">Intenta cambiar los filtros o buscar con otros términos.</p>
-                <Button onClick={() => { setSearchTerm(""); setSelectedCategory("all"); setSelectedLocation("all"); }} className="bg-gradient-to-r from-[#006F4B] to-[#008F5B] text-white rounded-xl hover:from-[#008F5B] hover:to-[#006F4B]">Restablecer filtros</Button>
+                <div className="flex flex-col items-center gap-4">
+                  <Button
+                    onClick={() => {
+                      setSearchTerm("");
+                      setSelectedCategory("all");
+                      setSelectedLocation("all");
+                    }}
+                    className="bg-gradient-to-r from-[#006F4B] to-[#008F5B] text-white rounded-xl hover:from-[#008F5B] hover:to-[#006F4B]"
+                  >
+                    Restablecer filtros
+                  </Button>
+                  <div className="pt-2">
+                    <p className="text-sm text-gray-500 mb-2">
+                      ¿Creés que falta una categoría para este tipo de profesional?
+                    </p>
+                    <CategorySuggestionModal origin="profesionales_empty_state" />
+                  </div>
+                </div>
               </CardContent>
             </Card>
           ) : (

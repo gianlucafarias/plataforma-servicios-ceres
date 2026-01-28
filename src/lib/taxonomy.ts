@@ -6,6 +6,12 @@ export type Area = {
   slug: string;
   group: CategoryGroup;
   image?: string;
+  /**
+   * Clave opcional para asociar un ícono en el frontend (ej: 'wrench', 'snowflake').
+   * El mapeo de esta clave a un icono concreto (lucide, etc.) se hace en la UI,
+   * no acá, para mantener esta capa libre de dependencias de componentes.
+   */
+  iconKey?: string;
 };
 
 export type Subcategory = {
@@ -34,17 +40,94 @@ export type Gender = {
 
 // Áreas (solo aplican a Oficios)
 export const AREAS_OFICIOS: Area[] = [
-  { id: "area-construccion-mantenimiento", name: "Construcción y mantenimiento", slug: "construccion-mantenimiento", group: "oficios", image: "/images/servicios/construccion.jpg" },
-  { id: "area-climatizacion", name: "Climatización", slug: "climatizacion", group: "oficios", image: "/images/servicios/climatizacion.jpg" },
-  { id: "area-servicios-electronicos", name: "Servicios técnicos electrónicos", slug: "servicios-electronicos", group: "oficios", image: "/images/servicios/electricista.webp" },
-  { id: "area-automotores", name: "Automotores", slug: "automotores", group: "oficios", image: "/images/servicios/automotores.jpg" },
-  { id: "area-jardineria", name: "Jardinería", slug: "jardineria", group: "oficios", image: "/images/servicios/jardineria.jpg" },
-  { id: "area-cocina", name: "Cocina", slug: "cocina", group: "oficios", image: "/images/servicios/cocina.jpg" },
-  { id: "area-cuidados", name: "Cuidados", slug: "cuidados", group: "oficios", image: "/images/servicios/cuidados.jpg" },
-  { id: "area-fletes-mudanzas", name: "Fletes y mudanzas", slug: "fletes-mudanzas", group: "oficios", image: "/images/servicios/fletes-mudanzas.jpg" },
-  { id: "area-limpieza", name: "Limpieza", slug: "limpieza", group: "oficios", image: "/images/servicios/limpieza.jpg" },
-  { id: "area-cerrajeria", name: "Cerrajería", slug: "cerrajeria", group: "oficios", image: "/images/servicios/cerrajeria.jpg" },
-  { id: "area-costura", name: "Costura", slug: "costura", group: "oficios", image: "/images/servicios/costura.jpg" },
+  {
+    id: "area-construccion-mantenimiento",
+    name: "Construcción y mantenimiento",
+    slug: "construccion-mantenimiento",
+    group: "oficios",
+    image: "/images/servicios/construccion.jpg",
+    iconKey: "wrench",
+  },
+  {
+    id: "area-climatizacion",
+    name: "Climatización",
+    slug: "climatizacion",
+    group: "oficios",
+    image: "/images/servicios/climatizacion.jpg",
+    iconKey: "snowflake",
+  },
+  {
+    id: "area-servicios-electronicos",
+    name: "Servicios técnicos electrónicos",
+    slug: "servicios-electronicos",
+    group: "oficios",
+    image: "/images/servicios/electricista.webp",
+    iconKey: "bolt",
+  },
+  {
+    id: "area-automotores",
+    name: "Automotores",
+    slug: "automotores",
+    group: "oficios",
+    image: "/images/servicios/automotores.jpg",
+    iconKey: "car",
+  },
+  {
+    id: "area-jardineria",
+    name: "Jardinería",
+    slug: "jardineria",
+    group: "oficios",
+    image: "/images/servicios/jardineria.jpg",
+    iconKey: "tree",
+  },
+  {
+    id: "area-cocina",
+    name: "Cocina",
+    slug: "cocina",
+    group: "oficios",
+    image: "/images/servicios/cocina.jpg",
+    iconKey: "chef-hat"
+  },
+  {
+    id: "area-cuidados",
+    name: "Cuidados",
+    slug: "cuidados",
+    group: "oficios",
+    image: "/images/servicios/cuidados.jpg",
+    iconKey: "heart",
+  },
+  {
+    id: "area-fletes-mudanzas",
+    name: "Fletes y mudanzas",
+    slug: "fletes-mudanzas",
+    group: "oficios",
+    image: "/images/servicios/fletes-mudanzas.jpg",
+    iconKey: "truck",
+  },
+  {
+    id: "area-limpieza",
+    name: "Limpieza",
+    slug: "limpieza",
+    group: "oficios",
+    image: "/images/servicios/limpieza.jpg",
+    iconKey: "cleaning-1",
+  },
+  {
+    id: "area-cerrajeria",
+    name: "Cerrajería",
+    slug: "cerrajeria",
+    group: "oficios",
+    image: "/images/servicios/cerrajeria.jpg",
+    iconKey: "lock",
+  },
+  {
+    id: "area-costura",
+    name: "Costura",
+    slug: "costura",
+    group: "oficios",
+    image: "/images/servicios/costura.jpg",
+    iconKey: "needle",
+  },
 ];
 
 // Subcategorías de Oficios
@@ -117,7 +200,9 @@ export const LOCATIONS: Location[] = [
   { id: "arrufo", name: "Arrufó, Santa Fe, Argentina", },
   { id: "san-cristobal", name: "San Cristóbal, Santa Fe, Argentina" },
   { id: "san-guillermo", name: "San Guillermo, Santa Fe, Argentina" },
-  { id: "suardi", name: "Suardi, Santa Fe, Argentina" },   
+  { id: "suardi", name: "Suardi, Santa Fe, Argentina" }, 
+  { id: "villa-trinidad", name: "Villa Trinidad, Santa Fe, Argentina" },
+  { id: "tostado", name: "Tostado, Santa Fe, Argentina" },  
   { id: "otra", name: "Otra" },
 ];
 

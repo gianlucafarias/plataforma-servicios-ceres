@@ -3,12 +3,29 @@
 import { useState, useEffect, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Search, ArrowRight, Verified, Zap, MapPin, Wrench, Snowflake, Bolt, Car, TreePine, type LucideIcon } from "lucide-react";
+import {
+  Search,
+  ArrowRight,
+  Verified,
+  Zap,
+  MapPin,
+  Wrench,
+  Snowflake,
+  Bolt,
+  Car,
+  TreePine,
+  ChefHat,
+  Heart,
+  Truck,
+  Lock,
+  type LucideIcon,
+} from "lucide-react";
 import { useServices } from "@/hooks/useServices";
 import { useServiceCounts } from "@/hooks/useServiceCounts";
 import { ProfessionalCard } from "@/components/features/ProfessionalCard";
 import { AREAS_OFICIOS, SUBCATEGORIES_OFICIOS, SUBCATEGORIES_PROFESIONES, LOCATIONS } from "@/lib/taxonomy";
 import { CategoryItem } from "@/components/features/CategoryItem";
+import { CategorySuggestionModal } from "@/components/features/CategorySuggestionModal";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import Link from "next/link";
 
@@ -265,13 +282,20 @@ export default function ServiciosPage() {
                   count: serviceCounts[s.slug] ?? 0,
                 }));
               const iconMap: Record<string, LucideIcon | null> = {
-                'construccion-mantenimiento': Wrench,
-                'climatizacion': Snowflake,
-                'servicios-electronicos': Bolt,
-                'automotores': Car,
-                'jardineria': TreePine,
+                wrench: Wrench,
+                snowflake: Snowflake,
+                bolt: Bolt,
+                car: Car,
+                tree: TreePine,
+                "chef-hat": ChefHat,
+                heart: Heart,
+                truck: Truck,
+                // Para limpieza y costura usamos íconos genéricos existentes
+                "cleaning-1": Zap,
+                lock: Lock,
+                needle: Wrench,
               };
-              const Icon = iconMap[area.slug] || Wrench;
+              const Icon = area.iconKey ? iconMap[area.iconKey] || Wrench : Wrench;
               
               return (
                 <CategoryItem
@@ -474,8 +498,11 @@ export default function ServiciosPage() {
                   }}
                 />
               </div>
+              
             )}
+           
           </section>
+          
 
           {/* Header de resultados */}
           <div className="flex items-end justify-between border-b border-gray-200 dark:border-gray-700 pb-2">
@@ -516,18 +543,21 @@ export default function ServiciosPage() {
                 No hay servicios que coincidan con tu búsqueda. 
                 Intenta con términos más generales o limpia los filtros.
               </p>
-              <Button 
-                variant="outline" 
-                onClick={() => {
-                  setSearchTerm("");
-                  setBarSearchQuery("");
-                  setSelectedCategory("all");
-                  setSelectedGroup("all");
-                  setSelectedLocation("all");
-                }}
-              >
-                Limpiar todos los filtros
-              </Button>
+              <div className="flex flex-col items-center gap-4">
+                <Button 
+                  variant="outline" 
+                  onClick={() => {
+                    setSearchTerm("");
+                    setBarSearchQuery("");
+                    setSelectedCategory("all");
+                    setSelectedGroup("all");
+                    setSelectedLocation("all");
+                  }}
+                >
+                  Limpiar todos los filtros
+                </Button>
+                
+              </div>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -616,7 +646,7 @@ export default function ServiciosPage() {
                 Encontrá tu solución, <span className="text-primary">¡con solo un clic!</span>
               </h1>
               <p className="text-gray-600 dark:text-gray-400 text-sm">
-                Plataforma oficial para conectar vecinos con profesionales verificados en Ceres.
+                Plataforma oficial para conectar vecinos con profesionales verificados en Ceres y la zona.
               </p>
             </div>
             <div className="relative z-10 flex gap-4">
