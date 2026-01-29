@@ -214,6 +214,7 @@ export default function Home() {
                 src="/servicios/instalacion-aires.jpg"
                 alt="Profesional trabajando"
                 fill
+                sizes="(max-width: 768px) 100vw, 50vw"
                 className="object-cover"
               />
               <div className="absolute inset-0 bg-primary/20 mix-blend-multiply"></div>

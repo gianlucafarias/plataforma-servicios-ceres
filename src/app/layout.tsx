@@ -69,6 +69,13 @@ export const metadata: Metadata = {
       "max-snippet": -1,
     },
   },
+  // Verificación de Google Search Console
+  // Agregar variable de entorno: GOOGLE_SITE_VERIFICATION con el código de verificación
+  verification: process.env.GOOGLE_SITE_VERIFICATION
+    ? {
+        google: process.env.GOOGLE_SITE_VERIFICATION,
+      }
+    : undefined,
 };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {

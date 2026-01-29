@@ -62,32 +62,7 @@ export function Footer() {
             </ul>
           </div>
 
-          {/* Para profesionales */}
-          <div>
-            <h5 className="font-bold text-gray-200 dark:text-white mb-4">Para Profesionales</h5>
-            <ul className="space-y-3 text-sm text-gray-400 dark:text-gray-400">
-              <li>
-                <Link href="/auth/registro" className="hover:text-primary transition-colors">
-                  Registrarse
-                </Link>
-              </li>
-              <li>
-                <Link href="/dashboard" className="hover:text-primary transition-colors">
-                  Mi Panel
-                </Link>
-              </li>
-              <li>
-                <Link href="/ayuda" className="hover:text-primary transition-colors">
-                  Centro de Ayuda
-                </Link>
-              </li>
-              <li>
-                <Link href="/terminos" className="hover:text-primary transition-colors">
-                  Términos y Condiciones
-                </Link>
-              </li>
-            </ul>
-          </div>
+          
 
           {/* Soporte */}
           <div>
@@ -99,7 +74,7 @@ export function Footer() {
                 </Link>
               </li>
               <li>
-                <Link href="/preguntas-frecuentes" className="hover:text-primary transition-colors">
+                <Link href="/como-funciona" className="hover:text-primary transition-colors">
                   Preguntas Frecuentes
                 </Link>
               </li>
@@ -108,25 +83,13 @@ export function Footer() {
                   Política de Privacidad
                 </Link>
               </li>
-              <li>
-                <Link href="/reportar" className="hover:text-primary transition-colors">
-                  Reportar Problema
-                </Link>
-              </li>
             </ul>
           </div>
         </div>
 
         <div className="border-t border-gray-100 dark:border-gray-800 pt-8 flex flex-col md:flex-row justify-between items-center gap-4 text-xs text-gray-400">
           <p>© 2026 Gobierno de la Ciudad de Ceres. Todos los derechos reservados.</p>
-          <div className="flex gap-6">
-            <Link href="/accesibilidad" className="hover:text-gray-600 dark:hover:text-gray-300">
-              Accesibilidad
-            </Link>
-            <Link href="/mapa-sitio" className="hover:text-gray-600 dark:hover:text-gray-300">
-              Mapa del Sitio
-            </Link>
-          </div>
+          
         </div>
       </div>
     </footer>
