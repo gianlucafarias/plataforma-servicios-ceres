@@ -78,8 +78,25 @@ export async function GET(request: NextRequest) {
         orderBy,
         skip: (page - 1) * limit,
         take: limit,
-        include: {
-          user: { select: { firstName: true, lastName: true, verified: true, image: true, location: true } },
+        select: {
+          id: true,
+          bio: true,
+          verified: true,
+          rating: true,
+          reviewCount: true,
+          location: true,
+          ProfilePicture: true,
+          whatsapp: true,
+          user: { 
+            select: { 
+              firstName: true, 
+              lastName: true, 
+              verified: true, 
+              image: true, 
+              location: true,
+              phone: true
+            } 
+          },
           services: {
             take: 1,
             orderBy: { createdAt: 'asc' },
@@ -100,6 +117,9 @@ export async function GET(request: NextRequest) {
       reviewCount: p.reviewCount ?? 0,
       // Usar ProfilePicture si existe, sino usar imagen de OAuth del usuario
       ProfilePicture: p.ProfilePicture || p.user.image || undefined,
+      // Incluir WhatsApp y teléfono para el botón de contacto
+      whatsapp: p.whatsapp || undefined,
+      phone: p.user.phone || undefined,
     }));
 
     return NextResponse.json({

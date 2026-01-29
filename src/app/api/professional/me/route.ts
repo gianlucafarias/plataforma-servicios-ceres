@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/app/api/auth/options';
 import { prisma } from '@/lib/prisma';
+import { normalizeWhatsAppNumber } from '@/lib/whatsapp-normalize';
 
 export async function GET() {
   try {
@@ -185,7 +186,7 @@ export async function PUT(request: Request) {
         experienceYears: experienceYears ? parseInt(experienceYears) : 0,
         specialties: specialty ? [specialty] : [], // Convertir string a array
         professionalGroup: professionalGroup || null,
-        whatsapp,
+        whatsapp: normalizeWhatsAppNumber(whatsapp) || null,
         instagram,
         facebook,
         linkedin,

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '../options';
 import { prisma } from '@/lib/prisma';
+import { normalizeWhatsAppNumber } from '@/lib/whatsapp-normalize';
 
 export async function POST(request: NextRequest) {
   try {
@@ -95,7 +96,7 @@ export async function POST(request: NextRequest) {
           professionalGroup,
           location,
           serviceLocations: serviceLocations || [location],
-          whatsapp: phone, // Por defecto usar el mismo teléfono
+          whatsapp: normalizeWhatsAppNumber(phone) || null, // Normalizar WhatsApp (por defecto usar el mismo teléfono)
           status: 'pending', // Pendiente de verificación
           verified: false,
         }

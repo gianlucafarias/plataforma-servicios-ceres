@@ -18,6 +18,8 @@ import { getLocations, GROUPS, SUBCATEGORIES_PROFESIONES, SUBCATEGORIES_OFICIOS,
 import { User, Mail, Phone, MapPin, Calendar, Briefcase, Award, Save, Loader2, Linkedin, Globe, Upload, FileText, X, Store, AlertCircle } from "lucide-react";
 import { Badge as BadgeComponent } from "@/components/ui/badge";
 import { toast } from "sonner";
+import { normalizeWhatsAppNumber, validateWhatsAppNumber } from "@/lib/whatsapp-normalize";
+import WhatsAppIcon from "@/components/ui/whatsapp";
 import { ImageCropper } from "@/components/ui/image-cropper";
 
 
@@ -264,8 +266,11 @@ export default function SettingsPage() {
         }
         break;
       case 'whatsapp':
-        if (value && typeof value === 'string' && !/^[\+]?[0-9\s\-\(\)]{10,}$/.test(value)) {
-          return 'WhatsApp inválido';
+        if (value && typeof value === 'string') {
+          const error = validateWhatsAppNumber(value);
+          if (error) {
+            return error;
+          }
         }
         break;
       case 'instagram':
@@ -302,12 +307,24 @@ export default function SettingsPage() {
   };
 
   const handleInputChange = (field: string, value: unknown) => {
-    // Validar el campo
-    const error = validateField(field, value);
-    setErrors(prev => ({
-      ...prev,
-      [field]: error
-    }));
+    // Para WhatsApp: NO normalizar mientras escribe, solo guardar lo que el usuario escribe
+    // La normalización se hará al guardar el formulario
+    
+    // Validar WhatsApp en tiempo real pero sin normalizar
+    if (field === 'whatsapp' && typeof value === 'string') {
+      const error = validateWhatsAppNumber(value);
+      setErrors(prev => ({
+        ...prev,
+        [field]: error || ''
+      }));
+    } else {
+      // Validar otros campos
+      const error = validateField(field, value);
+      setErrors(prev => ({
+        ...prev,
+        [field]: error
+      }));
+    }
 
     setFormData(prev => ({
       ...prev,
@@ -462,12 +479,18 @@ export default function SettingsPage() {
 
     setSaving(true);
     try {
+      // Normalizar WhatsApp antes de enviar
+      const dataToSend = {
+        ...formData,
+        whatsapp: normalizeWhatsAppNumber(formData.whatsapp) || null,
+      };
+
       const response = await fetch('/api/professional/me', {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(dataToSend),
       });
 
       const result = await response.json();
@@ -942,13 +965,17 @@ export default function SettingsPage() {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="whatsapp">WhatsApp</Label>
-                  <Input
-                    id="whatsapp"
-                    value={formData.whatsapp}
-                    onChange={(e) => handleInputChange('whatsapp', e.target.value)}
-                    placeholder="+54 9 11 1234-5678"
-                    className={errors.whatsapp ? "border-red-500" : ""}
-                  />
+                  <div className="relative">
+                    <WhatsAppIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 z-10" />
+                    <Input
+                      id="whatsapp"
+                      type="tel"
+                      value={formData.whatsapp}
+                      onChange={(e) => handleInputChange('whatsapp', e.target.value)}
+                      placeholder="Sin 0 y sin 15 (ej: 349112345678)"
+                      className={`pl-10 ${errors.whatsapp ? "border-red-500" : ""}`}
+                    />
+                  </div>
                   {errors.whatsapp && (
                     <p className="text-sm text-red-500">{errors.whatsapp}</p>
                   )}

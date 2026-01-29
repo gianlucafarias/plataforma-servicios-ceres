@@ -6,6 +6,7 @@ import { prisma } from '@/lib/prisma';
 import { generateRandomToken } from '@/lib/utils';
 import { enqueueEmailVerify } from '@/jobs/email.producer';
 import { enqueueSlackAlert } from '@/jobs/slack.producer';
+import { normalizeWhatsAppNumber } from '@/lib/whatsapp-normalize';
 
 
 export async function POST(request: NextRequest) {
@@ -164,7 +165,7 @@ export async function POST(request: NextRequest) {
             experienceYears: typeof experienceYears === 'number' ? experienceYears : 0,
             professionalGroup: professionalGroup || null,
             location: location || null,
-            whatsapp: whatsapp || null,
+            whatsapp: normalizeWhatsAppNumber(whatsapp) || null,
             instagram: instagram || null,
             facebook: facebook || null,
             linkedin: linkedin || null,
