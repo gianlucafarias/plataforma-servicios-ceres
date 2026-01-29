@@ -49,7 +49,7 @@ export function HeroSearch() {
           placeholder="¿Qué servicio necesitas? Ej: plomero, electricista."
           aria-label="¿Qué servicio necesitas?"
           autoComplete="off"
-          className="flex-grow bg-transparent border-none text-gray-700 dark:text-gray-200 px-6 py-3 placeholder-gray-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-gray-800"
+          className="flex-grow bg-transparent border-none text-gray-700 dark:text-gray-200 px-6 py-3 placeholder-gray-400 focus-visible:outline-none dark:focus-visible:ring-offset-gray-800"
         />
         <div className="absolute left-0 right-14 top-full mt-1">
           <SearchSuggestions
