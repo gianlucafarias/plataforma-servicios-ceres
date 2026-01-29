@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireAdminApiKey } from '@/lib/auth-helpers';
+import { normalizeWhatsAppNumber } from '@/lib/whatsapp-normalize';
 
 // GET: Obtener detalles completos de un profesional
 export async function GET(
@@ -162,7 +163,7 @@ export async function PUT(
         bio: body.bio,
         experienceYears: body.experienceYears,
         professionalGroup: body.professionalGroup,
-        whatsapp: body.whatsapp,
+        whatsapp: normalizeWhatsAppNumber(body.whatsapp) || null,
         instagram: body.instagram,
         facebook: body.facebook,
         linkedin: body.linkedin,

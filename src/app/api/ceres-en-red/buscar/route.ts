@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { Prisma } from '@prisma/client';
 import type { DaySchedule } from '@/lib/availability';
+import { normalizeWhatsAppNumber } from '@/lib/whatsapp-normalize';
 
 /**
  * POST /api/ceres-en-red/buscar
@@ -150,22 +151,8 @@ export async function POST(request: NextRequest) {
       const user = prof.user;
       const nombreCompleto = `${user.firstName} ${user.lastName}`.trim();
 
-      // Formatear WhatsApp (asegurar formato +549XXXXXXXXX)
-      let whatsappFormatted = prof.whatsapp || user.phone || null;
-      if (whatsappFormatted) {
-        // Normalizar formato de WhatsApp
-        whatsappFormatted = whatsappFormatted.replace(/\s+/g, ''); // Quitar espacios
-        if (!whatsappFormatted.startsWith('+')) {
-          // Si no empieza con +, agregar código de país argentino
-          if (whatsappFormatted.startsWith('54')) {
-            whatsappFormatted = '+' + whatsappFormatted;
-          } else if (whatsappFormatted.startsWith('9')) {
-            whatsappFormatted = '+54' + whatsappFormatted;
-          } else {
-            whatsappFormatted = '+549' + whatsappFormatted;
-          }
-        }
-      }
+      // Formatear WhatsApp usando la función de normalización
+      const whatsappFormatted = normalizeWhatsAppNumber(prof.whatsapp || user.phone || null);
 
       // Formatear horarios desde schedule (JSON)
       let horarios = '';

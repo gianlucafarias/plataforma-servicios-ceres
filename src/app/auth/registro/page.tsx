@@ -14,9 +14,11 @@ import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { GROUPS, getAreasByGroup, getSubcategories, getLocations, getGenders } from "@/lib/taxonomy";
 import type { CategoryGroup } from "@/types";
-import { Eye, EyeOff, User, Mail, Lock, Phone, Building2, Award, Send, ArrowLeft, CheckCircle, MapPin, CircleUser, Upload, FileText, Globe, Linkedin, Instagram, Facebook, MessageCircle, Store } from "lucide-react";
+import { Eye, EyeOff, User, Mail, Lock, Phone, Building2, Award, Send, ArrowLeft, CheckCircle, MapPin, CircleUser, Upload, FileText, Globe, Linkedin, Instagram, Facebook, Store } from "lucide-react";
+import WhatsAppIcon from "@/components/ui/whatsapp";
 import Link from "next/link";
 import { DateBirthPicker } from "./_components/date-birth-picker";
+import { normalizeWhatsAppNumber, isValidWhatsAppNumber, formatWhatsAppForDisplay, validateWhatsAppNumber } from "@/lib/whatsapp-normalize";
 
 // Iconos de redes sociales
 const GoogleIcon = () => (
@@ -142,26 +144,13 @@ export default function RegistroPage() {
     }
   };
 
-  // Inicializar serviceLocations con la localidad principal cuando cambie
+  // Cuando cambia la localidad principal, agregarla a serviceLocations si no está
   useEffect(() => {
-    if (formData.location) {
-      setFormData(prev => {
-        // Si la localidad principal no está en serviceLocations, agregarla al inicio
-        if (!prev.serviceLocations.includes(formData.location)) {
-          return {
-            ...prev,
-            serviceLocations: [formData.location, ...prev.serviceLocations.filter(loc => loc !== formData.location)]
-          };
-        }
-        // Si la localidad principal cambió, actualizar serviceLocations
-        if (prev.serviceLocations[0] !== formData.location) {
-          return {
-            ...prev,
-            serviceLocations: [formData.location, ...prev.serviceLocations.filter(loc => loc !== formData.location)]
-          };
-        }
-        return prev;
-      });
+    if (formData.location && !formData.serviceLocations.includes(formData.location)) {
+      setFormData(prev => ({
+        ...prev,
+        serviceLocations: [formData.location, ...prev.serviceLocations]
+      }));
     }
   }, [formData.location]);
 
@@ -179,9 +168,17 @@ export default function RegistroPage() {
         const resetServices = [{ areaSlug: '', categoryId: '', title: '', description: '', priceRange: '' }];
         return { ...prev, professionalGroup: newGroup, services: resetServices };
       }
+      
+      // Para WhatsApp: NO normalizar mientras escribe, solo guardar lo que el usuario escribe
+      // La normalización se hará al enviar el formulario
       return { ...prev, [field]: value };
     });
-    if (errors[field]) {
+    
+    // Validar WhatsApp en tiempo real pero sin normalizar
+    if (field === 'whatsapp' && typeof value === 'string') {
+      const error = validateWhatsAppNumber(value);
+      setErrors(prev => ({ ...prev, whatsapp: error || "" }));
+    } else if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: "" }));
     }
   };
@@ -301,6 +298,19 @@ export default function RegistroPage() {
       newErrors.professionalGroup = "Debes elegir si ofreces Oficios o Profesiones";
     }
 
+    // Validar que haya al menos una localidad donde ofrece servicios
+    if (!formData.serviceLocations || formData.serviceLocations.length === 0) {
+      newErrors.serviceLocations = "Debes agregar al menos una localidad donde ofreces tus servicios";
+    }
+
+    // Validar WhatsApp si está presente
+    if (formData.whatsapp) {
+      const error = validateWhatsAppNumber(formData.whatsapp);
+      if (error) {
+        newErrors.whatsapp = error;
+      }
+    }
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -381,8 +391,8 @@ export default function RegistroPage() {
         experienceYears: parseInt(String(formData.experienceYears || '0')),
         professionalGroup: formData.professionalGroup as CategoryGroup,
         serviceLocations: formData.serviceLocations,
-        // Campos de redes sociales
-        whatsapp: formData.whatsapp,
+        // Campos de redes sociales - normalizar WhatsApp antes de enviar
+        whatsapp: normalizeWhatsAppNumber(formData.whatsapp) || null,
         instagram: formData.instagram,
         facebook: formData.facebook,
         linkedin: formData.linkedin,
@@ -655,7 +665,7 @@ export default function RegistroPage() {
       </div>
       <div>
         <Label htmlFor="location" className="text-sm font-semibold text-gray-700">
-          Localidad Principal *
+          Localidad *
         </Label>
         <div className="relative mt-1">
           <MapPin className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 z-10" />
@@ -828,71 +838,82 @@ export default function RegistroPage() {
           Lugares donde ofreces tus servicios *
         </Label>
         <p className="text-sm text-gray-600 mt-1 mb-3">
-          Selecciona las localidades donde trabajas. Por defecto se incluye tu localidad principal.
+          Selecciona las localidades donde trabajas. La primera será tu localidad principal.
         </p>
         
         <div className="space-y-3">
-          {/* Localidad principal (no editable, solo informativa) */}
-          <div className="flex items-center justify-between p-3 bg-green-50 border border-green-200 rounded-lg">
-            <div className="flex items-center space-x-3">
-              <MapPin className="h-4 w-4 text-green-600" />
-              <span className="text-sm font-medium text-green-800">
-                {locations.find(l => l.id === formData.location)?.name || 'Localidad principal'}
-              </span>
-              <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full">
-                Principal
-              </span>
-            </div>
-          </div>
-
-          {/* Selector de localidades adicionales */}
+          {/* Selector de localidades */}
           <div className="relative">
             <Select
               value=""
               onValueChange={(value) => {
                 if (value && !formData.serviceLocations.includes(value)) {
-                  handleInputChange('serviceLocations', [...formData.serviceLocations, value]);
+                  if (value === 'all-region') {
+                    // Si se agrega "Toda la región", mantener solo la principal y agregar "all-region"
+                    const principalLocation = formData.serviceLocations[0] || formData.location;
+                    handleInputChange('serviceLocations', principalLocation ? [principalLocation, 'all-region'] : ['all-region']);
+                  } else {
+                    // Si se agrega una localidad normal y ya existe "all-region", eliminarlo primero
+                    const newLocations = formData.serviceLocations.filter(loc => loc !== 'all-region');
+                    handleInputChange('serviceLocations', [...newLocations, value]);
+                  }
                 }
               }}
             >
-              <SelectTrigger className="w-full rounded-lg border-2 focus:ring-4 focus:ring-green-100 focus:border-[#006F4B] transition-all duration-200 border-gray-200">
-                <SelectValue placeholder="Agregar más localidades..." />
+              <SelectTrigger className={`w-full rounded-lg border-2 focus:ring-4 focus:ring-green-100 focus:border-[#006F4B] transition-all duration-200 ${
+                errors.serviceLocations ? 'border-red-300' : 'border-gray-200'
+              }`}>
+                <SelectValue placeholder="Agregar localidades..." />
               </SelectTrigger>
               <SelectContent>
                 {locations
-                  .filter(location => location.id !== formData.location && !formData.serviceLocations.includes(location.id))
+                  .filter(location => !formData.serviceLocations.includes(location.id))
                   .map((location) => (
                     <SelectItem key={location.id} value={location.id}>
                       {location.name}
                     </SelectItem>
                   ))}
-                <SelectItem value="all-region">Toda la región (todas las ciudades)</SelectItem>
+                {!formData.serviceLocations.includes('all-region') && (
+                  <SelectItem value="all-region">Toda la región (todas las ciudades)</SelectItem>
+                )}
               </SelectContent>
             </Select>
           </div>
 
           {/* Localidades seleccionadas */}
-          {formData.serviceLocations.length > 0 && (
+          {formData.serviceLocations.length > 0 ? (
             <div className="space-y-2">
-              <p className="text-sm font-medium text-gray-700">Localidades adicionales:</p>
               <div className="flex flex-wrap gap-2">
-                {formData.serviceLocations.map((locationId) => {
+                {formData.serviceLocations.map((locationId, index) => {
                   const location = locations.find(l => l.id === locationId);
+                  const isPrincipal = index === 0;
                   return (
                     <div
                       key={locationId}
-                      className="flex items-center space-x-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2"
+                      className={`flex items-center space-x-2 rounded-lg px-3 py-2 ${
+                        isPrincipal 
+                          ? 'bg-green-50 border border-green-200' 
+                          : 'bg-blue-50 border border-blue-200'
+                      }`}
                     >
-                      <MapPin className="h-3 w-3 text-blue-600" />
-                      <span className="text-sm text-blue-800">
+                      <MapPin className={`h-3 w-3 ${isPrincipal ? 'text-green-600' : 'text-blue-600'}`} />
+                      <span className={`text-sm ${isPrincipal ? 'text-green-800' : 'text-blue-800'}`}>
                         {locationId === 'all-region' ? 'Toda la región' : location?.name}
                       </span>
+                      {isPrincipal && (
+                        <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">
+                          Principal
+                        </span>
+                      )}
                       <button
                         type="button"
                         onClick={() => {
                           handleInputChange('serviceLocations', formData.serviceLocations.filter(id => id !== locationId));
                         }}
-                        className="text-blue-600 hover:text-blue-800 ml-1"
+                        className={`ml-1 hover:opacity-70 transition-opacity ${
+                          isPrincipal ? 'text-green-600 hover:text-green-800' : 'text-blue-600 hover:text-blue-800'
+                        }`}
+                        aria-label="Eliminar localidad"
                       >
                         ×
                       </button>
@@ -901,7 +922,7 @@ export default function RegistroPage() {
                 })}
               </div>
             </div>
-          )}
+          ) : null}
         </div>
         
         {errors.serviceLocations && <p className="text-red-600 text-sm mt-1">{errors.serviceLocations}</p>}
@@ -924,15 +945,19 @@ export default function RegistroPage() {
               WhatsApp *
             </Label>
             <div className="relative mt-1">
-              <MessageCircle className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+              <WhatsAppIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 z-10" />
               <Input
                 id="whatsapp"
+                type="tel"
                 value={formData.whatsapp}
                 onChange={(e) => handleInputChange('whatsapp', e.target.value)}
-                className="pl-10 rounded-lg border-2 focus:ring-4 focus:ring-green-100 focus:border-[#006F4B] transition-all duration-200 border-gray-200"
-                placeholder="+54 9 3491 123456"
+                className={`pl-10 rounded-lg border-2 focus:ring-4 focus:ring-green-100 focus:border-[#006F4B] transition-all duration-200 ${
+                  errors.whatsapp ? 'border-red-300' : 'border-gray-200'
+                }`}
+                placeholder="Sin 0 y sin 15 (ej: 349112345678)"
               />
             </div>
+            {errors.whatsapp && <p className="text-red-600 text-sm mt-1">{errors.whatsapp}</p>}
           </div>
 
           <div>
