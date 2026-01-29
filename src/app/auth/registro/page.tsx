@@ -18,7 +18,7 @@ import { Eye, EyeOff, User, Mail, Lock, Phone, Building2, Award, Send, ArrowLeft
 import WhatsAppIcon from "@/components/ui/whatsapp";
 import Link from "next/link";
 import { DateBirthPicker } from "./_components/date-birth-picker";
-import { normalizeWhatsAppNumber, isValidWhatsAppNumber, formatWhatsAppForDisplay, validateWhatsAppNumber } from "@/lib/whatsapp-normalize";
+import { normalizeWhatsAppNumber, validateWhatsAppNumber } from "@/lib/whatsapp-normalize";
 
 // Iconos de redes sociales
 const GoogleIcon = () => (
@@ -392,7 +392,7 @@ export default function RegistroPage() {
         professionalGroup: formData.professionalGroup as CategoryGroup,
         serviceLocations: formData.serviceLocations,
         // Campos de redes sociales - normalizar WhatsApp antes de enviar
-        whatsapp: normalizeWhatsAppNumber(formData.whatsapp) || null,
+        whatsapp: normalizeWhatsAppNumber(formData.whatsapp) ?? undefined,
         instagram: formData.instagram,
         facebook: formData.facebook,
         linkedin: formData.linkedin,
