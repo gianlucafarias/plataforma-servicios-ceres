@@ -125,7 +125,6 @@ export const authOptions: AuthOptions = {
                         return false
                     }
 
-                    console.log('OAuth signIn iniciado para:', email, 'provider:', account.provider)
 
                     // Buscar usuario existente
                     let dbUser = await prisma.user.findUnique({
@@ -133,7 +132,6 @@ export const authOptions: AuthOptions = {
                     })
 
                     if (dbUser) {
-                        console.log('Usuario existente encontrado:', dbUser.id)
                         
                         // Verificar si ya tiene esta cuenta OAuth vinculada
                         try {
@@ -147,7 +145,6 @@ export const authOptions: AuthOptions = {
                             })
 
                             if (!existingAccount) {
-                                console.log('Vinculando nueva cuenta OAuth')
                                 // Vincular nueva cuenta OAuth al usuario existente
                                 await prisma.account.create({
                                     data: {
@@ -164,9 +161,7 @@ export const authOptions: AuthOptions = {
                                         session_state: account.session_state as string | null,
                                     }
                                 })
-                            } else {
-                                console.log('Cuenta OAuth ya existe')
-                            }
+                            } 
                         } catch (accountError) {
                             console.error('Error al manejar cuenta OAuth:', accountError)
                             // Continuar aunque falle la vinculación de cuenta
@@ -187,7 +182,6 @@ export const authOptions: AuthOptions = {
                             }
                             
                             if (Object.keys(updateData).length > 0) {
-                                console.log('Actualizando usuario:', updateData)
                                 await prisma.user.update({
                                     where: { id: dbUser.id },
                                     data: updateData
@@ -198,7 +192,6 @@ export const authOptions: AuthOptions = {
                             // Continuar aunque falle la actualización
                         }
                     } else {
-                        console.log('Creando nuevo usuario OAuth')
                         // Usuario no existe - crear nuevo usuario y cuenta OAuth
                         const nameParts = (user.name || '').split(' ')
                         const firstName = nameParts[0] || 'Usuario'
@@ -230,10 +223,8 @@ export const authOptions: AuthOptions = {
                                 }
                             }
                         })
-                        console.log('Usuario creado:', dbUser.id)
                     }
 
-                    console.log('OAuth signIn completado exitosamente')
                     return true
                 } catch (error) {
                     console.error('Error en signIn OAuth:', error)

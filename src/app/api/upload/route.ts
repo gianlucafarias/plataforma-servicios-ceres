@@ -12,14 +12,7 @@ export async function POST(request: NextRequest) {
     const file: File | null = data.get('file') as unknown as File;
     const typeHint = data.get('type') as string | null; // 'image' | 'cv' opcional
 
-    // Log para debugging
-    console.log('[upload] Request recibido:', {
-      hasFile: !!file,
-      fileName: file?.name,
-      fileType: file?.type,
-      fileSize: file?.size,
-      typeHint,
-    });
+  
 
     if (!file) {
       console.error('[upload] Error: No se recibió ningún archivo');
@@ -60,7 +53,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: validation.error }, { status: 400 });
     }
 
-    console.log('[upload] Validación exitosa, procesando archivo...');
 
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);

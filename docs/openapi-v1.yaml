@@ -1,0 +1,641 @@
+openapi: 3.1.0
+info:
+  title: CERES API
+  description: Versioned endpoints (v1) with consistent envelopes.
+  version: "1.0.0"
+servers:
+  - url: https://{host}
+    variables:
+      host:
+        default: api.ceres.local
+paths:
+  /api/v1/bug-reports:
+    post:
+      summary: Reportar un bug
+      tags: [bug-reports]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title, description]
+              properties:
+                title:
+                  type: string
+                description:
+                  type: string
+                severity:
+                  type: string
+                  enum: [low, medium, high, critical]
+                  default: medium
+                userEmail:
+                  type: string
+                  format: email
+                context:
+                  type: object
+      responses:
+        "201":
+          description: Bug creado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiSuccessBug"
+        "400":
+          description: Error de validación
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "429":
+          description: Rate limit excedido
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+  /api/v1/categories:
+    get:
+      summary: Listar categorías, áreas y subcategorías
+      tags: [categories]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiSuccessCategories"
+        "429":
+          description: Rate limit excedido
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+
+  /api/v1/auth/verify:
+    post:
+      summary: Verificar cuenta por token
+      tags: [auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token, email]
+              properties:
+                token: { type: string }
+                email: { type: string, format: email }
+      responses:
+        "200":
+          description: Cuenta verificada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiSuccessMessage"
+        "400":
+          description: Token inválido o datos incompletos
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "404":
+          description: Usuario no encontrado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "429":
+          description: Rate limit excedido
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+
+  /api/v1/auth/password/reset:
+    post:
+      summary: Resetear contraseña mediante token
+      tags: [auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token, password]
+              properties:
+                token: { type: string }
+                password: { type: string, minLength: 8 }
+      responses:
+        "200":
+          description: Contraseña actualizada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiSuccessMessage"
+        "400":
+          description: Payload inválido o token inválido/expirado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "429":
+          description: Rate limit excedido
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+
+  /api/v1/auth/register:
+    post:
+      summary: Registro de usuario (con creación opcional de perfil profesional)
+      tags: [auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password, firstName, lastName]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string, minLength: 8 }
+                firstName: { type: string }
+                lastName: { type: string }
+                phone: { type: string }
+                birthDate: { type: string, format: date }
+                location: { type: string }
+                whatsapp: { type: string }
+                instagram: { type: string }
+                facebook: { type: string }
+                linkedin: { type: string }
+                website: { type: string }
+                portfolio: { type: string }
+                cv: { type: string }
+                picture: { type: string }
+                bio: { type: string }
+                experienceYears: { type: integer }
+                professionalGroup: { type: string, enum: [oficios, profesiones] }
+                serviceLocations:
+                  type: array
+                  items: { type: string }
+                hasPhysicalStore: { type: boolean }
+                physicalStoreAddress: { type: string }
+                services:
+                  type: array
+                  items:
+                    type: object
+                    required: [categoryId, title, description]
+                    properties:
+                      categoryId: { type: string }
+                      title: { type: string }
+                      description: { type: string }
+      responses:
+        "201":
+          description: Creado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiSuccessRegister"
+        "400":
+          description: Datos inválidos o usuario existente
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "429":
+          description: Rate limit excedido
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+
+  /api/v1/auth/complete-profile:
+    post:
+      summary: Completar perfil profesional de un usuario existente
+      tags: [auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [phone, location, bio, professionalGroup, services]
+              properties:
+                phone: { type: string }
+                location: { type: string }
+                bio: { type: string }
+                experienceYears: { type: integer }
+                professionalGroup: { type: string, enum: [oficios, profesiones] }
+                serviceLocations:
+                  type: array
+                  items: { type: string }
+                services:
+                  type: array
+                  items:
+                    type: object
+                    required: [categoryId, description]
+                    properties:
+                      categoryId: { type: string }
+                      title: { type: string }
+                      description: { type: string }
+      responses:
+        "200":
+          description: Perfil creado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiSuccessProfessional"
+        "400":
+          description: Datos inválidos
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "401":
+          description: No autorizado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "404":
+          description: Usuario no encontrado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "429":
+          description: Rate limit excedido
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+
+components:
+  schemas:
+    ApiMeta:
+      type: object
+      properties:
+        requestId:
+          type: string
+        pagination:
+          type: object
+          properties:
+            page: { type: integer }
+            pageSize: { type: integer }
+            total: { type: integer }
+    ApiError:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+        details:
+          description: Datos opcionales del error.
+    ApiFailure:
+      type: object
+      required: [success, error]
+      properties:
+        success:
+          type: boolean
+          enum: [false]
+        error:
+          $ref: "#/components/schemas/ApiError"
+        meta:
+          $ref: "#/components/schemas/ApiMeta"
+    ApiSuccessBug:
+      type: object
+      required: [success, data]
+      properties:
+        success:
+          type: boolean
+          enum: [true]
+        data:
+          $ref: "#/components/schemas/BugReport"
+        meta:
+          $ref: "#/components/schemas/ApiMeta"
+    ApiSuccessCategories:
+      type: object
+      required: [success, data]
+      properties:
+        success:
+          type: boolean
+          enum: [true]
+        data:
+          type: object
+          properties:
+            areas:
+              type: array
+              items:
+                $ref: "#/components/schemas/Area"
+            subcategoriesOficios:
+              type: array
+              items:
+                $ref: "#/components/schemas/Subcategory"
+            subcategoriesProfesiones:
+              type: array
+              items:
+                $ref: "#/components/schemas/Subcategory"
+        meta:
+          $ref: "#/components/schemas/ApiMeta"
+    ApiSuccessProfessionals:
+      type: object
+      required: [success, data]
+      properties:
+        success:
+          type: boolean
+          enum: [true]
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProfessionalSummary"
+        meta:
+          $ref: "#/components/schemas/ApiMeta"
+    ApiSuccessServices:
+      type: object
+      required: [success, data]
+      properties:
+        success:
+          type: boolean
+          enum: [true]
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/ServiceSummary"
+        meta:
+          $ref: "#/components/schemas/ApiMeta"
+    ApiSuccessService:
+      type: object
+      required: [success, data]
+      properties:
+        success:
+          type: boolean
+          enum: [true]
+        data:
+          $ref: "#/components/schemas/ServiceSummary"
+        meta:
+          $ref: "#/components/schemas/ApiMeta"
+    ApiSuccessRegister:
+      type: object
+      required: [success, data]
+      properties:
+        success:
+          type: boolean
+          enum: [true]
+        data:
+          type: object
+          properties:
+            message: { type: string }
+            user:
+              type: object
+            professional:
+              type: object
+            devVerifyUrl: { type: string }
+        meta:
+          $ref: "#/components/schemas/ApiMeta"
+    ApiSuccessProfessional:
+      type: object
+      required: [success, data]
+      properties:
+        success:
+          type: boolean
+          enum: [true]
+        data:
+          type: object
+        meta:
+          $ref: "#/components/schemas/ApiMeta"
+    ApiSuccessMessage:
+      type: object
+      required: [success, data]
+      properties:
+        success:
+          type: boolean
+          enum: [true]
+        data:
+          type: object
+          properties:
+            message:
+              type: string
+        meta:
+          $ref: "#/components/schemas/ApiMeta"
+    BugReport:
+      type: object
+      properties:
+        id: { type: string }
+        title: { type: string }
+        description: { type: string }
+        severity: { type: string }
+        status: { type: string }
+        userEmail: { type: string, nullable: true }
+        userId: { type: string, nullable: true }
+        context: { type: object, nullable: true }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time, nullable: true }
+    Area:
+      type: object
+      properties:
+        id: { type: string }
+        name: { type: string }
+        slug: { type: string }
+        group: { type: string }
+        image: { type: string, nullable: true }
+        description: { type: string, nullable: true }
+        active: { type: boolean }
+        subcategoryCount: { type: integer }
+        professionalCount: { type: integer }
+    Subcategory:
+      type: object
+      properties:
+        id: { type: string }
+        name: { type: string }
+        slug: { type: string }
+        group: { type: string }
+        areaId: { type: string, nullable: true }
+        areaSlug: { type: string, nullable: true }
+        image: { type: string, nullable: true }
+        description: { type: string, nullable: true }
+        active: { type: boolean }
+        professionalCount: { type: integer }
+    ProfessionalSummary:
+      type: object
+      properties:
+        id: { type: string }
+        user:
+          type: object
+          properties:
+            name: { type: string }
+        bio: { type: string }
+        verified: { type: boolean }
+        primaryCategory:
+          type: object
+          properties:
+            name: { type: string, nullable: true }
+        location: { type: string, nullable: true }
+        rating: { type: number }
+        reviewCount: { type: integer }
+        ProfilePicture: { type: string, nullable: true }
+        whatsapp: { type: string, nullable: true }
+        phone: { type: string, nullable: true }
+        serviceLocations:
+          type: array
+          items: { type: string }
+    ServiceSummary:
+      type: object
+      properties:
+        id: { type: string }
+        title: { type: string }
+        description: { type: string }
+        priceRange: { type: string }
+        category:
+          type: object
+          properties:
+            name: { type: string }
+        professional:
+          type: object
+          properties:
+            id: { type: string }
+            location: { type: string, nullable: true }
+            whatsapp: { type: string, nullable: true }
+            phone: { type: string, nullable: true }
+            user:
+              type: object
+              properties:
+                name: { type: string }
+                location: { type: string, nullable: true }
+            rating: { type: number }
+            reviewCount: { type: integer }
+            verified: { type: boolean }
+            ProfilePicture: { type: string, nullable: true }
+  /api/v1/professionals:
+    get:
+      summary: Listar profesionales activos con filtros
+      tags: [professionals]
+      parameters:
+        - in: query
+          name: q
+          schema: { type: string }
+          description: Búsqueda por bio/nombre/servicios.
+        - in: query
+          name: categoria
+          schema: { type: string }
+          description: Slug de subcategoría.
+        - in: query
+          name: grupo
+          schema:
+            type: string
+            enum: [oficios, profesiones]
+        - in: query
+          name: location
+          schema: { type: string }
+        - in: query
+          name: page
+          schema: { type: integer, minimum: 1, default: 1 }
+        - in: query
+          name: limit
+          schema: { type: integer, minimum: 1, maximum: 50, default: 12 }
+        - in: query
+          name: sortBy
+          schema:
+            type: string
+            enum: [name, rating, recent]
+            default: recent
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiSuccessProfessionals"
+        "429":
+          description: Rate limit excedido
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+
+  /api/v1/services:
+    get:
+      summary: Listar servicios disponibles
+      tags: [services]
+      parameters:
+        - in: query
+          name: q
+          schema: { type: string }
+        - in: query
+          name: grupo
+          schema: { type: string, enum: [oficios, profesiones] }
+        - in: query
+          name: categoria
+          schema: { type: string }
+        - in: query
+          name: subcategoria
+          schema: { type: string }
+        - in: query
+          name: location
+          schema: { type: string }
+        - in: query
+          name: page
+          schema: { type: integer, minimum: 1, default: 1 }
+        - in: query
+          name: limit
+          schema: { type: integer, minimum: 1, maximum: 50, default: 20 }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiSuccessServices"
+        "429":
+          description: Rate limit excedido
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+    post:
+      summary: Crear servicio (requiere sesión)
+      tags: [services]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title, description, categorySlug]
+              properties:
+                title: { type: string }
+                description: { type: string }
+                categorySlug: { type: string }
+                priceRange: { type: string }
+      responses:
+        "201":
+          description: Creado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiSuccessService"
+        "400":
+          description: Body inválido
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "401":
+          description: No autorizado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "404":
+          description: Profesional o categoría no encontrada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"
+        "429":
+          description: Rate limit excedido
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiFailure"

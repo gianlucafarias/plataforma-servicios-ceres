@@ -330,7 +330,6 @@ export default function DashboardPage() {
       try {
         const response = await fetch('/api/professional/stats');
         const result = await response.json();
-        console.log('Stats response:', result);
 
         // Si no está autorizado, no mostramos toast ni marcamos error visual
         if (response.status === 401 || result.error === 'unauthorized') {

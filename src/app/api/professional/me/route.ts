@@ -8,7 +8,6 @@ export async function GET() {
   try {
     const session = await getServerSession(authOptions);
     
-    console.log('Session en /api/professional/me:', session);
     
     if (!session?.user?.id) {
       return NextResponse.json({ 
@@ -68,7 +67,6 @@ export async function GET() {
       },
     });
 
-    console.log('Professional encontrado:', professional);
 
     if (!professional) {
       return NextResponse.json({ 
