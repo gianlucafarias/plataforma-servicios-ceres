@@ -12,6 +12,8 @@ model User {
   email              String              @unique
   name               String?
   phone              String?
+  dni                String?             // Documento Nacional de Identidad
+  gender             String?             // Género del usuario
   emailVerifiedAt    DateTime?
   role               UserRole            @default(professional)
   verified           Boolean             @default(false)

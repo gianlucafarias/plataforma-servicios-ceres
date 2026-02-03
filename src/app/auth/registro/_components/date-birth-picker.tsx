@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { ChevronDownIcon } from "lucide-react"
+import { ChevronDownIcon, Calendar as CalendarIcon } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Calendar } from "@/components/ui/calendar"
@@ -47,10 +47,11 @@ export function DateBirthPicker({ onChange, value, error }: DateBirthPickerProps
           <Button
             variant="outline"
             id="date"
-            className={`w-full pl-10 rounded-lg border-2 focus:ring-4 focus:ring-green-100 focus:border-[#006F4B] transition-all duration-200 ${error ? 'border-red-500' : ''}`}
+            className={`w-full pl-10 pr-10 rounded-lg border-2 focus:ring-4 focus:ring-green-100 focus:border-[#006F4B] transition-all duration-200 ${error ? 'border-red-500' : ''}`}
           >
-            {date ? date.toLocaleDateString() : "Selecciona una fecha"}
-            <ChevronDownIcon />
+            <CalendarIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+            <span className="flex-1 text-left">{date ? date.toLocaleDateString() : "Selecciona una fecha"}</span>
+            <ChevronDownIcon className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
           </Button>
         </PopoverTrigger>
         <PopoverContent className="w-auto overflow-hidden p-0" align="start">

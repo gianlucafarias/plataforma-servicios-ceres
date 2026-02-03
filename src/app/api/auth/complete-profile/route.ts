@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '../options';
 import { prisma } from '@/lib/prisma';
 import { normalizeWhatsAppNumber } from '@/lib/whatsapp-normalize';
+import { downloadAndSaveImage, isExternalOAuthImage } from '@/lib/download-image';
 
 export async function POST(request: NextRequest) {
   try {
@@ -39,21 +40,60 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
     const {
+      dni,
+      gender,
+      birthDate,
       phone,
       location,
       bio,
       experienceYears,
       professionalGroup,
       serviceLocations,
+      whatsapp,
+      instagram,
+      facebook,
+      linkedin,
+      website,
+      portfolio,
+      cv,
+      picture,
+      hasPhysicalStore,
+      physicalStoreAddress,
       services
     } = body;
 
     // Validaciones básicas
-    if (!phone || !location || !bio || !professionalGroup) {
+    if (!dni || !gender || !birthDate || !phone || !location || !bio || !professionalGroup) {
       return NextResponse.json(
-        { success: false, error: 'Faltan campos requeridos' },
+        { success: false, error: 'Faltan campos requeridos (DNI, género, fecha de nacimiento, teléfono, localidad, bio y grupo profesional son obligatorios)' },
         { status: 400 }
       );
+    }
+
+    // Validar formato de DNI (7-8 dígitos)
+    if (!/^\d{7,8}$/.test(dni.trim())) {
+      return NextResponse.json(
+        { success: false, error: 'El DNI debe tener entre 7 y 8 dígitos' },
+        { status: 400 }
+      );
+    }
+
+    // Validar edad mínima
+    if (birthDate) {
+      const birthDateObj = new Date(birthDate);
+      const today = new Date();
+      const age = today.getFullYear() - birthDateObj.getFullYear();
+      const monthDiff = today.getMonth() - birthDateObj.getMonth();
+      const actualAge = monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDateObj.getDate()) 
+        ? age - 1 
+        : age;
+        
+      if (actualAge < 18) {
+        return NextResponse.json(
+          { success: false, error: 'Debes ser mayor de 18 años para registrarte' },
+          { status: 400 }
+        );
+      }
     }
 
     if (!services || services.length === 0) {
@@ -76,12 +116,28 @@ export async function POST(request: NextRequest) {
         },
       });
 
+      // Procesar imagen de perfil: si es externa (OAuth), descargarla y guardarla en R2
+      let processedPicture = picture;
+      if (picture && isExternalOAuthImage(picture)) {
+        try {
+          processedPicture = await downloadAndSaveImage(picture);
+        } catch (error) {
+          console.error('Error al descargar imagen OAuth, usando URL original:', error);
+          // Si falla, usar la URL original como fallback
+          processedPicture = picture;
+        }
+      }
+
       // Actualizar datos del usuario
       await tx.user.update({
         where: { id: user.id },
         data: {
+          dni: dni.trim(),
+          gender,
           phone,
+          birthDate: birthDate ? new Date(birthDate) : null,
           location,
+          image: processedPicture || user.image, // Actualizar también la imagen del usuario
           role: 'professional',
           // El usuario sigue verificado si ya lo estaba (OAuth)
         }
@@ -96,7 +152,16 @@ export async function POST(request: NextRequest) {
           professionalGroup,
           location,
           serviceLocations: serviceLocations || [location],
-          whatsapp: normalizeWhatsAppNumber(phone) || null, // Normalizar WhatsApp (por defecto usar el mismo teléfono)
+          whatsapp: normalizeWhatsAppNumber(whatsapp || phone) || null,
+          instagram: instagram || null,
+          facebook: facebook || null,
+          linkedin: linkedin || null,
+          website: website || null,
+          portfolio: portfolio || null,
+          CV: cv || null,
+          ProfilePicture: processedPicture || null,
+          hasPhysicalStore: hasPhysicalStore || false,
+          physicalStoreAddress: hasPhysicalStore ? physicalStoreAddress : null,
           status: 'pending', // Pendiente de verificación
           verified: false,
         }

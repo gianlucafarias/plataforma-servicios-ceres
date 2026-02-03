@@ -14,7 +14,7 @@ import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { GROUPS, getAreasByGroup, getSubcategories, getLocations, getGenders } from "@/lib/taxonomy";
 import type { CategoryGroup } from "@/types";
-import { Eye, EyeOff, User, Mail, Lock, Phone, Building2, Award, Send, ArrowLeft, CheckCircle, MapPin, CircleUser, Upload, FileText, Globe, Linkedin, Instagram, Facebook, Store } from "lucide-react";
+import { Eye, EyeOff, User, Mail, Lock, Building2, Award, Send, ArrowLeft, CheckCircle, MapPin, CircleUser, Upload, FileText, Globe, Linkedin, Instagram, Facebook, Store, IdCard } from "lucide-react";
 import WhatsAppIcon from "@/components/ui/whatsapp";
 import Link from "next/link";
 import { DateBirthPicker } from "./_components/date-birth-picker";
@@ -49,7 +49,7 @@ export default function RegistroPage() {
     picture: "",
     email: "",
     confirmEmail: "",
-    phone: "",
+    dni: "", // Documento Nacional de Identidad (obligatorio)
     location: "",
     password: "",
     confirmPassword: "",
@@ -269,7 +269,11 @@ export default function RegistroPage() {
     } else if (formData.email !== formData.confirmEmail) {
       newErrors.confirmEmail = "Los emails no coinciden";
     }
-    if (!formData.phone.trim()) newErrors.phone = "El teléfono es requerido";
+    if (!formData.dni.trim()) {
+      newErrors.dni = "El DNI es requerido";
+    } else if (!/^\d{7,8}$/.test(formData.dni.trim())) {
+      newErrors.dni = "El DNI debe tener entre 7 y 8 dígitos";
+    }
     if (!formData.location.trim()) newErrors.location = "La localidad es requerida";
     if (!formData.password.trim()) {
       newErrors.password = "La contraseña es requerida";
@@ -303,8 +307,10 @@ export default function RegistroPage() {
       newErrors.serviceLocations = "Debes agregar al menos una localidad donde ofreces tus servicios";
     }
 
-    // Validar WhatsApp si está presente
-    if (formData.whatsapp) {
+    // Validar WhatsApp (obligatorio) - se usará como teléfono
+    if (!formData.whatsapp || !formData.whatsapp.trim()) {
+      newErrors.whatsapp = "El WhatsApp es requerido";
+    } else {
       const error = validateWhatsAppNumber(formData.whatsapp);
       if (error) {
         newErrors.whatsapp = error;
@@ -379,12 +385,14 @@ export default function RegistroPage() {
     
     try {
       // Usar el hook useAuth para registrar al usuario
+      // El teléfono se asocia al WhatsApp del paso 2
       await register({
         email: formData.email,
         password: formData.password,
         firstName: formData.firstName,
         lastName: formData.lastName,
-        phone: formData.phone,
+        dni: formData.dni.trim(),
+        phone: normalizeWhatsAppNumber(formData.whatsapp) ?? undefined, // Usar WhatsApp como teléfono
         birthDate: formData.birthDate,
         location: formData.location,
         bio: formData.bio,
@@ -645,25 +653,33 @@ export default function RegistroPage() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-        <Label htmlFor="phone" className="text-sm font-semibold text-gray-700">
-          Teléfono
-        </Label>
-        <div className="relative mt-1">
-          <Phone className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-          <Input
-            id="phone"
-            type="tel"
-            value={formData.phone}
-            onChange={(e) => handleInputChange('phone', e.target.value)}
-            className={`pl-10 rounded-lg border-2 focus:ring-4 focus:ring-green-100 focus:border-[#006F4B] transition-all duration-200 ${
-              errors.phone ? 'border-red-300' : 'border-gray-200'
-            }`}
-            placeholder="Sin 0 y sin 15 (3491567890) "
-          />
+          <Label htmlFor="dni" className="text-sm font-semibold text-gray-700">
+            DNI *
+          </Label>
+          <div className="relative mt-1">
+            <IdCard className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+            <Input
+              id="dni"
+              type="text"
+              value={formData.dni}
+              onChange={(e) => {
+                // Solo permitir números
+                const value = e.target.value.replace(/\D/g, '');
+                handleInputChange('dni', value);
+              }}
+              className={`pl-10 rounded-lg border-2 focus:ring-4 focus:ring-green-100 focus:border-[#006F4B] transition-all duration-200 ${
+                errors.dni ? 'border-red-300' : 'border-gray-200'
+              }`}
+              placeholder="12345678"
+              maxLength={8}
+            />
+          </div>
+          {errors.dni && <p className="text-red-600 text-sm mt-1">{errors.dni}</p>}
+          <p className="text-xs text-gray-500 mt-1">
+            Documento Nacional de Identidad (sin puntos ni espacios)
+          </p>
         </div>
-        {errors.phone && <p className="text-red-600 text-sm mt-1">{errors.phone}</p>}
-      </div>
-      <div>
+        <div>
         <Label htmlFor="location" className="text-sm font-semibold text-gray-700">
           Localidad *
         </Label>
@@ -942,7 +958,7 @@ export default function RegistroPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <Label htmlFor="whatsapp" className="text-sm font-semibold text-gray-700">
-              WhatsApp *
+              WhatsApp (Teléfono de contacto) *
             </Label>
             <div className="relative mt-1">
               <WhatsAppIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 z-10" />
@@ -958,6 +974,9 @@ export default function RegistroPage() {
               />
             </div>
             {errors.whatsapp && <p className="text-red-600 text-sm mt-1">{errors.whatsapp}</p>}
+            <p className="text-xs text-gray-500 mt-1">
+              Este número se usará como tu teléfono de contacto
+            </p>
           </div>
 
           <div>

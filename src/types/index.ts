@@ -8,6 +8,8 @@ export interface User {
   name?: string; // Para compatibilidad con NextAuth
   image?: string; // Foto de perfil (puede ser URL de OAuth o ruta local)
   phone?: string;
+  dni?: string; // Documento Nacional de Identidad
+  gender?: string; // Género del usuario
   birthDate?: Date;
   location?: string;
   role?: 'citizen' | 'professional' | 'admin';
@@ -107,7 +109,8 @@ export interface RegisterFormData {
   email: string;
   password: string;
   confirmPassword?: string;
-  phone?: string;
+  dni?: string; // Documento Nacional de Identidad (obligatorio)
+  phone?: string; // Se asocia al WhatsApp del paso 2
   birthDate?: string;
   location?: string;
   whatsapp?: string;

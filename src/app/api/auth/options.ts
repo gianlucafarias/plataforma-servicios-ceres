@@ -4,6 +4,7 @@ import FacebookProvider from "next-auth/providers/facebook"
 import bcrypt from 'bcryptjs'
 import { AuthOptions } from 'next-auth'
 import { prisma } from '@/lib/prisma'
+import { downloadAndSaveImage, isExternalOAuthImage } from '@/lib/download-image'
 
 // Extend NextAuth types
 declare module "next-auth" {
@@ -178,7 +179,19 @@ export const authOptions: AuthOptions = {
                             
                             // Actualizar imagen de perfil si el usuario no tiene una o si cambió
                             if (user.image && (!dbUser.image || dbUser.image !== user.image)) {
-                                updateData.image = user.image
+                                // Si es una imagen externa (OAuth), descargarla y guardarla en R2
+                                if (isExternalOAuthImage(user.image)) {
+                                    try {
+                                        const downloadedImage = await downloadAndSaveImage(user.image);
+                                        updateData.image = downloadedImage;
+                                    } catch (error) {
+                                        console.error('Error al descargar imagen OAuth en signIn, usando URL original:', error);
+                                        // Si falla, usar la URL original como fallback
+                                        updateData.image = user.image;
+                                    }
+                                } else {
+                                    updateData.image = user.image;
+                                }
                             }
                             
                             if (Object.keys(updateData).length > 0) {
@@ -197,13 +210,25 @@ export const authOptions: AuthOptions = {
                         const firstName = nameParts[0] || 'Usuario'
                         const lastName = nameParts.slice(1).join(' ') || ''
 
+                        // Procesar imagen de perfil: si es externa (OAuth), descargarla y guardarla en R2
+                        let processedImage = user.image;
+                        if (user.image && isExternalOAuthImage(user.image)) {
+                            try {
+                                processedImage = await downloadAndSaveImage(user.image);
+                            } catch (error) {
+                                console.error('Error al descargar imagen OAuth en signIn, usando URL original:', error);
+                                // Si falla, usar la URL original como fallback
+                                processedImage = user.image;
+                            }
+                        }
+
                         dbUser = await prisma.user.create({
                             data: {
                                 email,
                                 firstName,
                                 lastName,
                                 name: user.name,
-                                image: user.image,
+                                image: processedImage,
                                 verified: true, // OAuth ya verificó el email
                                 emailVerifiedAt: new Date(),
                                 role: 'citizen', // Usuarios OAuth empiezan como ciudadanos
