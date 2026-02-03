@@ -53,7 +53,8 @@ describe('POST /api/auth/register', () => {
       email: 'dup@acme.com',
       password: 'example-password',
       firstName: 'John',
-      lastName: 'Doe'
+      lastName: 'Doe',
+      dni: '12345678'
     })
 
     const res = await POST(req)
@@ -97,6 +98,7 @@ describe('POST /api/auth/register', () => {
       password: 'example-password-123',
       firstName: 'Jane',
       lastName: 'Doe',
+      dni: '12345678',
       professionalGroup: 'oficios'
     })
 
