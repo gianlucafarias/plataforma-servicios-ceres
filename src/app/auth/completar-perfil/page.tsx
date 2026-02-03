@@ -9,12 +9,11 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { GROUPS, getAreasByGroup, getSubcategories, getLocations } from "@/lib/taxonomy";
+import { GROUPS, getAreasByGroup, getSubcategories, getLocations, getGenders } from "@/lib/taxonomy";
 import type { CategoryGroup } from "@/types";
 import { 
   Phone, 
   MapPin, 
-  Briefcase, 
   Award, 
   Send, 
   ArrowLeft, 
@@ -22,9 +21,24 @@ import {
   Plus,
   Trash2,
   Building2,
-  Loader2
+  Loader2,
+  IdCard,
+  CircleUser,
+  Upload,
+  FileText,
+  Globe,
+  Linkedin,
+  Instagram,
+  Facebook,
+  Store,
+  X
 } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
+import { DateBirthPicker } from "../registro/_components/date-birth-picker";
+import WhatsAppIcon from "@/components/ui/whatsapp";
+import { Switch } from "@/components/ui/switch";
+import { normalizeWhatsAppNumber, validateWhatsAppNumber } from "@/lib/whatsapp-normalize";
 
 export default function CompletarPerfilPage() {
   const router = useRouter();
@@ -32,12 +46,29 @@ export default function CompletarPerfilPage() {
   
   const [currentStep, setCurrentStep] = useState(1);
   const [formData, setFormData] = useState({
+    // Paso 1: Datos personales obligatorios
+    dni: "",
+    gender: "",
+    birthDate: "",
     phone: "",
     location: "",
+    // Paso 2: Datos profesionales
     bio: "",
     experienceYears: "",
     professionalGroup: "" as "" | CategoryGroup,
     serviceLocations: [] as string[],
+    // Redes sociales y perfil profesional
+    whatsapp: "",
+    instagram: "",
+    facebook: "",
+    linkedin: "",
+    website: "",
+    portfolio: "",
+    cv: "",
+    picture: "",
+    // Local físico
+    hasPhysicalStore: false,
+    physicalStoreAddress: "",
     services: [
       { areaSlug: "", categoryId: "", title: "", description: "" }
     ]
@@ -48,6 +79,7 @@ export default function CompletarPerfilPage() {
 
   const areas = useMemo(() => getAreasByGroup(formData.professionalGroup as CategoryGroup), [formData.professionalGroup]);
   const locations = useMemo(() => getLocations(), []);
+  const genders = useMemo(() => getGenders(), []);
 
   // Redirigir si no está logueado
   useEffect(() => {
@@ -55,6 +87,55 @@ export default function CompletarPerfilPage() {
       router.push("/auth/login");
     }
   }, [status, router]);
+
+  // Inicializar y descargar la foto de perfil del proveedor OAuth cuando la sesión esté disponible
+  useEffect(() => {
+    if (status === "authenticated" && session?.user?.image) {
+      setFormData(prev => {
+        // Solo procesar si no hay una foto ya establecida
+        if (prev.picture) {
+          return prev;
+        }
+
+        const imageUrl = session.user.image;
+        
+        // Si es una URL externa (OAuth), descargarla y guardarla en R2
+        if (imageUrl && (imageUrl.startsWith('http://') || imageUrl.startsWith('https://'))) {
+          // Descargar y guardar la imagen en R2 de forma asíncrona
+          fetch('/api/upload/external', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ imageUrl }),
+          })
+            .then(res => res.json())
+            .then(result => {
+              if (result.success) {
+                setFormData(current => ({ ...current, picture: result.url || result.value }));
+              } else {
+                console.error('Error al descargar imagen OAuth:', result.error);
+                // Si falla, usar la URL original como fallback
+                setFormData(current => ({ ...current, picture: imageUrl }));
+              }
+            })
+            .catch(error => {
+              console.error('Error al descargar imagen OAuth:', error);
+              // Si falla, usar la URL original como fallback
+              setFormData(current => ({ ...current, picture: imageUrl }));
+            });
+          
+          // Retornar el estado actual mientras se descarga
+          return prev;
+        } else if (imageUrl) {
+          // Si ya es una URL local, usarla directamente
+          return { ...prev, picture: imageUrl };
+        }
+        
+        return prev;
+      });
+    }
+  }, [status, session?.user?.image]);
 
   // Inicializar serviceLocations con la localidad principal
   useEffect(() => {
@@ -67,7 +148,7 @@ export default function CompletarPerfilPage() {
   }, [formData.location, formData.serviceLocations]);
 
   const steps = [
-    { id: 1, title: "Datos de Contacto", description: "Teléfono y ubicación" },
+    { id: 1, title: "Datos Personales", description: "Información básica requerida" },
     { id: 2, title: "Perfil Profesional", description: "Experiencia y servicios" }
   ];
 
@@ -78,9 +159,16 @@ export default function CompletarPerfilPage() {
         const resetServices = [{ areaSlug: '', categoryId: '', title: '', description: '' }];
         return { ...prev, professionalGroup: newGroup, services: resetServices };
       }
+      
+      // Para WhatsApp: validar en tiempo real pero sin normalizar
+      if (field === 'whatsapp' && typeof value === 'string') {
+        const error = validateWhatsAppNumber(value);
+        setErrors(prev => ({ ...prev, whatsapp: error || "" }));
+      }
+      
       return { ...prev, [field]: value };
     });
-    if (errors[field]) {
+    if (errors[field] && field !== 'whatsapp') {
       setErrors(prev => ({ ...prev, [field]: "" }));
     }
   };
@@ -125,8 +213,47 @@ export default function CompletarPerfilPage() {
 
   const validateStep1 = () => {
     const newErrors: {[key: string]: string} = {};
-    if (!formData.phone.trim()) newErrors.phone = "El teléfono es requerido";
-    if (!formData.location.trim()) newErrors.location = "La localidad es requerida";
+    
+    // Validar DNI
+    if (!formData.dni.trim()) {
+      newErrors.dni = "El DNI es requerido";
+    } else if (!/^\d{7,8}$/.test(formData.dni.trim())) {
+      newErrors.dni = "El DNI debe tener entre 7 y 8 dígitos";
+    }
+    
+    // Validar género
+    if (!formData.gender.trim()) {
+      newErrors.gender = "El género es requerido";
+    }
+    
+    // Validar fecha de nacimiento
+    if (!formData.birthDate) {
+      newErrors.birthDate = "La fecha de nacimiento es requerida";
+    } else {
+      const birthDate = new Date(formData.birthDate);
+      const today = new Date();
+      const age = today.getFullYear() - birthDate.getFullYear();
+      const monthDiff = today.getMonth() - birthDate.getMonth();
+      
+      const actualAge = monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate()) 
+        ? age - 1 
+        : age;
+        
+      if (actualAge < 18) {
+        newErrors.birthDate = "Debes ser mayor de 18 años para registrarte";
+      }
+    }
+    
+    // Validar teléfono
+    if (!formData.phone.trim()) {
+      newErrors.phone = "El teléfono es requerido";
+    }
+    
+    // Validar localidad
+    if (!formData.location.trim()) {
+      newErrors.location = "La localidad es requerida";
+    }
+    
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -139,6 +266,26 @@ export default function CompletarPerfilPage() {
     }
     if (!formData.professionalGroup) {
       newErrors.professionalGroup = "Debes elegir si ofreces Oficios o Profesiones";
+    }
+    
+    // Validar que haya al menos una localidad donde ofrece servicios
+    if (!formData.serviceLocations || formData.serviceLocations.length === 0) {
+      newErrors.serviceLocations = "Debes agregar al menos una localidad donde ofreces tus servicios";
+    }
+    
+    // Validar WhatsApp (obligatorio)
+    if (!formData.whatsapp || !formData.whatsapp.trim()) {
+      newErrors.whatsapp = "El WhatsApp es requerido";
+    } else {
+      const error = validateWhatsAppNumber(formData.whatsapp);
+      if (error) {
+        newErrors.whatsapp = error;
+      }
+    }
+    
+    // Validar dirección del local físico si tiene local
+    if (formData.hasPhysicalStore && !formData.physicalStoreAddress?.trim()) {
+      newErrors.physicalStoreAddress = "La dirección del local es requerida si tienes un local físico";
     }
     
     formData.services.forEach((service, index) => {
@@ -168,12 +315,27 @@ export default function CompletarPerfilPage() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          phone: formData.phone,
+          dni: formData.dni.trim(),
+          gender: formData.gender,
+          birthDate: formData.birthDate,
+          phone: normalizeWhatsAppNumber(formData.whatsapp) || formData.phone, // Usar WhatsApp normalizado como teléfono
           location: formData.location,
           bio: formData.bio,
           experienceYears: parseInt(formData.experienceYears || '0'),
           professionalGroup: formData.professionalGroup,
           serviceLocations: formData.serviceLocations,
+          // Campos de redes sociales
+          whatsapp: normalizeWhatsAppNumber(formData.whatsapp) ?? undefined,
+          instagram: formData.instagram,
+          facebook: formData.facebook,
+          linkedin: formData.linkedin,
+          website: formData.website,
+          portfolio: formData.portfolio,
+          cv: formData.cv,
+          picture: formData.picture || undefined, // Enviar undefined si está vacío
+          // Local físico
+          hasPhysicalStore: formData.hasPhysicalStore,
+          physicalStoreAddress: formData.physicalStoreAddress,
           services: formData.services.map((s) => ({
             categoryId: s.categoryId,
             title: s.title,
@@ -298,18 +460,86 @@ export default function CompletarPerfilPage() {
               </div>
             )}
 
-            {/* Step 1: Datos de Contacto */}
+            {/* Step 1: Datos Personales */}
             {currentStep === 1 && (
               <div className="space-y-6">
                 <div className="text-center mb-6">
-                  <h2 className="text-2xl font-bold text-gray-900 mb-2">Datos de Contacto</h2>
-                  <p className="text-gray-600">¿Cómo pueden contactarte los clientes?</p>
+                  <h2 className="text-2xl font-bold text-gray-900 mb-2">Datos Personales</h2>
+                  <p className="text-gray-600">Completá tu información básica requerida</p>
                 </div>
 
+                {/* DNI y Género */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="dni" className="text-sm font-semibold text-gray-700">
+                      DNI *
+                    </Label>
+                    <div className="relative mt-1">
+                      <IdCard className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                      <Input
+                        id="dni"
+                        type="text"
+                        value={formData.dni}
+                        onChange={(e) => {
+                          // Solo permitir números
+                          const value = e.target.value.replace(/\D/g, '');
+                          handleInputChange('dni', value);
+                        }}
+                        className={`pl-10 rounded-xl border-2 ${errors.dni ? 'border-red-300' : 'border-gray-200'}`}
+                        placeholder="12345678"
+                        maxLength={8}
+                      />
+                    </div>
+                    {errors.dni && <p className="text-red-600 text-sm mt-1">{errors.dni}</p>}
+                    <p className="text-xs text-gray-500 mt-1">
+                      Documento Nacional de Identidad (sin puntos ni espacios)
+                    </p>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="gender" className="text-sm font-semibold text-gray-700">
+                      Género *
+                    </Label>
+                    <div className="relative mt-1">
+                      <CircleUser className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 z-10" />
+                      <Select
+                        value={formData.gender}
+                        onValueChange={(value) => handleInputChange('gender', value)}
+                      >
+                        <SelectTrigger className={`pl-10 rounded-xl border-2 ${errors.gender ? 'border-red-300' : 'border-gray-200'}`}>
+                          <SelectValue placeholder="Selecciona un género" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {genders.map((g) => (
+                            <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    {errors.gender && <p className="text-red-600 text-sm mt-1">{errors.gender}</p>}
+                  </div>
+                </div>
+
+                {/* Fecha de nacimiento */}
+                <div>
+                  <Label htmlFor="birthDate" className="text-sm font-semibold text-gray-700">
+                    Fecha de nacimiento *
+                  </Label>
+                  <div className="mt-1">
+                    <DateBirthPicker 
+                      value={formData.birthDate} 
+                      onChange={(date) => handleInputChange('birthDate', date)} 
+                      error={errors.birthDate}
+                    />
+                  </div>
+                  {errors.birthDate && <p className="text-red-600 text-sm mt-1">{errors.birthDate}</p>}
+                </div>
+
+                {/* Teléfono y Localidad */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="phone" className="text-sm font-semibold text-gray-700">
-                      Teléfono *
+                      Teléfono (WhatsApp) *
                     </Label>
                     <div className="relative mt-1">
                       <Phone className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
@@ -323,11 +553,14 @@ export default function CompletarPerfilPage() {
                       />
                     </div>
                     {errors.phone && <p className="text-red-600 text-sm mt-1">{errors.phone}</p>}
+                    <p className="text-xs text-gray-500 mt-1">
+                      Este número se usará como tu teléfono de contacto
+                    </p>
                   </div>
 
                   <div>
                     <Label htmlFor="location" className="text-sm font-semibold text-gray-700">
-                      Localidad Principal *
+                      Localidad *
                     </Label>
                     <div className="relative mt-1">
                       <MapPin className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 z-10" />
@@ -348,41 +581,6 @@ export default function CompletarPerfilPage() {
                     {errors.location && <p className="text-red-600 text-sm mt-1">{errors.location}</p>}
                   </div>
                 </div>
-
-                {/* Localidades adicionales */}
-                <div>
-                  <Label className="text-sm font-semibold text-gray-700">
-                    ¿En qué localidades ofrecés servicios?
-                  </Label>
-                  <p className="text-xs text-gray-500 mb-2">
-                    Tu localidad principal ya está incluida. Podés agregar más.
-                  </p>
-                  <div className="flex flex-wrap gap-2">
-                    {locations.map((loc) => (
-                      <button
-                        key={loc.id}
-                        type="button"
-                        onClick={() => {
-                          const isSelected = formData.serviceLocations.includes(loc.id);
-                          if (loc.id === formData.location) return; // No se puede quitar la principal
-                          if (isSelected) {
-                            handleInputChange('serviceLocations', formData.serviceLocations.filter(l => l !== loc.id));
-                          } else {
-                            handleInputChange('serviceLocations', [...formData.serviceLocations, loc.id]);
-                          }
-                        }}
-                        className={`px-3 py-1.5 rounded-full text-sm transition-all ${
-                          formData.serviceLocations.includes(loc.id)
-                            ? 'bg-[#006F4B] text-white'
-                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                        } ${loc.id === formData.location ? 'ring-2 ring-[#006F4B] ring-offset-1' : ''}`}
-                      >
-                        {loc.name}
-                        {loc.id === formData.location && ' (principal)'}
-                      </button>
-                    ))}
-                  </div>
-                </div>
               </div>
             )}
 
@@ -390,8 +588,12 @@ export default function CompletarPerfilPage() {
             {currentStep === 2 && (
               <div className="space-y-6">
                 <div className="text-center mb-6">
-                  <h2 className="text-2xl font-bold text-gray-900 mb-2">Tu Perfil Profesional</h2>
-                  <p className="text-gray-600">Contanos sobre tu experiencia y servicios</p>
+                  <h2 className="text-2xl font-bold text-gray-900 mb-2">
+                    Información Profesional
+                  </h2>
+                  <p className="text-gray-600">
+                    Cuéntanos sobre tu experiencia
+                  </p>
                 </div>
 
                 <div>
@@ -402,54 +604,478 @@ export default function CompletarPerfilPage() {
                     id="bio"
                     value={formData.bio}
                     onChange={(e) => handleInputChange('bio', e.target.value)}
-                    className={`mt-1 rounded-xl border-2 min-h-[100px] ${errors.bio ? 'border-red-300' : 'border-gray-200'}`}
-                    placeholder="Describí tu experiencia, especialidades y qué te diferencia..."
+                    className={`mt-1 rounded-lg border-2 focus:ring-4 focus:ring-green-100 focus:border-[#006F4B] transition-all duration-200 resize-none ${
+                      errors.bio ? 'border-red-300' : 'border-gray-200'
+                    }`}
+                    placeholder="Describe tu experiencia, especialidades y qué te diferencia..."
+                    rows={4}
                   />
                   {errors.bio && <p className="text-red-600 text-sm mt-1">{errors.bio}</p>}
+                  <p className="text-sm text-gray-500 mt-1">
+                    {formData.bio.length}/3000 caracteres
+                  </p>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="experienceYears" className="text-sm font-semibold text-gray-700">
-                      Años de experiencia *
-                    </Label>
-                    <div className="relative mt-1">
-                      <Award className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-                      <Input
-                        id="experienceYears"
-                        type="number"
-                        min="0"
-                        value={formData.experienceYears}
-                        onChange={(e) => handleInputChange('experienceYears', e.target.value)}
-                        className={`pl-10 rounded-xl border-2 ${errors.experienceYears ? 'border-red-300' : 'border-gray-200'}`}
-                        placeholder="0"
-                      />
-                    </div>
-                    {errors.experienceYears && <p className="text-red-600 text-sm mt-1">{errors.experienceYears}</p>}
+                <div>
+                  <Label htmlFor="experience" className="text-sm font-semibold text-gray-700">
+                    Años de experiencia *
+                  </Label>
+                  <div className="relative mt-1">
+                    <Award className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                    <Input
+                      id="experience"
+                      type="number"
+                      min="0"
+                      max="50"
+                      value={formData.experienceYears}
+                      onChange={(e) => handleInputChange('experienceYears', e.target.value)}
+                      className={`pl-10 rounded-lg border-2 focus:ring-4 focus:ring-green-100 focus:border-[#006F4B] transition-all duration-200 ${
+                        errors.experienceYears ? 'border-red-300' : 'border-gray-200'
+                      }`}
+                      placeholder="15"
+                    />
                   </div>
+                  {errors.experienceYears && <p className="text-red-600 text-sm mt-1">{errors.experienceYears}</p>}
+                </div>
 
-                  <div>
-                    <Label className="text-sm font-semibold text-gray-700">
-                      Tipo de servicio *
-                    </Label>
-                    <div className="relative mt-1">
-                      <Briefcase className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 z-10" />
+                {/* Lugares donde ofrece servicios */}
+                <div>
+                  <Label htmlFor="serviceLocations" className="text-sm font-semibold text-gray-700">
+                    Lugares donde ofreces tus servicios *
+                  </Label>
+                  <p className="text-sm text-gray-600 mt-1 mb-3">
+                    Selecciona las localidades donde trabajas. La primera será tu localidad principal.
+                  </p>
+                  
+                  <div className="space-y-3">
+                    {/* Selector de localidades */}
+                    <div className="relative">
                       <Select
-                        value={formData.professionalGroup}
-                        onValueChange={(value) => handleInputChange('professionalGroup', value)}
+                        value=""
+                        onValueChange={(value) => {
+                          if (value && !formData.serviceLocations.includes(value)) {
+                            if (value === 'all-region') {
+                              // Si se agrega "Toda la región", mantener solo la principal y agregar "all-region"
+                              const principalLocation = formData.serviceLocations[0] || formData.location;
+                              handleInputChange('serviceLocations', principalLocation ? [principalLocation, 'all-region'] : ['all-region']);
+                            } else {
+                              // Si se agrega una localidad normal y ya existe "all-region", eliminarlo primero
+                              const newLocations = formData.serviceLocations.filter(loc => loc !== 'all-region');
+                              handleInputChange('serviceLocations', [...newLocations, value]);
+                            }
+                          }
+                        }}
                       >
-                        <SelectTrigger className={`pl-10 rounded-xl border-2 ${errors.professionalGroup ? 'border-red-300' : 'border-gray-200'}`}>
-                          <SelectValue placeholder="¿Oficios o Profesiones?" />
+                        <SelectTrigger className={`w-full rounded-lg border-2 focus:ring-4 focus:ring-green-100 focus:border-[#006F4B] transition-all duration-200 ${
+                          errors.serviceLocations ? 'border-red-300' : 'border-gray-200'
+                        }`}>
+                          <SelectValue placeholder="Agregar localidades..." />
                         </SelectTrigger>
                         <SelectContent>
-                          {GROUPS.map((group) => (
-                            <SelectItem key={group.id} value={group.id}>{group.name}</SelectItem>
-                          ))}
+                          {locations
+                            .filter(location => !formData.serviceLocations.includes(location.id))
+                            .map((location) => (
+                              <SelectItem key={location.id} value={location.id}>
+                                {location.name}
+                              </SelectItem>
+                            ))}
+                          {!formData.serviceLocations.includes('all-region') && (
+                            <SelectItem value="all-region">Toda la región (todas las ciudades)</SelectItem>
+                          )}
                         </SelectContent>
                       </Select>
                     </div>
-                    {errors.professionalGroup && <p className="text-red-600 text-sm mt-1">{errors.professionalGroup}</p>}
+
+                    {/* Localidades seleccionadas */}
+                    {formData.serviceLocations.length > 0 ? (
+                      <div className="space-y-2">
+                        <div className="flex flex-wrap gap-2">
+                          {formData.serviceLocations.map((locationId, index) => {
+                            const location = locations.find(l => l.id === locationId);
+                            const isPrincipal = index === 0;
+                            return (
+                              <div
+                                key={locationId}
+                                className={`flex items-center space-x-2 rounded-lg px-3 py-2 ${
+                                  isPrincipal 
+                                    ? 'bg-green-50 border border-green-200' 
+                                    : 'bg-blue-50 border border-blue-200'
+                                }`}
+                              >
+                                <MapPin className={`h-3 w-3 ${isPrincipal ? 'text-green-600' : 'text-blue-600'}`} />
+                                <span className={`text-sm ${isPrincipal ? 'text-green-800' : 'text-blue-800'}`}>
+                                  {locationId === 'all-region' ? 'Toda la región' : location?.name}
+                                </span>
+                                {isPrincipal && (
+                                  <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">
+                                    Principal
+                                  </span>
+                                )}
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    handleInputChange('serviceLocations', formData.serviceLocations.filter(id => id !== locationId));
+                                  }}
+                                  className={`ml-1 hover:opacity-70 transition-opacity ${
+                                    isPrincipal ? 'text-green-600 hover:text-green-800' : 'text-blue-600 hover:text-blue-800'
+                                  }`}
+                                  aria-label="Eliminar localidad"
+                                >
+                                  ×
+                                </button>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ) : null}
                   </div>
+                  
+                  {errors.serviceLocations && <p className="text-red-600 text-sm mt-1">{errors.serviceLocations}</p>}
+                </div>
+
+                {/* Sección de Perfil Profesional de Redes Sociales */}
+                <div className="pt-6 border-t border-gray-200">
+                  <div className="mb-6">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                      Perfil Profesional de Redes Sociales
+                    </h3>
+                    <p className="text-sm text-gray-600">
+                      Agrega tus perfiles profesionales para que los clientes puedan conocerte mejor (opcional)
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="whatsapp" className="text-sm font-semibold text-gray-700">
+                        WhatsApp (Teléfono de contacto) *
+                      </Label>
+                      <div className="relative mt-1">
+                        <WhatsAppIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 z-10" />
+                        <Input
+                          id="whatsapp"
+                          type="tel"
+                          value={formData.whatsapp}
+                          onChange={(e) => handleInputChange('whatsapp', e.target.value)}
+                          className={`pl-10 rounded-lg border-2 focus:ring-4 focus:ring-green-100 focus:border-[#006F4B] transition-all duration-200 ${
+                            errors.whatsapp ? 'border-red-300' : 'border-gray-200'
+                          }`}
+                          placeholder="Sin 0 y sin 15 (ej: 349112345678)"
+                        />
+                      </div>
+                      {errors.whatsapp && <p className="text-red-600 text-sm mt-1">{errors.whatsapp}</p>}
+                      <p className="text-xs text-gray-500 mt-1">
+                        Este número se usará como tu teléfono de contacto
+                      </p>
+                    </div>
+
+                    <div>
+                      <Label htmlFor="instagram" className="text-sm font-semibold text-gray-700">
+                        Instagram
+                      </Label>
+                      <div className="relative mt-1">
+                        <Instagram className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                        <Input
+                          id="instagram"
+                          value={formData.instagram}
+                          onChange={(e) => handleInputChange('instagram', e.target.value)}
+                          className="pl-10 rounded-lg border-2 focus:ring-4 focus:ring-green-100 focus:border-[#006F4B] transition-all duration-200 border-gray-200"
+                          placeholder="@tuusuario"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <Label htmlFor="facebook" className="text-sm font-semibold text-gray-700">
+                        Facebook
+                      </Label>
+                      <div className="relative mt-1">
+                        <Facebook className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                        <Input
+                          id="facebook"
+                          value={formData.facebook}
+                          onChange={(e) => handleInputChange('facebook', e.target.value)}
+                          className="pl-10 rounded-lg border-2 focus:ring-4 focus:ring-green-100 focus:border-[#006F4B] transition-all duration-200 border-gray-200"
+                          placeholder="/tu-pagina"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <Label htmlFor="linkedin" className="text-sm font-semibold text-gray-700">
+                        LinkedIn
+                      </Label>
+                      <div className="relative mt-1">
+                        <Linkedin className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                        <Input
+                          id="linkedin"
+                          value={formData.linkedin}
+                          onChange={(e) => handleInputChange('linkedin', e.target.value)}
+                          className="pl-10 rounded-lg border-2 focus:ring-4 focus:ring-green-100 focus:border-[#006F4B] transition-all duration-200 border-gray-200"
+                          placeholder="/in/tuperfil"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <Label htmlFor="website" className="text-sm font-semibold text-gray-700">
+                        Sitio Web
+                      </Label>
+                      <div className="relative mt-1">
+                        <Globe className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                        <Input
+                          id="website"
+                          value={formData.website}
+                          onChange={(e) => handleInputChange('website', e.target.value)}
+                          className="pl-10 rounded-lg border-2 focus:ring-4 focus:ring-green-100 focus:border-[#006F4B] transition-all duration-200 border-gray-200"
+                          placeholder="https://tusitio.com"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <Label htmlFor="portfolio" className="text-sm font-semibold text-gray-700">
+                        Portfolio
+                      </Label>
+                      <div className="relative mt-1">
+                        <Globe className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                        <Input
+                          id="portfolio"
+                          value={formData.portfolio}
+                          onChange={(e) => handleInputChange('portfolio', e.target.value)}
+                          className="pl-10 rounded-lg border-2 focus:ring-4 focus:ring-green-100 focus:border-[#006F4B] transition-all duration-200 border-gray-200"
+                          placeholder="https://tuportfolio.com"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Local Físico */}
+                <div className="pt-6 border-t border-gray-200">
+                  <div className="mb-4">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                      Local Físico
+                    </h3>
+                    <p className="text-sm text-gray-600">
+                      Si tenés un local físico, podés agregar la dirección (opcional)
+                    </p>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div className="flex items-center space-x-3">
+                      <Switch
+                        id="hasPhysicalStore"
+                        checked={formData.hasPhysicalStore}
+                        onCheckedChange={(checked) => handleInputChange('hasPhysicalStore', checked)}
+                      />
+                      <Label htmlFor="hasPhysicalStore" className="text-sm font-semibold text-gray-700 cursor-pointer">
+                        Tengo un local físico
+                      </Label>
+                    </div>
+
+                    {formData.hasPhysicalStore && (
+                      <div>
+                        <Label htmlFor="physicalStoreAddress" className="text-sm font-semibold text-gray-700">
+                          Dirección del local *
+                        </Label>
+                        <div className="relative mt-1">
+                          <Store className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                          <Input
+                            id="physicalStoreAddress"
+                            value={formData.physicalStoreAddress}
+                            onChange={(e) => handleInputChange('physicalStoreAddress', e.target.value)}
+                            className="pl-10 rounded-lg border-2 focus:ring-4 focus:ring-green-100 focus:border-[#006F4B] transition-all duration-200 border-gray-200"
+                            placeholder="Ej: Av. San Martín 123, Ceres"
+                          />
+                        </div>
+                        {errors.physicalStoreAddress && (
+                          <p className="text-red-600 text-sm mt-1">{errors.physicalStoreAddress}</p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                  <div>
+                    <Label htmlFor="picture" className="text-sm font-semibold text-gray-700">
+                      Foto de Perfil
+                    </Label>
+                    
+                    {/* Mostrar foto actual si existe */}
+                    {formData.picture && formData.picture.trim() !== "" && (
+                      <div className="mt-2 mb-3 relative inline-block">
+                        <div className="relative w-24 h-24 rounded-full overflow-hidden border-2 border-gray-200 bg-gray-100">
+                          {formData.picture.startsWith('http') || formData.picture.startsWith('https') ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={formData.picture}
+                              alt="Foto de perfil"
+                              className="w-full h-full object-cover"
+                              onError={(e) => {
+                                console.error("Error cargando imagen:", formData.picture);
+                                e.currentTarget.style.display = 'none';
+                              }}
+                            />
+                          ) : formData.picture.startsWith('/') ? (
+                            <Image
+                              src={formData.picture}
+                              alt="Foto de perfil"
+                              fill
+                              className="object-cover"
+                              onError={() => console.error("Error cargando imagen local:", formData.picture)}
+                            />
+                          ) : (
+                            <Image
+                              src={`/uploads/profiles/${formData.picture}`}
+                              alt="Foto de perfil"
+                              fill
+                              className="object-cover"
+                              onError={() => console.error("Error cargando imagen desde uploads:", formData.picture)}
+                            />
+                          )}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            handleInputChange('picture', '');
+                            // Resetear el input file
+                            const fileInput = document.getElementById('picture') as HTMLInputElement;
+                            if (fileInput) fileInput.value = '';
+                          }}
+                          className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1.5 hover:bg-red-600 transition-colors shadow-sm z-10"
+                          aria-label="Eliminar foto"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
+                    )}
+                    
+                    <div className="relative mt-1">
+                      <Upload className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                      <Input
+                        id="picture"
+                        type="file"
+                        accept="image/*"
+                        onChange={async (e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            try {
+                              const formDataUpload = new FormData();
+                              formDataUpload.append('file', file);
+                              formDataUpload.append('type', 'image');
+                              
+                              const response = await fetch('/api/upload', {
+                                method: 'POST',
+                                body: formDataUpload,
+                              });
+                              
+                              const result = await response.json();
+                              if (result.success) {
+                                const pictureValue = result.value || (result.storage === 'r2' ? result.url : result.filename);
+                                handleInputChange('picture', pictureValue);
+                                setErrors(prev => {
+                                  const newErrors = {...prev};
+                                  delete newErrors.picture;
+                                  return newErrors;
+                                });
+                              } else {
+                                setErrors(prev => ({ ...prev, picture: result.error || 'Error al subir la imagen' }));
+                              }
+                            } catch (error) {
+                              console.error('Error uploading file:', error);
+                              setErrors(prev => ({ ...prev, picture: 'Error al subir la imagen' }));
+                            }
+                          }
+                        }}
+                        className="pl-10 rounded-lg border-2 focus:ring-4 focus:ring-green-100 focus:border-[#006F4B] transition-all duration-200 border-gray-200"
+                      />
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">
+                      {formData.picture ? 'Hacé clic en la X para eliminar o subí una nueva imagen' : 'PNG, JPG, JPEG, WEBP (máx. 10MB)'}
+                    </p>
+                    {errors.picture && <p className="text-xs text-red-600 mt-1">{errors.picture}</p>}
+                  </div>
+
+                  <div>
+                    <Label htmlFor="cv" className="text-sm font-semibold text-gray-700">
+                      CV (Curriculum Vitae)
+                    </Label>
+                    <div className="relative mt-1">
+                      <FileText className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                      <Input
+                        id="cv"
+                        type="file"
+                        accept=".pdf"
+                        onChange={async (e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            try {
+                              const formData = new FormData();
+                              formData.append('file', file);
+                              formData.append('type', 'cv');
+                              
+                              const response = await fetch('/api/upload', {
+                                method: 'POST',
+                                body: formData,
+                              });
+                              
+                              const result = await response.json();
+                              if (result.success) {
+                                handleInputChange(
+                                  'cv',
+                                  result.url || result.path || result.filename
+                                );
+                                setErrors(prev => {
+                                  const newErrors = {...prev};
+                                  delete newErrors.cv;
+                                  return newErrors;
+                                });
+                              } else {
+                                setErrors(prev => ({ ...prev, cv: result.error || 'Error al subir el CV' }));
+                              }
+                            } catch (error) {
+                              console.error('Error uploading file:', error);
+                              setErrors(prev => ({ ...prev, cv: 'Error al subir el CV' }));
+                            }
+                          }
+                        }}
+                        className="pl-10 rounded-lg border-2 focus:ring-4 focus:ring-green-100 focus:border-[#006F4B] transition-all duration-200 border-gray-200"
+                      />
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">PDF, DOC, DOCX, JPG, PNG (máx. 15MB)</p>
+                    {errors.cv && <p className="text-xs text-red-600 mt-1">{errors.cv}</p>}
+                  </div>
+                </div>
+
+                <div>
+                  <Label className="text-sm font-semibold text-gray-700">Tipo de registro *</Label>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
+                    {GROUPS.map((g) => (
+                      <button
+                        key={g.id}
+                        type="button"
+                        onClick={() => handleInputChange('professionalGroup', g.id)}
+                        className={`w-full rounded-2xl border p-5 text-left transition-all duration-200 ${
+                          formData.professionalGroup === g.id
+                            ? 'border-[#006F4B] bg-green-50'
+                            : 'border-gray-200 hover:bg-gray-50'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="text-lg font-semibold">{g.name}</div>
+                          <div className={`h-3 w-3 rounded-full ${formData.professionalGroup === g.id ? 'bg-[#006F4B]' : 'bg-gray-300'}`} />
+                        </div>
+                        <p className="text-sm text-gray-600 mt-2">
+                          {g.id === 'oficios'
+                            ? 'Trabajos manuales y técnicos por oficio (ej: plomería, electricidad, mantenimiento).'
+                            : 'Profesiones colegiadas o formales (ej: enfermería, arquitectura, abogacía).'}
+                        </p>
+                      </button>
+                    ))}
+                  </div>
+                  {errors.professionalGroup && <p className="text-red-600 text-sm mt-1">{errors.professionalGroup}</p>}
                 </div>
 
                 {/* Servicios */}

@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma';
 import { normalizeWhatsAppNumber } from '@/lib/whatsapp-normalize';
 import { ok, fail, requestMeta } from '@/lib/api-response';
 import { rateLimit, rateLimitHeaders } from '@/lib/rate-limit-memory';
+import { downloadAndSaveImage, isExternalOAuthImage } from '@/lib/download-image';
 
 const RL_LIMIT = 30;
 const RL_WINDOW = 10 * 60 * 1000; // 10 min
@@ -57,13 +58,60 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { phone, location, bio, experienceYears, professionalGroup, serviceLocations, services } = body;
+    const { 
+      dni, 
+      gender, 
+      birthDate, 
+      phone, 
+      location, 
+      bio, 
+      experienceYears, 
+      professionalGroup, 
+      serviceLocations,
+      whatsapp,
+      instagram,
+      facebook,
+      linkedin,
+      website,
+      portfolio,
+      cv,
+      picture,
+      hasPhysicalStore,
+      physicalStoreAddress,
+      services 
+    } = body;
 
-    if (!phone || !location || !bio || !professionalGroup) {
-      return NextResponse.json(fail('validation_error', 'Faltan campos requeridos', undefined, metaBase), {
+    if (!dni || !gender || !birthDate || !phone || !location || !bio || !professionalGroup) {
+      return NextResponse.json(fail('validation_error', 'Faltan campos requeridos (DNI, género, fecha de nacimiento, teléfono, localidad, bio y grupo profesional son obligatorios)', undefined, metaBase), {
         status: 400,
         headers: rateLimitHeaders(rl),
       });
+    }
+
+    // Validar formato de DNI (7-8 dígitos)
+    if (!/^\d{7,8}$/.test(dni.trim())) {
+      return NextResponse.json(fail('validation_error', 'El DNI debe tener entre 7 y 8 dígitos', undefined, metaBase), {
+        status: 400,
+        headers: rateLimitHeaders(rl),
+      });
+    }
+
+    // Validar edad mínima
+    if (birthDate) {
+      const birthDateObj = new Date(birthDate);
+      const today = new Date();
+      const age = today.getFullYear() - birthDateObj.getFullYear();
+      const monthDiff = today.getMonth() - birthDateObj.getMonth();
+      const actualAge = monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDateObj.getDate()) 
+        ? age - 1 
+        : age;
+        
+      if (actualAge < 18) {
+        return NextResponse.json(fail('validation_error', 'Debes ser mayor de 18 años para registrarte', undefined, metaBase), {
+          status: 400,
+          headers: rateLimitHeaders(rl),
+        });
+      }
     }
 
     if (!services || services.length === 0) {
@@ -84,11 +132,27 @@ export async function POST(request: NextRequest) {
         },
       });
 
+      // Procesar imagen de perfil: si es externa (OAuth), descargarla y guardarla en R2
+      let processedPicture = picture;
+      if (picture && isExternalOAuthImage(picture)) {
+        try {
+          processedPicture = await downloadAndSaveImage(picture);
+        } catch (error) {
+          console.error('Error al descargar imagen OAuth, usando URL original:', error);
+          // Si falla, usar la URL original como fallback
+          processedPicture = picture;
+        }
+      }
+
       await tx.user.update({
         where: { id: user.id },
         data: {
+          dni: dni.trim(),
+          gender,
           phone,
+          birthDate: birthDate ? new Date(birthDate) : null,
           location,
+          image: processedPicture || user.image, // Actualizar también la imagen del usuario
           role: 'professional',
         },
       });
@@ -101,7 +165,16 @@ export async function POST(request: NextRequest) {
           professionalGroup,
           location,
           serviceLocations: serviceLocations || [location],
-          whatsapp: normalizeWhatsAppNumber(phone) || null,
+          whatsapp: normalizeWhatsAppNumber(whatsapp || phone) || null,
+          instagram: instagram || null,
+          facebook: facebook || null,
+          linkedin: linkedin || null,
+          website: website || null,
+          portfolio: portfolio || null,
+          CV: cv || null,
+          ProfilePicture: processedPicture || null,
+          hasPhysicalStore: hasPhysicalStore || false,
+          physicalStoreAddress: hasPhysicalStore ? physicalStoreAddress : null,
           status: 'pending',
           verified: false,
         },

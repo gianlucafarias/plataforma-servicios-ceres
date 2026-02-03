@@ -32,6 +32,7 @@ interface RegisterRequestPayload {
   password: string;
   firstName: string;
   lastName: string;
+  dni?: string; // Documento Nacional de Identidad (obligatorio)
   phone?: string;
   birthDate?: string;
   location?: string;
@@ -69,6 +70,7 @@ export async function POST(request: NextRequest) {
       password,
       firstName,
       lastName,
+      dni,
       phone,
       birthDate,
       location,
@@ -89,9 +91,17 @@ export async function POST(request: NextRequest) {
       services,
     } = payload;
 
-    if (!email || !password || !firstName || !lastName) {
+    if (!email || !password || !firstName || !lastName || !dni) {
       return NextResponse.json(
-        fail('validation_error', 'Faltan datos requeridos', undefined, metaBase),
+        fail('validation_error', 'Faltan datos requeridos (email, contraseña, nombre, apellido y DNI son obligatorios)', undefined, metaBase),
+        { status: 400, headers: rateLimitHeaders(rl) }
+      );
+    }
+
+    // Validar formato de DNI (7-8 dígitos)
+    if (!/^\d{7,8}$/.test(dni.trim())) {
+      return NextResponse.json(
+        fail('validation_error', 'El DNI debe tener entre 7 y 8 dígitos', undefined, metaBase),
         { status: 400, headers: rateLimitHeaders(rl) }
       );
     }
@@ -117,6 +127,7 @@ export async function POST(request: NextRequest) {
           password: hashedPassword,
           firstName,
           lastName,
+          dni: dni.trim(),
           phone: phone || null,
           birthDate: birthDate ? new Date(birthDate) : null,
           location: location || null,
