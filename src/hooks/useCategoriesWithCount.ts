@@ -132,3 +132,4 @@ export function useCategoriesWithCount() {
 
   return { categories, loading, error };
 }
+

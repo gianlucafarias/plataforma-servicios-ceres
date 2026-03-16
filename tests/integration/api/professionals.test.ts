@@ -65,13 +65,43 @@ describe('GET /api/professional/[id]', () => {
   })
 
   it('200 devuelve profesional', async () => {
-    hoisted.prismaMock.professional.findUnique.mockResolvedValueOnce({ id: 'p1' })
+    hoisted.prismaMock.professional.findUnique.mockResolvedValueOnce({
+      id: 'p1',
+      userId: 'u1',
+      status: 'active',
+    })
     const mockParams = Promise.resolve({ id: 'p1' })
     const res = await GET_DETAIL(makeRequest('http://localhost/api/professional/p1'), { params: mockParams })
     expect(res.status).toBe(200)
     const json = await res.json()
     expect(json.success).toBe(true)
     expect(json.data.id).toBe('p1')
+  })
+
+  it('404 cuando el perfil no esta activo y no es el dueno', async () => {
+    hoisted.prismaMock.professional.findUnique.mockResolvedValueOnce({
+      id: 'p1',
+      userId: 'u1',
+      status: 'pending',
+    })
+    const mockParams = Promise.resolve({ id: 'p1' })
+    const res = await GET_DETAIL(makeRequest('http://localhost/api/professional/p1'), { params: mockParams })
+    expect(res.status).toBe(404)
+  })
+
+  it('200 devuelve perfil pendiente al dueno autenticado', async () => {
+    hoisted.getServerSessionMock.mockResolvedValueOnce({ user: { id: 'u1' } })
+    hoisted.prismaMock.professional.findUnique.mockResolvedValueOnce({
+      id: 'p1',
+      userId: 'u1',
+      status: 'pending',
+    })
+    const mockParams = Promise.resolve({ id: 'p1' })
+    const res = await GET_DETAIL(makeRequest('http://localhost/api/professional/p1'), { params: mockParams })
+    expect(res.status).toBe(200)
+    const json = await res.json()
+    expect(json.success).toBe(true)
+    expect(json.data.status).toBe('pending')
   })
 })
 

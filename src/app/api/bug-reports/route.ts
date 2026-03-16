@@ -1,43 +1,60 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { enqueueSlackAlert } from '@/jobs/slack.producer';
+import { rateLimit, rateLimitHeaders } from '@/lib/rate-limit-memory';
+import { clientIp } from '@/lib/request-helpers';
 
-/**
- * POST /api/bug-reports
- * Endpoint público para reportar bugs
- * Body: { title, description, severity?, userEmail?, context? }
- */
+const LIMIT = 20;
+const WINDOW_MS = 10 * 60 * 1000;
+
 export async function POST(request: NextRequest) {
+  const rl = rateLimit(`bug-reports:${clientIp(request)}`, LIMIT, WINDOW_MS);
+  if (!rl.allowed) {
+    return NextResponse.json(
+      {
+        success: false,
+        error: 'rate_limited',
+        message: 'Demasiadas solicitudes. Intenta nuevamente mas tarde.',
+      },
+      { status: 429, headers: rateLimitHeaders(rl) }
+    );
+  }
+
   try {
     const body = await request.json();
     const { title, description, severity = 'medium', userEmail, context } = body;
 
-    // Validaciones básicas
     if (!title || !description) {
       return NextResponse.json(
-        { success: false, error: 'validation_error', message: 'Título y descripción son requeridos' },
-        { status: 400 }
+        {
+          success: false,
+          error: 'validation_error',
+          message: 'Titulo y descripcion son requeridos',
+        },
+        { status: 400, headers: rateLimitHeaders(rl) }
       );
     }
 
     if (!['low', 'medium', 'high', 'critical'].includes(severity)) {
       return NextResponse.json(
-        { success: false, error: 'validation_error', message: 'Severidad inválida' },
-        { status: 400 }
+        {
+          success: false,
+          error: 'validation_error',
+          message: 'Severidad invalida',
+        },
+        { status: 400, headers: rateLimitHeaders(rl) }
       );
     }
 
-    // Buscar usuario por email si se proporciona
     let userId: string | null = null;
     if (userEmail) {
       const user = await prisma.user.findUnique({
         where: { email: userEmail },
-        select: { id: true }
+        select: { id: true },
       });
       userId = user?.id || null;
     }
 
-    // Crear bug report
     const bugReport = await prisma.bugReport.create({
       data: {
         title,
@@ -47,30 +64,31 @@ export async function POST(request: NextRequest) {
         userId,
         context: context || null,
         status: 'open',
-      }
+      },
     });
 
-    // Enviar notificación a Slack (en background)
     try {
       await enqueueSlackAlert(
         `bug:${bugReport.id}`,
-        `🐛 Nuevo bug reportado:\n*${title}*\nSeveridad: ${severity}\n${userEmail ? `Reportado por: ${userEmail}` : 'Reporte anónimo'}`
+        `Nuevo bug reportado:\n*${title}*\nSeveridad: ${severity}\n${userEmail ? `Reportado por: ${userEmail}` : 'Reporte anonimo'}`
       );
     } catch (slackError) {
-      // No fallar si Slack falla
       console.error('Error enviando alerta a Slack:', slackError);
     }
 
-    return NextResponse.json({
-      success: true,
-      data: bugReport,
-      message: 'Bug reportado exitosamente'
-    }, { status: 201 });
+    return NextResponse.json(
+      {
+        success: true,
+        data: bugReport,
+        message: 'Bug reportado exitosamente',
+      },
+      { status: 201, headers: rateLimitHeaders(rl) }
+    );
   } catch (error) {
     console.error('Error creando bug report:', error);
     return NextResponse.json(
       { success: false, error: 'server_error', message: 'Error al reportar bug' },
-      { status: 500 }
+      { status: 500, headers: rateLimitHeaders(rl) }
     );
   }
 }

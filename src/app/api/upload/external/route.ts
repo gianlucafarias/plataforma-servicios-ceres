@@ -1,43 +1,71 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth';
 import { downloadAndSaveImage, isExternalOAuthImage } from '@/lib/download-image';
+import { authOptions } from '@/app/api/auth/options';
+import { rateLimit, rateLimitHeaders } from '@/lib/rate-limit-memory';
+import { clientIp } from '@/lib/request-helpers';
+
+const LIMIT = 20;
+const WINDOW_MS = 10 * 60 * 1000;
 
 /**
- * Endpoint para descargar y guardar imágenes externas (OAuth) en R2
+ * Endpoint para descargar y guardar imagenes externas (OAuth) en R2.
  */
 export async function POST(request: NextRequest) {
+  const rl = rateLimit(`upload-external:${clientIp(request)}`, LIMIT, WINDOW_MS);
+  if (!rl.allowed) {
+    return NextResponse.json(
+      {
+        success: false,
+        error: 'rate_limited',
+        message: 'Demasiadas solicitudes. Intenta nuevamente mas tarde.',
+      },
+      { status: 429, headers: rateLimitHeaders(rl) }
+    );
+  }
+
   try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.id) {
+      return NextResponse.json(
+        { success: false, error: 'unauthorized' },
+        { status: 401, headers: rateLimitHeaders(rl) }
+      );
+    }
+
     const body = await request.json();
     const { imageUrl } = body;
 
     if (!imageUrl || typeof imageUrl !== 'string') {
       return NextResponse.json(
-        { success: false, error: 'Se requiere una URL de imagen válida' },
-        { status: 400 }
+        { success: false, error: 'Se requiere una URL de imagen valida' },
+        { status: 400, headers: rateLimitHeaders(rl) }
       );
     }
 
-    // Verificar que sea una URL externa válida
     if (!isExternalOAuthImage(imageUrl)) {
       return NextResponse.json(
-        { success: false, error: 'La URL proporcionada no es una imagen externa válida' },
-        { status: 400 }
+        { success: false, error: 'La URL proporcionada no es una imagen externa valida' },
+        { status: 400, headers: rateLimitHeaders(rl) }
       );
     }
 
-    // Descargar y guardar la imagen
     const savedUrl = await downloadAndSaveImage(imageUrl);
 
-    return NextResponse.json({
-      success: true,
-      url: savedUrl,
-      value: savedUrl, // Para compatibilidad con el formato de /api/upload
-    });
+    return NextResponse.json(
+      {
+        success: true,
+        url: savedUrl,
+        value: savedUrl,
+      },
+      { headers: rateLimitHeaders(rl) }
+    );
   } catch (error) {
     console.error('Error al descargar imagen externa:', error);
     const message = error instanceof Error ? error.message : 'Error al descargar la imagen';
     return NextResponse.json(
       { success: false, error: message },
-      { status: 500 }
+      { status: 500, headers: rateLimitHeaders(rl) }
     );
   }
 }

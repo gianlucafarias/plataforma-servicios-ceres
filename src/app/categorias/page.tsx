@@ -1,6 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import {
   ArrowRight,
   Wrench,
@@ -20,6 +19,7 @@ import type { Metadata } from "next";
 import { getAbsoluteUrl } from "@/lib/seo";
 import { CategorySuggestionModal } from "@/components/features/CategorySuggestionModal";
 import { SupportContactModal } from "@/components/features/SupportContactModal";
+import { getServiceCountsByCategorySlug } from "@/lib/service-stats";
 
 // Datos de categorías expandidas a partir de taxonomía local
 const categories = AREAS_OFICIOS.map((category) => ({
@@ -70,16 +70,7 @@ export default async function CategoriasPage() {
   // usando el mismo endpoint que la sidebar de /servicios.
   let serviceCounts: Record<string, number> = {};
   try {
-    const res = await fetch(getAbsoluteUrl("/api/services/stats"), {
-      // Cachear brevemente para no recalcular en cada request
-      next: { revalidate: 60 },
-    });
-    if (res.ok) {
-      const json = await res.json();
-      if (json?.success && json.data) {
-        serviceCounts = json.data as Record<string, number>;
-      }
-    }
+    serviceCounts = await getServiceCountsByCategorySlug();
   } catch {
     // Silencioso: si falla, usamos 0 para todos y evitamos romper la página.
   }
@@ -201,4 +192,3 @@ export default async function CategoriasPage() {
     </div>
   );
 }
-

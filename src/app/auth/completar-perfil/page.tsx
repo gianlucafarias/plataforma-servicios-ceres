@@ -1225,3 +1225,4 @@ export default function CompletarPerfilPage() {
     </div>
   );
 }
+

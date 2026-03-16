@@ -28,6 +28,60 @@ export interface ValidationResult {
   fileType?: 'image' | 'cv';
 }
 
+function startsWithBytes(buffer: Buffer, signature: number[]): boolean {
+  return signature.every((byte, index) => buffer[index] === byte);
+}
+
+function isZipFile(buffer: Buffer): boolean {
+  return startsWithBytes(buffer, [0x50, 0x4b, 0x03, 0x04]);
+}
+
+function isOleDocument(buffer: Buffer): boolean {
+  return startsWithBytes(buffer, [0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1]);
+}
+
+function isPng(buffer: Buffer): boolean {
+  return startsWithBytes(buffer, [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+}
+
+function isJpeg(buffer: Buffer): boolean {
+  return startsWithBytes(buffer, [0xff, 0xd8, 0xff]);
+}
+
+function isPdf(buffer: Buffer): boolean {
+  return buffer.subarray(0, 5).toString('ascii') === '%PDF-';
+}
+
+function isWebp(buffer: Buffer): boolean {
+  if (buffer.length < 12) {
+    return false;
+  }
+
+  return (
+    buffer.subarray(0, 4).toString('ascii') === 'RIFF' &&
+    buffer.subarray(8, 12).toString('ascii') === 'WEBP'
+  );
+}
+
+function matchesImageSignature(buffer: Buffer, extension: string): boolean {
+  if (extension === 'png') return isPng(buffer);
+  if (extension === 'jpg' || extension === 'jpeg') return isJpeg(buffer);
+  if (extension === 'webp') return isWebp(buffer);
+
+  return isPng(buffer) || isJpeg(buffer) || isWebp(buffer);
+}
+
+function matchesCvSignature(buffer: Buffer, extension: string): boolean {
+  if (extension === 'pdf') return isPdf(buffer);
+  if (extension === 'docx') return isZipFile(buffer);
+  if (extension === 'doc') return isOleDocument(buffer);
+  if (extension === 'png' || extension === 'jpg' || extension === 'jpeg') {
+    return matchesImageSignature(buffer, extension);
+  }
+
+  return isPdf(buffer) || isZipFile(buffer) || isOleDocument(buffer) || matchesImageSignature(buffer, extension);
+}
+
 /**
  * Valida un archivo según tipo esperado
  * 
@@ -170,5 +224,34 @@ export function validateUploadServer(file: { name: string; type: string; size: n
   }
 
   return { valid: false, error: 'Tipo de archivo no especificado' };
+}
+
+export function validateUploadBuffer(
+  file: { name: string; type: string; size: number },
+  buffer: Buffer,
+  expectedType: 'image' | 'cv'
+): ValidationResult {
+  const baseValidation = validateUploadServer(file, expectedType);
+  if (!baseValidation.valid) {
+    return baseValidation;
+  }
+
+  const extension = file.name.split('.').pop()?.toLowerCase() || '';
+  const hasValidSignature =
+    expectedType === 'image'
+      ? matchesImageSignature(buffer, extension)
+      : matchesCvSignature(buffer, extension);
+
+  if (!hasValidSignature) {
+    return {
+      valid: false,
+      error:
+        expectedType === 'image'
+          ? 'El archivo no coincide con una imagen válida'
+          : 'El archivo no coincide con un documento o imagen válido',
+    };
+  }
+
+  return baseValidation;
 }
 

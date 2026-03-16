@@ -82,3 +82,4 @@ export function CategoryDropdown({ category, isActive, onSelect, onSelectSubcate
     </div>
   );
 }
+

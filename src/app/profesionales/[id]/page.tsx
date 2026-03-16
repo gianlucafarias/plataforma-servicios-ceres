@@ -6,7 +6,6 @@ import {
   MapPin, 
   Clock, 
   Phone,
-  Mail,
   Award,
   CheckCircle2,
   Instagram,
@@ -24,6 +23,7 @@ import {
   Store
 } from "lucide-react";
 import Link from "next/link";
+import { notFound } from "next/navigation";
 import WhatsAppIcon from "@/components/ui/whatsapp";
 import { checkProfessionalAvailability } from "@/lib/availability";
 import { getServerSession } from "next-auth";
@@ -56,7 +56,7 @@ type ApiProfessional = {
   verified?: boolean;
   rating?: number;
   reviewCount?: number;
-  user: { firstName: string; lastName: string; email: string; phone?: string; verified?: boolean; image?: string; location?: string | null };
+  user: { firstName: string; lastName: string; phone?: string; verified?: boolean; image?: string; location?: string | null };
   whatsapp?: string;
   instagram?: string;
   facebook?: string;
@@ -86,7 +86,7 @@ type ApiProfessional = {
 };
 
 // Función helper para obtener datos del profesional directamente desde la BD
-async function getProfessionalData(id: string): Promise<ApiProfessional | null> {
+async function getProfessionalData(id: string, viewerUserId?: string): Promise<ApiProfessional | null> {
   const professional = await prisma.professional.findUnique({
     where: { id },
     select: {
@@ -117,7 +117,6 @@ async function getProfessionalData(id: string): Promise<ApiProfessional | null> 
         select: {
           firstName: true,
           lastName: true,
-          email: true,
           phone: true,
           verified: true,
           image: true,
@@ -148,6 +147,7 @@ async function getProfessionalData(id: string): Promise<ApiProfessional | null> 
   });
 
   if (!professional) return null;
+  if (professional.status !== "active" && professional.userId !== viewerUserId) return null;
 
   return professional as unknown as ApiProfessional;
 }
@@ -218,10 +218,10 @@ export default async function ProfessionalDetailPage({ params }: { params: Promi
   const { id } = await params;
   const session = await getServerSession(authOptions);
 
-  const data = await getProfessionalData(id);
+  const data = await getProfessionalData(id, session?.user?.id);
   
   if (!data) {
-    return (
+    notFound(); /* return (
       <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white flex items-center justify-center">
         <div className="text-center">
           <p className="text-gray-600 mb-4">No se encontró el profesional.</p>
@@ -230,7 +230,7 @@ export default async function ProfessionalDetailPage({ params }: { params: Promi
           </Link>
         </div>
       </div>
-    );
+    ); */
   }
 
   // Verificar si el perfil está pendiente y si el usuario es el dueño
@@ -273,7 +273,6 @@ export default async function ProfessionalDetailPage({ params }: { params: Promi
     reviews: data.reviewCount ?? 0,
     category: data.services[0]?.category?.name,
     phone: data.user.phone || "",
-    email: data.user.email,
     whatsapp: data.whatsapp || data.user.phone || "",
     location: locationName,
     coverage: coverageLocations,
@@ -285,11 +284,12 @@ export default async function ProfessionalDetailPage({ params }: { params: Promi
     linkedin: data.linkedin,
     website: data.website,
     portfolio: data.portfolio,
-    cv: data.CV,
     schedule: data.schedule,
     holidays: data.schedule?.monday?.workOnHolidays || false,
     certifications: data.certifications || [],
   };
+
+  const ownerCv = isOwner ? data.CV : null;
 
   const mainWhatsappLink = buildWhatsAppLink(
     p.whatsapp,
@@ -342,6 +342,7 @@ export default async function ProfessionalDetailPage({ params }: { params: Promi
   };
 
   const schedule = formatSchedule();
+  const showDetailedSchedule = isOwner && !!schedule;
   const todayIndex = new Date().getDay();
   const dayKeys = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
   const todayKey = dayKeys[todayIndex];
@@ -355,7 +356,6 @@ export default async function ProfessionalDetailPage({ params }: { params: Promi
     category: p.category,
     location: p.location,
     phone: p.phone,
-    email: p.email,
     website: p.website,
     rating: p.rating,
     reviewCount: p.reviews,
@@ -724,19 +724,6 @@ export default async function ProfessionalDetailPage({ params }: { params: Promi
                     <div className="text-xs text-gray-500">Llamar ahora</div>
                   </div>
                 </a>
-                <a 
-                  href={`mailto:${p.email}`}
-                  className="flex items-center gap-3 p-3 rounded-xl bg-gray-50 hover:bg-[#006F4B]/5 transition-colors group"
-                >
-                  <div className="h-10 w-10 rounded-full bg-[#006F4B]/10 flex items-center justify-center group-hover:bg-[#006F4B]/20 transition-colors">
-                    <Mail className="h-5 w-5 text-[#006F4B]" />
-                  </div>
-                  <div className="min-w-0">
-                    <div className="font-semibold text-gray-900 truncate text-sm">{p.email}</div>
-                    <div className="text-xs text-gray-500">Enviar email</div>
-                  </div>
-                </a>
-
                 {/* Redes sociales */}
                 {p.instagram && (
                   <a
@@ -829,58 +816,73 @@ export default async function ProfessionalDetailPage({ params }: { params: Promi
             <div className="bg-white rounded-2xl shadow-sm p-5">
               <h3 className="font-bold text-gray-900 mb-4 flex items-center gap-2">
                 <CalendarDays className="h-5 w-5 text-[#006F4B]" />
-                Horarios
+                Disponibilidad
               </h3>
-              
-              {schedule ? (
-                <div className="space-y-1">
-                  {schedule.map(({ key, short, time, isOpen }) => {
-                    const isToday = key === todayKey;
-                    return (
-                      <div 
-                        key={key}
-                        className={`flex justify-between items-center py-2 px-3 rounded-lg text-sm ${
-                          isToday ? 'bg-[#006F4B]/10 font-medium' : ''
-                        }`}
-                      >
-                        <span className={isToday ? 'text-[#006F4B]' : 'text-gray-700'}>
-                          {short}
-                          {isToday && <span className="ml-1 text-[10px] bg-[#006F4B] text-white px-1.5 py-0.5 rounded uppercase">Hoy</span>}
-                        </span>
-                        <span className={isOpen ? (isToday ? 'text-[#006F4B]' : 'text-gray-600') : 'text-gray-400'}>
-                          {time}
-                        </span>
+
+              <div className="rounded-xl border border-gray-100 bg-gray-50 p-4">
+                <div className="flex items-start gap-3">
+                  <Clock className="h-5 w-5 text-[#006F4B] mt-0.5" />
+                  <div>
+                    <p className="font-medium text-gray-900">
+                      {p.availability.isAvailable ? 'Disponible en este momento' : 'Consultar disponibilidad'}
+                    </p>
+                    <p className="text-sm text-gray-600 mt-1">
+                      Los horarios detallados se coordinan por contacto directo.
+                    </p>
+                    {p.holidays && (
+                      <div className="mt-2 text-xs text-green-600 flex items-center gap-1">
+                        <CheckCircle2 className="h-3.5 w-3.5" />
+                        Atiende feriados
                       </div>
-                    );
-                  })}
-                  {p.holidays && (
-                    <div className="mt-3 text-xs text-green-600 flex items-center gap-1">
-                      <CheckCircle2 className="h-3.5 w-3.5" />
-                      Atiende feriados
-                    </div>
-                  )}
+                    )}
+                  </div>
                 </div>
-              ) : (
-                <div className="text-center py-4">
-                  <Clock className="h-8 w-8 text-gray-300 mx-auto mb-2" />
-                  <p className="text-sm text-gray-500">Consultar disponibilidad</p>
-                  {scheduleWhatsappLink && (
-                    <a
-                      href={scheduleWhatsappLink}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 text-[#006F4B] text-sm font-medium mt-2 hover:underline"
-                    >
-                      <WhatsAppIcon className="h-4 w-4" />
-                      Preguntar
-                    </a>
-                  )}
+              </div>
+
+              {scheduleWhatsappLink && (
+                <a
+                  href={scheduleWhatsappLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-[#006F4B] text-sm font-medium mt-3 hover:underline"
+                >
+                  <WhatsAppIcon className="h-4 w-4" />
+                  Consultar horario por WhatsApp
+                </a>
+              )}
+
+              {showDetailedSchedule && (
+                <div className="mt-4 border-t border-gray-100 pt-4">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-3">
+                    Vista privada del propietario
+                  </p>
+                  <div className="space-y-1">
+                    {schedule.map(({ key, short, time, isOpen }) => {
+                      const isToday = key === todayKey;
+                      return (
+                        <div 
+                          key={key}
+                          className={`flex justify-between items-center py-2 px-3 rounded-lg text-sm ${
+                            isToday ? 'bg-[#006F4B]/10 font-medium' : ''
+                          }`}
+                        >
+                          <span className={isToday ? 'text-[#006F4B]' : 'text-gray-700'}>
+                            {short}
+                            {isToday && <span className="ml-1 text-[10px] bg-[#006F4B] text-white px-1.5 py-0.5 rounded uppercase">Hoy</span>}
+                          </span>
+                          <span className={isOpen ? (isToday ? 'text-[#006F4B]' : 'text-gray-600') : 'text-gray-400'}>
+                            {time}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               )}
             </div>
 
             {/* Perfil profesional */}
-            {(p.portfolio || p.cv) && (
+            {(p.portfolio || ownerCv) && (
               <div className="bg-white rounded-2xl shadow-sm p-5">
                 <h3 className="font-bold text-gray-900 mb-4 flex items-center gap-2">
                   <Briefcase className="h-5 w-5 text-[#006F4B]" />
@@ -902,12 +904,12 @@ export default async function ProfessionalDetailPage({ params }: { params: Promi
                       <ExternalLink className="h-4 w-4 text-gray-400" />
                     </a>
                   )}
-                  {p.cv && (
+                  {ownerCv && (
                     <a
                       href={
-                        p.cv.startsWith('http')
-                          ? p.cv
-                          : `/uploads/profiles/${p.cv}`
+                        ownerCv.startsWith('http')
+                          ? ownerCv
+                          : `/uploads/profiles/${ownerCv}`
                       }
                       target="_blank"
                       rel="noopener noreferrer"
@@ -916,7 +918,7 @@ export default async function ProfessionalDetailPage({ params }: { params: Promi
                       <div className="h-9 w-9 rounded-lg bg-red-500 flex items-center justify-center">
                         <FileText className="h-5 w-5 text-white" />
                       </div>
-                      <span className="text-sm font-medium text-gray-700 flex-1">Curriculum Vitae</span>
+                      <span className="text-sm font-medium text-gray-700 flex-1">Curriculum Vitae (vista privada)</span>
                       <ExternalLink className="h-4 w-4 text-gray-400" />
                     </a>
                   )}

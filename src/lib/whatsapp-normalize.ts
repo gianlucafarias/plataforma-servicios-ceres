@@ -156,3 +156,4 @@ export function formatWhatsAppForDisplay(number: string | null | undefined): str
   
   return normalized;
 }
+

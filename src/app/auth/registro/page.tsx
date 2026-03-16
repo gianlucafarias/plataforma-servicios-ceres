@@ -183,6 +183,41 @@ export default function RegistroPage() {
     }
   };
 
+  const requestUploadGrant = async (type: "image" | "cv") => {
+    const response = await fetch("/api/upload/grant", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        context: "register",
+        type,
+      }),
+    });
+
+    const result = await response.json();
+    if (!response.ok || !result.success || !result.token) {
+      throw new Error(result.message || result.error || "Error al preparar la subida");
+    }
+
+    return result.token as string;
+  };
+
+  const uploadPublicFile = async (file: File, type: "image" | "cv") => {
+    const token = await requestUploadGrant(type);
+    const uploadFormData = new FormData();
+    uploadFormData.append("file", file);
+    uploadFormData.append("type", type);
+
+    return fetch("/api/upload", {
+      method: "POST",
+      headers: {
+        "x-upload-token": token,
+      },
+      body: uploadFormData,
+    }).then((response) => response.json());
+  };
+
   const handleServiceChange = (index: number, field: string, value: string) => {
     const newServices = [...formData.services];
     const updatedService = { ...newServices[index] };
@@ -1121,8 +1156,8 @@ export default function RegistroPage() {
                   const file = e.target.files?.[0];
                   if (file) {
                     try {
-                      const formData = new FormData();
-                      formData.append('file', file);
+                      const result = await uploadPublicFile(file, "image");
+                      /*
                       formData.append('type', 'image'); // Indicar explícitamente que es una imagen
                       
                       const response = await fetch('/api/upload', {
@@ -1130,7 +1165,7 @@ export default function RegistroPage() {
                         body: formData,
                       });
                       
-                      const result = await response.json();
+                      */
                       if (result.success) {
                         // Usar value si existe (normalizado), sino filename para local o url para R2
                         const pictureValue = result.value || (result.storage === 'r2' ? result.url : result.filename);
@@ -1170,7 +1205,8 @@ export default function RegistroPage() {
                   const file = e.target.files?.[0];
                   if (file) {
                     try {
-                      const formData = new FormData();
+                      const result = await uploadPublicFile(file, "cv");
+                      /*
                       formData.append('file', file);
                       formData.append('type', 'cv'); // Indicar explícitamente que es un CV
                       
@@ -1179,7 +1215,7 @@ export default function RegistroPage() {
                         body: formData,
                       });
                       
-                      const result = await response.json();
+                      */
                       if (result.success) {
                         handleInputChange(
                           'cv',
@@ -1484,4 +1520,3 @@ export default function RegistroPage() {
     </div>
   );
 }
-

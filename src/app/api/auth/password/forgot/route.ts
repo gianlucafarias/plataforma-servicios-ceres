@@ -1,19 +1,35 @@
-import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
-import { Resend } from "resend";
-import { getAbsoluteUrl } from "@/lib/seo";
-import crypto from "crypto";
+import crypto from 'crypto';
+import { NextRequest, NextResponse } from 'next/server';
+import { Resend } from 'resend';
+import { prisma } from '@/lib/prisma';
+import { getAbsoluteUrl } from '@/lib/seo';
+import { rateLimit, rateLimitHeaders } from '@/lib/rate-limit-memory';
+import { clientIp } from '@/lib/request-helpers';
 
-const resend = new Resend(process.env.RESEND_API_KEY || "");
+const resend = new Resend(process.env.RESEND_API_KEY || '');
+const LIMIT = 10;
+const WINDOW_MS = 10 * 60 * 1000;
 
 export async function POST(request: NextRequest) {
+  const rl = rateLimit(`forgot-password:${clientIp(request)}`, LIMIT, WINDOW_MS);
+  if (!rl.allowed) {
+    return NextResponse.json(
+      {
+        success: false,
+        error: 'rate_limited',
+        message: 'Demasiadas solicitudes. Intenta nuevamente mas tarde.',
+      },
+      { status: 429, headers: rateLimitHeaders(rl) }
+    );
+  }
+
   try {
     const { email } = (await request.json()) as { email?: string };
 
-    if (!email || typeof email !== "string") {
+    if (!email || typeof email !== 'string') {
       return NextResponse.json(
-        { success: false, error: "invalid_email" },
-        { status: 400 }
+        { success: false, error: 'invalid_email' },
+        { status: 400, headers: rateLimitHeaders(rl) }
       );
     }
 
@@ -22,17 +38,14 @@ export async function POST(request: NextRequest) {
       select: { id: true, email: true, firstName: true, password: true },
     });
 
-    // Siempre respondemos 200 para no filtrar si un email existe o no
     if (!user || !user.password) {
-      console.log("[forgot-password] No user or no password for email", email);
-      return NextResponse.json({ success: true });
+      console.log('[forgot-password] No user or no password for email', email);
+      return NextResponse.json({ success: true }, { headers: rateLimitHeaders(rl) });
     }
 
-    // Generar token seguro
-    const token = crypto.randomBytes(32).toString("hex");
-    const expiresAt = new Date(Date.now() + 1000 * 60 * 60); // 1 hora
+    const token = crypto.randomBytes(32).toString('hex');
+    const expiresAt = new Date(Date.now() + 1000 * 60 * 60);
 
-    // Opcional: invalidar tokens anteriores de este usuario
     await prisma.verificationToken.deleteMany({
       where: { userId: user.id },
     });
@@ -46,44 +59,42 @@ export async function POST(request: NextRequest) {
     });
 
     const resetUrl = getAbsoluteUrl(`/auth/reset-password?token=${token}`);
-    console.log("[forgot-password] Generated reset URL:", resetUrl);
+    console.log('[forgot-password] Generated reset URL:', resetUrl);
 
-    // Enviar email con Resend
     if (process.env.RESEND_API_KEY) {
       try {
         const result = await resend.emails.send({
-          from: "Ceres en Red <no-reply@ceresenred.ceres.gob.ar>",
+          from: 'Ceres en Red <no-reply@ceresenred.ceres.gob.ar>',
           to: user.email,
-          subject: "Restablecer tu contraseña - Ceres en Red",
+          subject: 'Restablecer tu contrasena - Ceres en Red',
           html: `
-          <p>Hola ${user.firstName || ""},</p>
-          <p>Recibimos un pedido para restablecer tu contraseña en <strong>Ceres en Red</strong>.</p>
-          <p>Hacé clic en el siguiente botón para crear una nueva contraseña:</p>
+          <p>Hola ${user.firstName || ''},</p>
+          <p>Recibimos un pedido para restablecer tu contrasena en <strong>Ceres en Red</strong>.</p>
+          <p>Hace clic en el siguiente boton para crear una nueva contrasena:</p>
           <p>
             <a href="${resetUrl}" 
                style="display:inline-block;padding:10px 18px;background:#006F4B;color:#ffffff;text-decoration:none;border-radius:6px;font-weight:bold;">
-              Restablecer contraseña
+              Restablecer contrasena
             </a>
           </p>
-          <p>Si no fuiste vos, podés ignorar este correo.</p>
-          <p>Este enlace será válido por 1 hora.</p>
+          <p>Si no fuiste vos, podes ignorar este correo.</p>
+          <p>Este enlace sera valido por 1 hora.</p>
         `,
         });
-        console.log("[forgot-password] Resend response:", result);
+        console.log('[forgot-password] Resend response:', result);
       } catch (emailError) {
-        console.error("[forgot-password] Error enviando email con Resend:", emailError);
+        console.error('[forgot-password] Error enviando email con Resend:', emailError);
       }
     } else {
-      console.warn("[forgot-password] RESEND_API_KEY no está configurada. No se envió el email.");
+      console.warn('[forgot-password] RESEND_API_KEY no esta configurada. No se envio el email.');
     }
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true }, { headers: rateLimitHeaders(rl) });
   } catch (error) {
-    console.error("[forgot-password] Error en endpoint:", error);
+    console.error('[forgot-password] Error en endpoint:', error);
     return NextResponse.json(
-      { success: false, error: "server_error" },
-      { status: 500 }
+      { success: false, error: 'server_error' },
+      { status: 500, headers: rateLimitHeaders(rl) }
     );
   }
 }
-

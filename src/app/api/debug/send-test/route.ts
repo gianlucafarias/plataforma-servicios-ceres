@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { sendMail } from '@/lib/mail'
+import { isProductionRuntime } from '@/lib/request-helpers'
 
 export async function POST(request: NextRequest) {
+  if (isProductionRuntime()) {
+    return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  }
+
   try {
     const { to } = await request.json()
     if (!to) return NextResponse.json({ error: 'Falta "to"' }, { status: 400 })

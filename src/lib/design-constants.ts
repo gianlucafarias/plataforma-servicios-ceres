@@ -100,3 +100,4 @@ export const COMPONENT_CLASSES = {
   // Badge
   badge: `px-3 py-1.5 ${UTILITY_CLASSES.roundedFull} text-sm font-medium ${UTILITY_CLASSES.transition}`,
 } as const;
+
