@@ -1,38 +1,28 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { rateLimit, rateLimitHeaders } from '@/lib/rate-limit-memory';
+import { clientIp } from '@/lib/request-helpers';
 
-/**
- * POST /api/support/contact
- * Crea un reporte de contacto/soporte genérico (usa el modelo BugReport).
- *
- * Body:
- * - name?: string
- * - email: string (obligatorio si no hay usuario autenticado)
- * - topic: "general" | "bug" | "improvement"
- * - message: string
- * - origin?: string
- * - url?: string
- * - context?: any
- * - website?: string (honeypot, debe venir vacío)
- * - openedAt?: number (timestamp ms en cliente, para validar tiempo mínimo)
- */
+const LIMIT = 20;
+const WINDOW_MS = 10 * 60 * 1000;
+
 export async function POST(request: NextRequest) {
+  const rl = rateLimit(`support-contact:${clientIp(request)}`, LIMIT, WINDOW_MS);
+  if (!rl.allowed) {
+    return NextResponse.json(
+      {
+        success: false,
+        error: 'rate_limited',
+        message: 'Demasiadas solicitudes. Intenta nuevamente mas tarde.',
+      },
+      { status: 429, headers: rateLimitHeaders(rl) }
+    );
+  }
+
   try {
     const body = await request.json();
+    const { name, email, topic, message, origin, url, context, website, openedAt } = body ?? {};
 
-    const {
-      name,
-      email,
-      topic,
-      message,
-      origin,
-      url,
-      context,
-      website,
-      openedAt,
-    } = body ?? {};
-
-    // Honeypot
     if (typeof website === 'string' && website.trim().length > 0) {
       return NextResponse.json(
         {
@@ -40,11 +30,10 @@ export async function POST(request: NextRequest) {
           data: { ignored: true },
           message: 'Mensaje recibido.',
         },
-        { status: 200 },
+        { status: 200, headers: rateLimitHeaders(rl) }
       );
     }
 
-    // Tiempo mínimo (2s)
     if (typeof openedAt === 'number' && openedAt > 0) {
       const elapsed = Date.now() - openedAt;
       if (elapsed < 2000) {
@@ -54,7 +43,7 @@ export async function POST(request: NextRequest) {
             data: { ignored: true },
             message: 'Mensaje recibido.',
           },
-          { status: 200 },
+          { status: 200, headers: rateLimitHeaders(rl) }
         );
       }
     }
@@ -66,7 +55,7 @@ export async function POST(request: NextRequest) {
           error: 'validation_error',
           message: 'El email es obligatorio.',
         },
-        { status: 400 },
+        { status: 400, headers: rateLimitHeaders(rl) }
       );
     }
 
@@ -77,16 +66,13 @@ export async function POST(request: NextRequest) {
           error: 'validation_error',
           message: 'El mensaje es obligatorio.',
         },
-        { status: 400 },
+        { status: 400, headers: rateLimitHeaders(rl) }
       );
     }
 
-    const normalizedTopic =
-      topic === 'bug' || topic === 'improvement' ? topic : 'general';
-
+    const normalizedTopic = topic === 'bug' || topic === 'improvement' ? topic : 'general';
     const severity =
       normalizedTopic === 'bug' ? 'high' : normalizedTopic === 'improvement' ? 'medium' : 'low';
-
     const titleBase =
       normalizedTopic === 'bug'
         ? 'Reporte de problema desde la web'
@@ -122,7 +108,7 @@ export async function POST(request: NextRequest) {
         data: { id: report.id },
         message: 'Tu mensaje fue enviado. Gracias por contactarnos.',
       },
-      { status: 201 },
+      { status: 201, headers: rateLimitHeaders(rl) }
     );
   } catch (error) {
     console.error('Error creando contacto de soporte:', error);
@@ -130,10 +116,9 @@ export async function POST(request: NextRequest) {
       {
         success: false,
         error: 'server_error',
-        message: 'No se pudo enviar tu mensaje. Intenta nuevamente más tarde.',
+        message: 'No se pudo enviar tu mensaje. Intenta nuevamente mas tarde.',
       },
-      { status: 500 },
+      { status: 500, headers: rateLimitHeaders(rl) }
     );
   }
 }
-

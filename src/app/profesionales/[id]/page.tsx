@@ -6,7 +6,6 @@ import {
   MapPin, 
   Clock, 
   Phone,
-  Mail,
   Award,
   CheckCircle2,
   Instagram,
@@ -24,132 +23,28 @@ import {
   Store
 } from "lucide-react";
 import Link from "next/link";
+import { notFound } from "next/navigation";
 import WhatsAppIcon from "@/components/ui/whatsapp";
 import { checkProfessionalAvailability } from "@/lib/availability";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/options";
 import type { Metadata } from "next";
 import { getBaseUrl, generateProfessionalStructuredData, generateBreadcrumbsStructuredData } from "@/lib/seo";
-import { prisma } from "@/lib/prisma";
 import { buildWhatsAppLink } from "@/lib/whatsapp";
 import { ProfileViewTracker } from "@/components/features/ProfileViewTracker";
+import {
+  getProfessionalProfileContext,
+  toProfessionalPageProfile,
+  type ProfessionalPageProfile,
+} from "@/lib/server/professional-profile";
 
-type TimeSlot = {
-  enabled: boolean;
-  start: string;
-  end: string;
-};
-
-type DaySchedule = {
-  fullDay?: boolean;
-  morning?: TimeSlot;
-  afternoon?: TimeSlot;
-  workOnHolidays?: boolean;
-};
-
-type ApiProfessional = {
-  id: string;
-  userId?: string;
-  status?: 'pending' | 'active' | 'suspended';
-  bio: string;
-  experienceYears?: number;
-  verified?: boolean;
-  rating?: number;
-  reviewCount?: number;
-  user: { firstName: string; lastName: string; email: string; phone?: string; verified?: boolean; image?: string; location?: string | null };
-  whatsapp?: string;
-  instagram?: string;
-  facebook?: string;
-  linkedin?: string;
-  website?: string;
-  portfolio?: string;
-  CV?: string;
-  ProfilePicture?: string;
-  location?: string;
-  specialties?: string[];
-  professionalGroup?: 'oficios' | 'profesiones';
-  serviceLocations?: string[];
-  hasPhysicalStore?: boolean;
-  physicalStoreAddress?: string;
-  schedule?: Record<string, DaySchedule>;
-  services: { title: string; description?: string; priceRange?: string; category?: { name?: string; slug?: string } }[];
-  certifications?: Array<{
-    id: string;
-    certificationType: string;
-    certificationNumber: string;
-    issuingOrganization: string;
-    issueDate: string | null;
-    expiryDate: string | null;
-    documentUrl: string | null;
-    category?: { id: string; name: string; slug: string } | null;
-  }>;
-};
+type ApiProfessional = ProfessionalPageProfile;
 
 // Función helper para obtener datos del profesional directamente desde la BD
-async function getProfessionalData(id: string): Promise<ApiProfessional | null> {
-  const professional = await prisma.professional.findUnique({
-    where: { id },
-    select: {
-      id: true,
-      userId: true,
-      status: true,
-      bio: true,
-      experienceYears: true,
-      verified: true,
-      rating: true,
-      reviewCount: true,
-      specialties: true,
-      professionalGroup: true,
-      whatsapp: true,
-      instagram: true,
-      facebook: true,
-      linkedin: true,
-      website: true,
-      portfolio: true,
-      CV: true,
-      ProfilePicture: true,
-      location: true,
-      serviceLocations: true,
-      hasPhysicalStore: true,
-      physicalStoreAddress: true,
-      schedule: true,
-      user: {
-        select: {
-          firstName: true,
-          lastName: true,
-          email: true,
-          phone: true,
-          verified: true,
-          image: true,
-          location: true,
-        },
-      },
-      services: {
-        where: { available: true },
-        orderBy: { createdAt: "asc" },
-        include: {
-          category: { select: { name: true, slug: true } },
-        },
-      },
-      certifications: {
-        where: { status: "approved" },
-        include: {
-          category: {
-            select: {
-              id: true,
-              name: true,
-              slug: true,
-            },
-          },
-        },
-        orderBy: { createdAt: "desc" },
-      },
-    },
-  });
-
-  if (!professional) return null;
-
-  return professional as unknown as ApiProfessional;
+async function getProfessionalData(id: string, viewerUserId?: string): Promise<ApiProfessional | null> {
+  const context = await getProfessionalProfileContext(id, viewerUserId);
+  if (!context.found) return null;
+  return toProfessionalPageProfile(context);
 }
 
 // Generar metadata dinámica para SEO
@@ -218,10 +113,10 @@ export default async function ProfessionalDetailPage({ params }: { params: Promi
   const { id } = await params;
   const session = await getServerSession(authOptions);
 
-  const data = await getProfessionalData(id);
+  const data = await getProfessionalData(id, session?.user?.id);
   
   if (!data) {
-    return (
+    notFound(); /* return (
       <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white flex items-center justify-center">
         <div className="text-center">
           <p className="text-gray-600 mb-4">No se encontró el profesional.</p>
@@ -230,7 +125,7 @@ export default async function ProfessionalDetailPage({ params }: { params: Promi
           </Link>
         </div>
       </div>
-    );
+    ); */
   }
 
   // Verificar si el perfil está pendiente y si el usuario es el dueño
@@ -272,9 +167,8 @@ export default async function ProfessionalDetailPage({ params }: { params: Promi
     rating: data.rating ?? 0,
     reviews: data.reviewCount ?? 0,
     category: data.services[0]?.category?.name,
-    phone: data.user.phone || "",
-    email: data.user.email,
-    whatsapp: data.whatsapp || data.user.phone || "",
+    phone: data.user.phone?.trim() || "",
+    whatsapp: data.whatsapp?.trim() || data.user.phone?.trim() || "",
     location: locationName,
     coverage: coverageLocations,
     picture: data.ProfilePicture || data.user.image, // Fallback a imagen de OAuth
@@ -285,11 +179,12 @@ export default async function ProfessionalDetailPage({ params }: { params: Promi
     linkedin: data.linkedin,
     website: data.website,
     portfolio: data.portfolio,
-    cv: data.CV,
     schedule: data.schedule,
     holidays: data.schedule?.monday?.workOnHolidays || false,
     certifications: data.certifications || [],
   };
+
+  const ownerCv = isOwner ? data.CV : null;
 
   const mainWhatsappLink = buildWhatsAppLink(
     p.whatsapp,
@@ -301,12 +196,50 @@ export default async function ProfessionalDetailPage({ params }: { params: Promi
     `Hola ${p.name}, vi tu perfil en Ceres en Red y me gustaría consultar por tus servicios.`
   );
 
+  void servicesWhatsappLink;
+
   const scheduleWhatsappLink = buildWhatsAppLink(
     p.whatsapp,
     `Hola ${p.name}, quería consultar tu disponibilidad horaria.`
   );
 
-  
+  // Formatear horarios
+  const hasWhatsapp = !!mainWhatsappLink;
+  const hasPhone = !!p.phone;
+  const hasContactDetails = hasPhone || !!p.instagram || !!p.facebook || !!p.linkedin || !!p.website;
+  const availabilityLabel = p.availability.isAvailable
+    ? "Disponible en este momento"
+    : "Disponibilidad a coordinar";
+  const availabilityDescription = p.availability.isAvailable
+    ? "Responde por contacto directo para confirmar horario y alcance."
+    : "Consulta por WhatsApp o llamada para coordinar dia y horario.";
+  const reviewsLabel = `${p.reviews} resena${p.reviews === 1 ? "" : "s"}`;
+  const normalizedInstagram = p.instagram?.replace("@", "").trim();
+  const normalizedFacebook = p.facebook?.trim();
+  const normalizedLinkedin = p.linkedin?.trim();
+  const normalizedWebsite = p.website?.trim();
+  const normalizedPortfolio = p.portfolio?.trim();
+  const portfolioHref = normalizedPortfolio
+    ? normalizedPortfolio.startsWith("http")
+      ? normalizedPortfolio
+      : `https://${normalizedPortfolio}`
+    : null;
+  const websiteHref = normalizedWebsite
+    ? normalizedWebsite.startsWith("http")
+      ? normalizedWebsite
+      : `https://${normalizedWebsite}`
+    : null;
+  const linkedinHref = normalizedLinkedin
+    ? normalizedLinkedin.startsWith("http")
+      ? normalizedLinkedin
+      : `https://linkedin.com/${normalizedLinkedin.replace(/^\/+/, "").replace(/^in\//, "in/")}`
+    : null;
+  const ownerCvHref = ownerCv
+    ? ownerCv.startsWith("http")
+      ? ownerCv
+      : `/uploads/profiles/${ownerCv}`
+    : null;
+
   // Formatear horarios
   const formatSchedule = () => {
     if (!p.schedule) return null;
@@ -342,6 +275,7 @@ export default async function ProfessionalDetailPage({ params }: { params: Promi
   };
 
   const schedule = formatSchedule();
+  const showDetailedSchedule = isOwner && !!schedule;
   const todayIndex = new Date().getDay();
   const dayKeys = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
   const todayKey = dayKeys[todayIndex];
@@ -354,9 +288,8 @@ export default async function ProfessionalDetailPage({ params }: { params: Promi
     bio: p.bio,
     category: p.category,
     location: p.location,
-    phone: p.phone,
-    email: p.email,
-    website: p.website,
+    phone: p.phone || undefined,
+    website: p.website || undefined,
     rating: p.rating,
     reviewCount: p.reviews,
     services: p.services.map(s => ({ title: s.title, description: s.description })),
@@ -366,7 +299,7 @@ export default async function ProfessionalDetailPage({ params }: { params: Promi
   // Breadcrumbs
   const breadcrumbsData = generateBreadcrumbsStructuredData([
     { name: "Inicio", url: baseUrl },
-    { name: "Profesionales", url: `${baseUrl}/servicios` },
+    { name: "Profesionales", url: `${baseUrl}/profesionales` },
     { name: p.name, url: `${baseUrl}/profesionales/${id}` },
   ]);
 
@@ -411,120 +344,148 @@ export default async function ProfessionalDetailPage({ params }: { params: Promi
       {/* Registrar visita al perfil (cliente, throttled) */}
       <ProfileViewTracker professionalId={data.id} />
 
-      {/* Hero compacto */}
-      <div className="bg-gradient-to-r from-[#006F4B] to-[#00875A]">
-        <div className="container mx-auto px-4 py-6">
+      {/* Hero */}
+      <div className="bg-gradient-to-r from-[#006F4B] via-[#007B54] to-[#00875A]">
+        <div className="container mx-auto px-4 py-5 lg:py-6">
           {/* Back */}
           <Link 
             href="/profesionales" 
-            className="inline-flex items-center gap-1.5 text-white/70 hover:text-white text-sm mb-4"
+            className="mb-4 inline-flex items-center gap-1.5 text-sm text-white/80 transition-colors hover:text-white"
           >
             <ArrowLeft className="h-4 w-4" />
             Ver más profesionales
           </Link>
 
-          <div className="flex flex-col lg:flex-row gap-6 items-start">
+          <div className="rounded-[28px] border border-white/10 bg-white/10 p-5 shadow-[0_24px_60px_rgba(0,0,0,0.08)] backdrop-blur-sm lg:p-6">
+            <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start lg:gap-8">
             {/* Info principal */}
-            <div className="flex gap-4 lg:gap-6 flex-1">
+            <div className="flex flex-col gap-4 sm:flex-row sm:gap-5">
               <div className="relative inline-flex flex-shrink-0 self-start items-center justify-center">
                 <ProfessionalAvatar
                   name={p.name}
-                  profilePicture={p.picture}
-                  className="h-24 w-24 lg:h-28 lg:w-28 ring-4 ring-white/20 shadow-xl"
+                  profilePicture={p.picture || undefined}
+                  className="h-24 w-24 ring-4 ring-white/20 shadow-xl lg:h-28 lg:w-28"
                 />
                 {p.verified && (
                   <div
-                    className="absolute -bottom-1 -right-1 lg:-bottom-1 lg:-right-1 bg-white rounded-full p-0.5 shadow-lg z-10"
+                    className="absolute -bottom-1 -right-1 rounded-full bg-white p-0.5 shadow-lg"
                     title="Certificado"
                     aria-label="Certificado"
                   >
-                    <Image src="/verificado.png" alt="Certificado" width={24} height={24} className="w-6 h-6 lg:w-6 lg:h-6" />
+                    <Image src="/verificado.png" alt="Certificado" width={24} height={24} className="h-6 w-6" />
                   </div>
                 )}
               </div>
               
-              <div className="flex-1 min-w-0 text-white">
-                <h1 className="text-2xl lg:text-3xl font-bold mb-1">{p.name}</h1>
-                <p className="text-white/80 text-lg mb-3">{p.category}</p>
-                
-                <div className="flex flex-wrap gap-2 text-sm">
-                  <span className="inline-flex items-center gap-1.5 bg-white/15 backdrop-blur-sm px-3 py-1.5 rounded-full">
+              <div className="min-w-0 flex-1 text-white">
+                <h1 className="text-3xl font-bold tracking-tight lg:text-4xl">{p.name}</h1>
+                {p.category && <p className="mt-1 text-base text-white/80 lg:text-lg">{p.category}</p>}
+
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-white/14 px-3 py-1.5 text-sm text-white">
                     <MapPin className="h-3.5 w-3.5" />
                     {p.location || "Ceres, Santa Fe, Argentina"}
                   </span>
-                  <span className="inline-flex items-center gap-1.5 bg-white/15 backdrop-blur-sm px-3 py-1.5 rounded-full">
+                  {p.years > 0 && (
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-white/14 px-3 py-1.5 text-sm text-white">
                     <Award className="h-3.5 w-3.5" />
-                    {p.years} años exp.
-                  </span>
-                  <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full ${
+                    {p.years} anos de experiencia
+                    </span>
+                  )}
+                  {p.reviews > 0 && (
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-white/14 px-3 py-1.5 text-sm text-white">
+                      <Star className="h-3.5 w-3.5 fill-current" />
+                      {p.rating.toFixed(1)} · {reviewsLabel}
+                    </span>
+                  )}
+                  <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm ${
                     p.availability.isAvailable 
-                      ? 'bg-green-400/30 text-green-100' 
-                      : 'bg-white/15'
+                      ? 'bg-green-400/25 text-green-50'
+                      : 'bg-white/14 text-white'
                   }`}>
-                    <span className={`h-2 w-2 rounded-full ${p.availability.isAvailable ? 'bg-green-400 animate-pulse' : 'bg-white/50'}`} />
-                    {p.availability.isAvailable ? 'Disponible' : 'No disponible'}
+                    <span className={`h-2 w-2 rounded-full ${p.availability.isAvailable ? 'bg-green-300 animate-pulse' : 'bg-white/55'}`} />
+                    {availabilityLabel}
                   </span>
                 </div>
               </div>
             </div>
 
             {/* CTAs */}
-            <div className="flex gap-3 w-full lg:w-auto">
-              {mainWhatsappLink && (
+            <div className="flex flex-col gap-3 lg:w-[280px] lg:self-center">
+              {hasWhatsapp && (
                 <a
                   href={mainWhatsappLink}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex-1 lg:flex-none flex items-center justify-center gap-2 bg-white text-[#006F4B] hover:bg-gray-50 py-3 px-6 rounded-xl font-bold transition-all shadow-lg"
+                  className="flex w-full items-center justify-center gap-2 rounded-full bg-[#25D366] px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-[#20BD5C]"
                 >
-                  <WhatsAppIcon className="h-5 w-5" />
-                  <span>Contactar</span>
+                  <WhatsAppIcon className="h-4 w-4" />
+                  Contactar por WhatsApp
                 </a>
               )}
-              <a
-                href={`tel:${p.phone}`}
-                className="flex items-center justify-center gap-2 bg-white/15 hover:bg-white/25 text-white py-3 px-4 rounded-xl font-medium transition-all border border-white/20"
-                title="Llamar"
-              >
-                <Phone className="h-5 w-5" />
-              </a>
+              {hasPhone && (
+                <a
+                  href={`tel:${p.phone}`}
+                  className="flex w-full items-center justify-center gap-2 rounded-full border border-white/20 bg-white/12 px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-white/20"
+                  aria-label={`Llamar a ${p.name}`}
+                >
+                  <Phone className="h-4 w-4" />
+                  Llamar
+                </a>
+              )}
+              {!hasWhatsapp && !hasPhone && (
+                  <div className="px-1 py-2 text-sm text-white/80">
+                    Los datos de contacto se estan actualizando. Mientras tanto, revisa la informacion del perfil.
+                  </div>
+              )}
+            </div>
             </div>
           </div>
         </div>
       </div>
 
       {/* Contenido */}
-      <div className="container mx-auto px-4 py-6">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="container mx-auto px-4 py-8 pb-28 lg:pb-10">
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3 lg:gap-8">
           
           {/* Columna principal */}
-          <div className="lg:col-span-2 space-y-5">
+          <div className="space-y-6 lg:col-span-2">
             
             {/* Card: Presentación + Qué hace */}
-            <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
+            <div className="overflow-hidden rounded-[28px] border border-gray-100 bg-white shadow-sm">
               {/* Bio */}
-              <div className="p-6 border-b border-gray-100">
+              <div className="border-b border-gray-100 px-6 py-6 lg:px-8">
+                <h2 className="text-xl font-semibold text-gray-900">Sobre este profesional</h2>
                 <p className="text-gray-700 leading-relaxed">{p.bio || 'Este profesional aún no ha agregado una descripción.'}</p>
               </div>
               
               {/* Servicios - Rediseñado */}
-              <div className="p-6">
-                <h2 className="font-bold text-gray-900 mb-4 flex items-center gap-2">
+              <div className="px-6 py-6 lg:px-8">
+                <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                  <div>
+                    <h2 className="text-xl font-semibold text-gray-900">
                   {p.services.length === 1 ? 'Servicio' : 'Servicios'}
-                </h2>
+                    </h2>
+                  </div>
+                  {p.services.length > 1 && (
+                    <Badge className="rounded-full border border-[#006F4B]/10 bg-[#006F4B]/5 px-3 py-1 text-[#006F4B] shadow-none hover:bg-[#006F4B]/5">
+                      {p.services.length} servicios
+                    </Badge>
+                  )}
+                </div>
                 
                 <div className="space-y-3">
                   {p.services.map((service, i) => (
                     <div key={i} className="group">
-                      <div className="flex items-start gap-3 p-4 rounded-xl bg-gradient-to-r from-[#006F4B]/5 to-transparent border border-[#006F4B]/10 hover:border-[#006F4B]/30 transition-all">
-                        <div className="h-10 w-10 rounded-lg bg-[#006F4B] flex items-center justify-center flex-shrink-0">
+                      <div className="flex items-start gap-3 rounded-2xl border border-gray-100 bg-gray-50/70 p-4 transition-all hover:border-[#006F4B]/20 hover:bg-white">
+                        <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-[#006F4B]">
                           <CheckCircle2 className="h-5 w-5 text-white" />
                         </div>
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-center justify-between gap-2 mb-1">
-                            <h3 className="font-semibold text-gray-900 text-lg">{service.title}</h3>
+                          <div className="mb-1 flex items-center justify-between gap-2">
+                            <h3 className="text-lg font-semibold text-gray-900">{service.title}</h3>
                             {service.priceRange && (
-                              <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100 border-0 text-xs">
+                              <Badge className="rounded-full border border-[#006F4B]/10 bg-[#006F4B]/5 text-xs text-[#006F4B] shadow-none hover:bg-[#006F4B]/5">
                                 {service.priceRange}
                               </Badge>
                             )}
@@ -541,17 +502,20 @@ export default async function ProfessionalDetailPage({ params }: { params: Promi
                 </div>
                 
                 {/* CTA secundario */}
-                <div className="mt-5 p-4 bg-gray-50 rounded-xl border border-dashed border-gray-200">
-                  <p className="text-sm text-gray-600 mb-3">
+                <div className="mt-6 rounded-2xl border border-[#006F4B]/10 bg-[#006F4B]/5 p-4">
+                  <p className="mb-2 text-sm font-medium text-gray-900">
                     <MessageCircle className="h-4 w-4 inline mr-1.5 text-[#006F4B]" />
                     ¿Necesitas alguno de estos servicios?
+                  </p>
+                  <p className="text-sm text-gray-600">
+                    Coordina alcance, tiempos y presupuesto directamente con este profesional.
                   </p>
                   {servicesWhatsappLink && (
                     <a
                       href={servicesWhatsappLink}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center gap-2 bg-[#25D366] text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-[#20BD5C] transition-colors"
+                      className="mt-4 inline-flex items-center gap-2 rounded-full border border-[#006F4B]/15 bg-white px-4 py-2 text-sm font-medium text-[#006F4B] transition-colors hover:border-[#006F4B]/30"
                     >
                       <WhatsAppIcon className="h-4 w-4" />
                       Pedir presupuesto
@@ -561,23 +525,7 @@ export default async function ProfessionalDetailPage({ params }: { params: Promi
               </div>
             </div>
 
-            {/* Zona de cobertura */}
-            {p.coverage.length > 0 && (
-              <div className="bg-white rounded-2xl shadow-sm p-6">
-                <h2 className="font-bold text-gray-900 mb-3 flex items-center gap-2">
-                  <MapPin className="h-5 w-5 text-[#006F4B]" />
-                  También trabaja en
-                </h2>
-                <div className="flex flex-wrap gap-2">
-                  {p.coverage.map((loc, i) => (
-                    <span key={i} className="inline-flex items-center gap-1.5 bg-blue-50 text-blue-700 px-3 py-1.5 rounded-full text-sm">
-                      <MapPin className="h-3.5 w-3.5" />
-                      {loc}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
+            {/*
 
             {/* Reseñas - Solo si hay */}
             {p.reviews > 0 && (
@@ -599,14 +547,15 @@ export default async function ProfessionalDetailPage({ params }: { params: Promi
                 </div>
               </div>
             )}
-
             {/* Certificaciones - Solo si hay certificaciones aprobadas */}
             {p.certifications && p.certifications.length > 0 && (
-              <div className="bg-white rounded-2xl shadow-sm p-6">
-                <h2 className="font-bold text-gray-900 mb-4 flex items-center gap-2">
-                  <Award className="h-5 w-5 text-[#006F4B]" />
-                  Certificaciones profesionales
-                </h2>
+              <div className="rounded-[28px] border border-gray-100 bg-white p-6 shadow-sm lg:p-8">
+                <div className="mb-5">
+                  <h2 className="flex items-center gap-2 text-xl font-semibold text-gray-900">
+                    <Award className="h-5 w-5 text-[#006F4B]" />
+                    Certificaciones profesionales
+                  </h2>
+                </div>
                 <div className="space-y-4">
                   {p.certifications.map((cert) => {
                     const getCertificationTypeLabel = (type: string) => {
@@ -627,7 +576,7 @@ export default async function ProfessionalDetailPage({ params }: { params: Promi
                     return (
                       <div
                         key={cert.id}
-                        className="p-4 rounded-xl border border-gray-200 bg-white"
+                        className="rounded-2xl border border-gray-200 bg-gray-50/70 p-4"
                       >
                         <div className="flex items-start justify-between gap-3 mb-2">
                           <div className="flex-1">
@@ -703,116 +652,156 @@ export default async function ProfessionalDetailPage({ params }: { params: Promi
           </div>
 
           {/* Sidebar */}
-          <div className="space-y-5">
+          <div className="self-start lg:sticky lg:top-24">
+            <div className="rounded-[28px] border border-gray-100 bg-white p-5 shadow-sm lg:p-6">
+              <h2 className="text-xl font-semibold text-gray-900">Contacto y datos del perfil</h2>
+              <p className="mt-2 text-sm leading-relaxed text-gray-600">
+                Informacion practica para coordinar con {p.name.split(" ")[0]} sin salir de la ficha.
+              </p>
+
+              <div className="mt-6 space-y-6">
             
             {/* Contacto directo */}
-            <div className="bg-white rounded-2xl shadow-sm p-5">
-              <h3 className="font-bold text-gray-900 mb-4 flex items-center gap-2">
+            <div className="border-t border-gray-100 pt-6">
+              <h3 className="mb-4 flex items-center gap-2 text-sm font-semibold text-gray-900">
                 <Phone className="h-5 w-5 text-[#006F4B]" />
                 Contacto directo
               </h3>
               <div className="space-y-3">
-                <a 
-                  href={`tel:${p.phone}`}
-                  className="flex items-center gap-3 p-3 rounded-xl bg-gray-50 hover:bg-[#006F4B]/5 transition-colors group"
-                >
-                  <div className="h-10 w-10 rounded-full bg-[#006F4B]/10 flex items-center justify-center group-hover:bg-[#006F4B]/20 transition-colors">
-                    <Phone className="h-5 w-5 text-[#006F4B]" />
-                  </div>
-                  <div>
-                    <div className="font-semibold text-gray-900">{p.phone}</div>
-                    <div className="text-xs text-gray-500">Llamar ahora</div>
-                  </div>
-                </a>
-                <a 
-                  href={`mailto:${p.email}`}
-                  className="flex items-center gap-3 p-3 rounded-xl bg-gray-50 hover:bg-[#006F4B]/5 transition-colors group"
-                >
-                  <div className="h-10 w-10 rounded-full bg-[#006F4B]/10 flex items-center justify-center group-hover:bg-[#006F4B]/20 transition-colors">
-                    <Mail className="h-5 w-5 text-[#006F4B]" />
-                  </div>
-                  <div className="min-w-0">
-                    <div className="font-semibold text-gray-900 truncate text-sm">{p.email}</div>
-                    <div className="text-xs text-gray-500">Enviar email</div>
-                  </div>
-                </a>
-
+                {hasPhone && (
+                  <a 
+                    href={`tel:${p.phone}`}
+                    className="flex items-center gap-3 rounded-2xl bg-gray-50 p-3 transition-colors hover:bg-[#006F4B]/5 group"
+                  >
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#006F4B]/10 transition-colors group-hover:bg-[#006F4B]/15">
+                      <Phone className="h-5 w-5 text-[#006F4B]" />
+                    </div>
+                    <div>
+                      <div className="font-semibold text-gray-900">{p.phone}</div>
+                      <div className="text-xs text-gray-500">Llamar ahora</div>
+                    </div>
+                  </a>
+                )}
                 {/* Redes sociales */}
-                {p.instagram && (
+                {normalizedInstagram && (
                   <a
-                    href={`https://instagram.com/${p.instagram.replace('@', '')}`}
+                    href={`https://instagram.com/${normalizedInstagram}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="flex items-center gap-3 p-3 rounded-xl bg-gray-50 hover:bg-[#006F4B]/5 transition-colors group"
                   >
-                    <div className="h-10 w-10 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
-                      <Instagram className="h-5 w-5 text-white" />
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#006F4B]/10">
+                      <Instagram className="h-5 w-5 text-[#006F4B]" />
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="font-semibold text-gray-900 text-sm">Instagram</div>
-                      <div className="text-xs text-gray-500 truncate">{p.instagram}</div>
+                        <div className="text-xs text-gray-500 truncate">@{normalizedInstagram}</div>
                     </div>
                     <ExternalLink className="h-4 w-4 text-gray-400" />
                   </a>
                 )}
-                {p.facebook && (
+                {normalizedFacebook && (
                   <a
-                    href={`https://facebook.com/${p.facebook}`}
+                    href={`https://facebook.com/${normalizedFacebook}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="flex items-center gap-3 p-3 rounded-xl bg-gray-50 hover:bg-[#006F4B]/5 transition-colors group"
                   >
-                    <div className="h-10 w-10 rounded-full bg-blue-600 flex items-center justify-center">
-                      <Facebook className="h-5 w-5 text-white" />
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#006F4B]/10">
+                      <Facebook className="h-5 w-5 text-[#006F4B]" />
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="font-semibold text-gray-900 text-sm">Facebook</div>
-                      <div className="text-xs text-gray-500 truncate">{p.facebook}</div>
+                        <div className="text-xs text-gray-500 truncate">{normalizedFacebook}</div>
                     </div>
                     <ExternalLink className="h-4 w-4 text-gray-400" />
                   </a>
                 )}
-                {p.linkedin && (
+                {linkedinHref && normalizedLinkedin && (
                   <a
-                    href={`https://linkedin.com/in/${p.linkedin.replace('/in/', '').replace('/', '')}`}
+                    href={linkedinHref}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="flex items-center gap-3 p-3 rounded-xl bg-gray-50 hover:bg-[#006F4B]/5 transition-colors group"
                   >
-                    <div className="h-10 w-10 rounded-full bg-blue-700 flex items-center justify-center">
-                      <Linkedin className="h-5 w-5 text-white" />
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#006F4B]/10">
+                      <Linkedin className="h-5 w-5 text-[#006F4B]" />
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="font-semibold text-gray-900 text-sm">LinkedIn</div>
-                      <div className="text-xs text-gray-500 truncate">{p.linkedin}</div>
+                        <div className="text-xs text-gray-500 truncate">{normalizedLinkedin}</div>
                     </div>
                     <ExternalLink className="h-4 w-4 text-gray-400" />
                   </a>
                 )}
-                {p.website && (
+                {websiteHref && normalizedWebsite && (
                   <a
-                    href={p.website}
+                    href={websiteHref}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="flex items-center gap-3 p-3 rounded-xl bg-gray-50 hover:bg-[#006F4B]/5 transition-colors group"
                   >
-                    <div className="h-10 w-10 rounded-full bg-gray-700 flex items-center justify-center">
-                      <Globe className="h-5 w-5 text-white" />
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#006F4B]/10">
+                      <Globe className="h-5 w-5 text-[#006F4B]" />
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="font-semibold text-gray-900 text-sm">Sitio web</div>
-                      <div className="text-xs text-gray-500 truncate">{p.website}</div>
+                        <div className="text-xs text-gray-500 truncate">{normalizedWebsite}</div>
                     </div>
                     <ExternalLink className="h-4 w-4 text-gray-400" />
+                  </a>
+                )}
+                {!hasContactDetails && !hasWhatsapp && (
+                  <p className="rounded-2xl bg-gray-50 px-4 py-3 text-sm text-gray-500">
+                    Este perfil todavia no publico canales adicionales de contacto.
+                  </p>
+                )}
+                {hasWhatsapp && (
+                  <a
+                    href={mainWhatsappLink}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 text-sm font-medium text-[#006F4B] hover:underline"
+                  >
+                    <WhatsAppIcon className="h-4 w-4" />
+                    Escribir por WhatsApp
                   </a>
                 )}
               </div>
             </div>
 
             {/* Local Físico - Solo si tiene (moved to sidebar) */}
+            <div className="border-t border-gray-100 pt-6">
+              <h3 className="mb-4 flex items-center gap-2 text-sm font-semibold text-gray-900">
+                <MapPin className="h-5 w-5 text-[#006F4B]" />
+                Ciudad y alcance
+              </h3>
+              <div className="space-y-3">
+                <div className="flex items-start gap-3 rounded-2xl bg-gray-50 px-4 py-3">
+                  <MapPin className="mt-0.5 h-5 w-5 flex-shrink-0 text-[#006F4B]" />
+                  <div>
+                    <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Ciudad base</p>
+                    <p className="text-sm font-medium text-gray-900">{p.location}</p>
+                  </div>
+                </div>
+                {p.coverage.length > 0 && (
+                  <div>
+                    <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Tambien trabaja en</p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {p.coverage.map((loc, i) => (
+                        <span key={i} className="inline-flex items-center gap-1.5 rounded-full bg-[#006F4B]/5 px-3 py-1.5 text-sm text-[#006F4B]">
+                          <MapPin className="h-3.5 w-3.5" />
+                          {loc}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
             {data.hasPhysicalStore && data.physicalStoreAddress && (
-              <div className="bg-white rounded-2xl shadow-sm p-5">
-                <h3 className="font-bold text-gray-900 mb-4 flex items-center gap-2">
+              <div className="border-t border-gray-100 pt-6">
+                <h3 className="mb-4 flex items-center gap-2 text-sm font-semibold text-gray-900">
                   <Store className="h-5 w-5 text-[#006F4B]" />
                   Ubicación
                 </h3>
@@ -826,97 +815,104 @@ export default async function ProfessionalDetailPage({ params }: { params: Promi
             )}
 
             {/* Horarios */}
-            <div className="bg-white rounded-2xl shadow-sm p-5">
-              <h3 className="font-bold text-gray-900 mb-4 flex items-center gap-2">
+            <div className="border-t border-gray-100 pt-6">
+              <h3 className="mb-4 flex items-center gap-2 text-sm font-semibold text-gray-900">
                 <CalendarDays className="h-5 w-5 text-[#006F4B]" />
-                Horarios
+                Disponibilidad
               </h3>
-              
-              {schedule ? (
-                <div className="space-y-1">
-                  {schedule.map(({ key, short, time, isOpen }) => {
-                    const isToday = key === todayKey;
-                    return (
-                      <div 
-                        key={key}
-                        className={`flex justify-between items-center py-2 px-3 rounded-lg text-sm ${
-                          isToday ? 'bg-[#006F4B]/10 font-medium' : ''
-                        }`}
-                      >
-                        <span className={isToday ? 'text-[#006F4B]' : 'text-gray-700'}>
-                          {short}
-                          {isToday && <span className="ml-1 text-[10px] bg-[#006F4B] text-white px-1.5 py-0.5 rounded uppercase">Hoy</span>}
-                        </span>
-                        <span className={isOpen ? (isToday ? 'text-[#006F4B]' : 'text-gray-600') : 'text-gray-400'}>
-                          {time}
-                        </span>
+
+              <div className="rounded-xl border border-gray-100 bg-gray-50 p-4">
+                <div className="flex items-start gap-3">
+                  <Clock className="h-5 w-5 text-[#006F4B] mt-0.5" />
+                  <div>
+                    <p className="font-medium text-gray-900">{availabilityLabel}</p>
+                    <p className="mt-1 text-sm text-gray-600">{availabilityDescription}</p>
+                    {p.holidays && (
+                      <div className="mt-2 text-xs text-green-600 flex items-center gap-1">
+                        <CheckCircle2 className="h-3.5 w-3.5" />
+                        Atiende feriados
                       </div>
-                    );
-                  })}
-                  {p.holidays && (
-                    <div className="mt-3 text-xs text-green-600 flex items-center gap-1">
-                      <CheckCircle2 className="h-3.5 w-3.5" />
-                      Atiende feriados
-                    </div>
-                  )}
+                    )}
+                  </div>
                 </div>
-              ) : (
-                <div className="text-center py-4">
-                  <Clock className="h-8 w-8 text-gray-300 mx-auto mb-2" />
-                  <p className="text-sm text-gray-500">Consultar disponibilidad</p>
-                  {scheduleWhatsappLink && (
-                    <a
-                      href={scheduleWhatsappLink}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 text-[#006F4B] text-sm font-medium mt-2 hover:underline"
-                    >
-                      <WhatsAppIcon className="h-4 w-4" />
-                      Preguntar
-                    </a>
-                  )}
+              </div>
+
+              {scheduleWhatsappLink && (
+                <a
+                  href={scheduleWhatsappLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-[#006F4B] text-sm font-medium mt-3 hover:underline"
+                >
+                  <WhatsAppIcon className="h-4 w-4" />
+                  Consultar horario por WhatsApp
+                </a>
+              )}
+
+              {showDetailedSchedule && (
+                <div className="mt-4 border-t border-gray-100 pt-4">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-3">
+                    Vista privada del propietario
+                  </p>
+                  <div className="space-y-1">
+                    {schedule.map(({ key, short, time, isOpen }) => {
+                      const isToday = key === todayKey;
+                      return (
+                        <div 
+                          key={key}
+                          className={`flex justify-between items-center py-2 px-3 rounded-lg text-sm ${
+                            isToday ? 'bg-[#006F4B]/10 font-medium' : ''
+                          }`}
+                        >
+                          <span className={isToday ? 'text-[#006F4B]' : 'text-gray-700'}>
+                            {short}
+                            {isToday && <span className="ml-1 text-[10px] bg-[#006F4B] text-white px-1.5 py-0.5 rounded uppercase">Hoy</span>}
+                          </span>
+                          <span className={isOpen ? (isToday ? 'text-[#006F4B]' : 'text-gray-600') : 'text-gray-400'}>
+                            {time}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               )}
             </div>
 
             {/* Perfil profesional */}
-            {(p.portfolio || p.cv) && (
-              <div className="bg-white rounded-2xl shadow-sm p-5">
-                <h3 className="font-bold text-gray-900 mb-4 flex items-center gap-2">
+            {(p.portfolio || ownerCv) && (
+              <div className="border-t border-gray-100 pt-6">
+                <h3 className="mb-4 flex items-center gap-2 text-sm font-semibold text-gray-900">
                   <Briefcase className="h-5 w-5 text-[#006F4B]" />
                   Perfil profesional
                 </h3>
                 
                 <div className="space-y-2">
-                  {p.portfolio && (
+                  {portfolioHref && (
                     <a
-                      href={p.portfolio}
+                      href={portfolioHref}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex items-center gap-3 p-2.5 rounded-lg hover:bg-gray-50 transition-colors"
+                      className="flex items-center gap-3 rounded-2xl bg-gray-50 p-3 transition-colors hover:bg-[#006F4B]/5"
                     >
-                      <div className="h-9 w-9 rounded-lg bg-purple-600 flex items-center justify-center">
-                        <Briefcase className="h-5 w-5 text-white" />
+                      <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#006F4B]/10">
+                        <Briefcase className="h-5 w-5 text-[#006F4B]" />
                       </div>
                       <span className="text-sm font-medium text-gray-700 flex-1">Portfolio</span>
                       <ExternalLink className="h-4 w-4 text-gray-400" />
                     </a>
                   )}
-                  {p.cv && (
+                  {ownerCvHref && (
                     <a
-                      href={
-                        p.cv.startsWith('http')
-                          ? p.cv
-                          : `/uploads/profiles/${p.cv}`
-                      }
+                      href={ownerCvHref}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex items-center gap-3 p-2.5 rounded-lg hover:bg-gray-50 transition-colors"
+                      className="flex items-center gap-3 rounded-2xl bg-gray-50 p-3 transition-colors hover:bg-[#006F4B]/5"
                     >
-                      <div className="h-9 w-9 rounded-lg bg-red-500 flex items-center justify-center">
-                        <FileText className="h-5 w-5 text-white" />
+                      <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#006F4B]/10">
+                        <FileText className="h-5 w-5 text-[#006F4B]" />
                       </div>
-                      <span className="text-sm font-medium text-gray-700 flex-1">Curriculum Vitae</span>
+                      <span className="text-sm font-medium text-gray-700 flex-1">Curriculum Vitae (vista privada)</span>
                       <ExternalLink className="h-4 w-4 text-gray-400" />
                     </a>
                   )}
@@ -934,9 +930,36 @@ export default async function ProfessionalDetailPage({ params }: { params: Promi
             )}
               */}
 
+              </div>
+            </div>
           </div>
         </div>
       </div>
+
+      {(hasWhatsapp || hasPhone) && (
+        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-gray-200 bg-white/95 px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-3 backdrop-blur lg:hidden">
+          <div className="mx-auto flex max-w-md gap-3">
+            {hasWhatsapp && (
+              <a
+                href={mainWhatsappLink}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex-1 rounded-full bg-[#25D366] px-4 py-3 text-center text-sm font-semibold text-white transition-colors hover:bg-[#20BD5C]"
+              >
+                Contactar
+              </a>
+            )}
+            {hasPhone && (
+              <a
+                href={`tel:${p.phone}`}
+                className="flex-1 rounded-full border border-gray-200 bg-white px-4 py-3 text-center text-sm font-semibold text-gray-700 transition-colors hover:border-[#006F4B]/30 hover:text-[#006F4B]"
+              >
+                Llamar
+              </a>
+            )}
+          </div>
+        </div>
+      )}
     </div>
     </>
   );

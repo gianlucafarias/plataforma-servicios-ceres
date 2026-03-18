@@ -1,77 +1,117 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth';
 import { writeFile } from 'fs/promises';
 import { join } from 'path';
 import { existsSync, mkdirSync } from 'fs';
 import { enqueueOptimizeProfileImage, enqueueValidateCV } from '@/jobs/files.producer';
-import { validateUploadServer, detectFileType } from '@/lib/uploadValidator';
-import { isR2Configured, uploadToR2, getR2PublicUrl } from '@/lib/r2';
+import { detectFileType, validateUploadBuffer } from '@/lib/uploadValidator';
+import { isR2Configured, uploadToR2 } from '@/lib/r2';
+import { authOptions } from '@/app/api/auth/options';
+import { rateLimit, rateLimitHeaders } from '@/lib/rate-limit-memory';
+import { clientIp } from '@/lib/request-helpers';
+import { verifyUploadGrant } from '@/lib/upload-grant';
+
+const LIMIT = 30;
+const WINDOW_MS = 10 * 60 * 1000;
 
 export async function POST(request: NextRequest) {
+  const rl = rateLimit(`upload:${clientIp(request)}`, LIMIT, WINDOW_MS);
+  if (!rl.allowed) {
+    return NextResponse.json(
+      {
+        success: false,
+        error: 'rate_limited',
+        message: 'Demasiadas solicitudes. Intenta nuevamente mas tarde.',
+      },
+      { status: 429, headers: rateLimitHeaders(rl) }
+    );
+  }
+
   try {
     const data = await request.formData();
-    const file: File | null = data.get('file') as unknown as File;
-    const typeHint = data.get('type') as string | null; // 'image' | 'cv' opcional
-
-  
+    const file = data.get('file') as File | null;
+    const typeHint = data.get('type') as string | null;
 
     if (!file) {
-      console.error('[upload] Error: No se recibió ningún archivo');
-      return NextResponse.json({ success: false, error: 'No se recibió ningún archivo' }, { status: 400 });
+      console.error('[upload] Error: No se recibio ningun archivo');
+      return NextResponse.json(
+        { success: false, error: 'No se recibio ningun archivo' },
+        { status: 400, headers: rateLimitHeaders(rl) }
+      );
     }
 
-    // Detectar tipo si no viene en el hint
-    // Si viene typeHint, usarlo; si no, detectar automáticamente
-    const detectedType = (typeHint as 'image' | 'cv' | null) || detectFileType(file as unknown as File);
+    const detectedType = (typeHint as 'image' | 'cv' | null) || detectFileType(file);
     if (!detectedType) {
-      // Log para debugging
       console.error('No se pudo detectar el tipo de archivo:', {
         fileName: file.name,
         fileType: file.type,
         fileSize: file.size,
         typeHint,
       });
-      return NextResponse.json({ 
-        success: false, 
-        error: 'No se pudo determinar el tipo de archivo. Asegurate de subir una imagen (png, jpg, jpeg, webp) o CV (pdf, doc, docx)' 
-      }, { status: 400 });
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            'No se pudo determinar el tipo de archivo. Asegurate de subir una imagen (png, jpg, jpeg, webp) o CV (pdf, doc, docx)',
+        },
+        { status: 400, headers: rateLimitHeaders(rl) }
+      );
     }
 
-    // Validar
-    const validation = validateUploadServer(
+    const uploadGrant = request.headers.get('x-upload-token');
+    const validGrant = uploadGrant
+      ? verifyUploadGrant(uploadGrant, { context: 'register', type: detectedType })
+      : null;
+
+    if (!validGrant) {
+      const session = await getServerSession(authOptions);
+      if (!session?.user?.id) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: 'unauthorized',
+            message: 'Se requiere autenticacion o un token de upload valido.',
+          },
+          { status: 401, headers: rateLimitHeaders(rl) }
+        );
+      }
+    }
+
+    const bytes = await file.arrayBuffer();
+    const buffer = Buffer.from(bytes);
+
+    const validation = validateUploadBuffer(
       { name: file.name, type: file.type, size: file.size },
+      buffer,
       detectedType
     );
 
     if (!validation.valid) {
-      console.error('[upload] Validación fallida:', {
+      console.error('[upload] Validacion fallida:', {
         fileName: file.name,
         fileType: file.type,
         fileSize: file.size,
         detectedType,
         validationError: validation.error,
       });
-      return NextResponse.json({ success: false, error: validation.error }, { status: 400 });
+      return NextResponse.json(
+        { success: false, error: validation.error },
+        { status: 400, headers: rateLimitHeaders(rl) }
+      );
     }
-
-
-    const bytes = await file.arrayBuffer();
-    const buffer = Buffer.from(bytes);
 
     const originalName = file.name;
     const extension = originalName.split('.').pop() || '';
     const timestamp = Date.now();
-
-    // Key estándar para almacenamiento remoto/local
     const safeExtension = extension.toLowerCase();
     const key = `profiles/${timestamp}.${safeExtension || 'bin'}`;
 
     let finalUrl: string;
     let storage: 'r2' | 'local' = 'local';
-    let storedFilename: string = key;
+    let storedFilename = key;
 
     if (isR2Configured()) {
       try {
-        // Subida a R2
         const contentType = file.type || 'application/octet-stream';
         const result = await uploadToR2({
           key,
@@ -84,7 +124,6 @@ export async function POST(request: NextRequest) {
         storedFilename = key;
       } catch (r2Error) {
         console.error('Error uploading to R2, falling back to local storage:', r2Error);
-        // Fallback a almacenamiento local si R2 falla
         const uploadsDir = join(process.cwd(), 'public', 'uploads', 'profiles');
         if (!existsSync(uploadsDir)) {
           mkdirSync(uploadsDir, { recursive: true });
@@ -99,16 +138,14 @@ export async function POST(request: NextRequest) {
         finalUrl = `/uploads/profiles/${localFilename}`;
         storage = 'local';
 
-        // Encolar post-proceso según tipo
         const lower = safeExtension;
-        if (['jpg','jpeg','png','webp'].includes(lower)) {
-          enqueueOptimizeProfileImage({ path: `/uploads/profiles/${localFilename}` }).catch(()=>{});
+        if (['jpg', 'jpeg', 'png', 'webp'].includes(lower)) {
+          enqueueOptimizeProfileImage({ path: `/uploads/profiles/${localFilename}` }).catch(() => {});
         } else if (lower === 'pdf') {
-          enqueueValidateCV({ path: `/uploads/profiles/${localFilename}` }).catch(()=>{});
+          enqueueValidateCV({ path: `/uploads/profiles/${localFilename}` }).catch(() => {});
         }
       }
     } else {
-      // Fallback local: mismo path de siempre para compatibilidad
       const uploadsDir = join(process.cwd(), 'public', 'uploads', 'profiles');
       if (!existsSync(uploadsDir)) {
         mkdirSync(uploadsDir, { recursive: true });
@@ -122,37 +159,33 @@ export async function POST(request: NextRequest) {
       storedFilename = localFilename;
       finalUrl = `/uploads/profiles/${localFilename}`;
 
-      // Encolar post-proceso según tipo SOLO para almacenamiento local
       const lower = safeExtension;
-      if (['jpg','jpeg','png','webp'].includes(lower)) {
-        enqueueOptimizeProfileImage({ path: `/uploads/profiles/${localFilename}` }).catch(()=>{});
+      if (['jpg', 'jpeg', 'png', 'webp'].includes(lower)) {
+        enqueueOptimizeProfileImage({ path: `/uploads/profiles/${localFilename}` }).catch(() => {});
       } else if (lower === 'pdf') {
-        enqueueValidateCV({ path: `/uploads/profiles/${localFilename}` }).catch(()=>{});
+        enqueueValidateCV({ path: `/uploads/profiles/${localFilename}` }).catch(() => {});
       }
     }
 
-    // Normalizar el valor a retornar: solo el nombre del archivo para almacenamiento local
-    // o la URL completa para R2
-    const returnValue = storage === 'r2' 
-      ? finalUrl // Para R2, retornar URL completa
-      : storedFilename; // Para local, retornar solo el nombre del archivo
+    const returnValue = storage === 'r2' ? finalUrl : storedFilename;
 
-    return NextResponse.json({ 
-      success: true, 
-      filename: storedFilename, // mantenemos por compatibilidad
-      originalName,
-      path: finalUrl, // Ruta completa para referencia
-      url: finalUrl, // URL completa para referencia
-      value: returnValue, // Valor normalizado para guardar en BD
-      storage,
-    });
-
+    return NextResponse.json(
+      {
+        success: true,
+        filename: storedFilename,
+        originalName,
+        path: finalUrl,
+        url: finalUrl,
+        value: returnValue,
+        storage,
+      },
+      { headers: rateLimitHeaders(rl) }
+    );
   } catch (error) {
     console.error('Error uploading file:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     const errorStack = error instanceof Error ? error.stack : undefined;
-    
-    // Log detallado en producción para debugging
+
     if (process.env.NODE_ENV === 'production') {
       console.error('Upload error details:', {
         message: errorMessage,
@@ -160,18 +193,14 @@ export async function POST(request: NextRequest) {
         timestamp: new Date().toISOString(),
       });
     }
-    
+
     return NextResponse.json(
-      { 
-        success: false, 
+      {
+        success: false,
         error: 'Failed to upload file',
-        // Solo incluir detalles del error en desarrollo
-        ...(process.env.NODE_ENV !== 'production' && { details: errorMessage })
+        ...(process.env.NODE_ENV !== 'production' && { details: errorMessage }),
       },
-      { status: 500 }
+      { status: 500, headers: rateLimitHeaders(rl) }
     );
   }
 }
-
-
-

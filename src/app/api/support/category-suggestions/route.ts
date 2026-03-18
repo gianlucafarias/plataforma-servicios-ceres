@@ -1,27 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { rateLimit, rateLimitHeaders } from '@/lib/rate-limit-memory';
+import { clientIp } from '@/lib/request-helpers';
 
-/**
- * POST /api/support/category-suggestions
- * Crea un ticket de sugerencia de categoría.
- *
- * Body:
- * - suggestedName: string (obligatorio)
- * - description?: string
- * - email: string (obligatorio si no se asocia a un usuario)
- * - userId?: string
- * - origin?: string
- * - url?: string
- * - context?: any (JSON serializable)
- * - relatedCategoryId?: string
- * - perspective?: "provider" | "seeker"
- * - website?: string (honeypot, debe venir vacío)
- * - openedAt?: number (timestamp ms en cliente, para validar tiempo mínimo)
- */
+const LIMIT = 20;
+const WINDOW_MS = 10 * 60 * 1000;
+
 export async function POST(request: NextRequest) {
+  const rl = rateLimit(`category-suggestion:${clientIp(request)}`, LIMIT, WINDOW_MS);
+  if (!rl.allowed) {
+    return NextResponse.json(
+      {
+        success: false,
+        error: 'rate_limited',
+        message: 'Demasiadas solicitudes. Intenta nuevamente mas tarde.',
+      },
+      { status: 429, headers: rateLimitHeaders(rl) }
+    );
+  }
+
   try {
     const body = await request.json();
-
     const {
       suggestedName,
       description,
@@ -36,20 +35,17 @@ export async function POST(request: NextRequest) {
       openedAt,
     } = body ?? {};
 
-    // Honeypot: si el campo "website" viene relleno, probablemente sea un bot.
     if (typeof website === 'string' && website.trim().length > 0) {
-      // Respondemos como éxito pero sin crear nada para no dar pistas.
       return NextResponse.json(
         {
           success: true,
           data: { ignored: true },
           message: 'Sugerencia registrada.',
         },
-        { status: 200 },
+        { status: 200, headers: rateLimitHeaders(rl) }
       );
     }
 
-    // Tiempo mínimo entre abrir el modal y enviar (p.ej. 2 segundos)
     if (typeof openedAt === 'number' && openedAt > 0) {
       const elapsed = Date.now() - openedAt;
       if (elapsed < 2000) {
@@ -59,7 +55,7 @@ export async function POST(request: NextRequest) {
             data: { ignored: true },
             message: 'Sugerencia registrada.',
           },
-          { status: 200 },
+          { status: 200, headers: rateLimitHeaders(rl) }
         );
       }
     }
@@ -69,9 +65,9 @@ export async function POST(request: NextRequest) {
         {
           success: false,
           error: 'validation_error',
-          message: 'El nombre de la categoría sugerida es obligatorio.',
+          message: 'El nombre de la categoria sugerida es obligatorio.',
         },
-        { status: 400 },
+        { status: 400, headers: rateLimitHeaders(rl) }
       );
     }
 
@@ -82,7 +78,7 @@ export async function POST(request: NextRequest) {
           error: 'validation_error',
           message: 'Debe proporcionar un email si no hay usuario autenticado.',
         },
-        { status: 400 },
+        { status: 400, headers: rateLimitHeaders(rl) }
       );
     }
 
@@ -116,20 +112,19 @@ export async function POST(request: NextRequest) {
         data: {
           id: suggestion.id,
         },
-        message: 'Sugerencia de categoría registrada correctamente.',
+        message: 'Sugerencia de categoria registrada correctamente.',
       },
-      { status: 201 },
+      { status: 201, headers: rateLimitHeaders(rl) }
     );
   } catch (error) {
-    console.error('Error creando sugerencia de categoría:', error);
+    console.error('Error creando sugerencia de categoria:', error);
     return NextResponse.json(
       {
         success: false,
         error: 'server_error',
-        message: 'No se pudo registrar la sugerencia de categoría.',
+        message: 'No se pudo registrar la sugerencia de categoria.',
       },
-      { status: 500 },
+      { status: 500, headers: rateLimitHeaders(rl) }
     );
   }
 }
-

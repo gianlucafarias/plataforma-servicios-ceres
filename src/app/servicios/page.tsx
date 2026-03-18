@@ -23,10 +23,9 @@ import {
 import { useServices } from "@/hooks/useServices";
 import { useServiceCounts } from "@/hooks/useServiceCounts";
 import { ProfessionalCard } from "@/components/features/ProfessionalCard";
-import { AREAS_OFICIOS, SUBCATEGORIES_OFICIOS, SUBCATEGORIES_PROFESIONES, LOCATIONS } from "@/lib/taxonomy";
+import { AREAS_OFICIOS, SUBCATEGORIES_OFICIOS, SUBCATEGORIES_PROFESIONES } from "@/lib/taxonomy";
 import { CategoryItem } from "@/components/features/CategoryItem";
-import { CategorySuggestionModal } from "@/components/features/CategorySuggestionModal";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { CitySelect } from "@/components/features/CitySelect";
 import Link from "next/link";
 
 export default function ServiciosPage() {
@@ -100,6 +99,7 @@ export default function ServiciosPage() {
     const grupo = searchParams.get('grupo');
     const subcategoria = searchParams.get('subcategoria');
     const q = searchParams.get('q');
+    const location = searchParams.get('location');
     
     if (subcategoria) {
       // Priorizar subcategoría si viene explícita (p.ej. desde el autocomplete)
@@ -152,6 +152,11 @@ export default function ServiciosPage() {
     if (q) {
       setSearchTerm(q);
       setBarSearchQuery(q);
+    }
+    if (location) {
+      setSelectedLocation(location);
+    } else {
+      setSelectedLocation('all');
     }
     // Una vez aplicados los parámetros de la URL, habilitamos el fetch
     setReady(true);
@@ -352,28 +357,14 @@ export default function ServiciosPage() {
                 />
               </div>
               <div className="flex gap-2 w-full md:w-auto overflow-x-auto pb-1 md:pb-0 no-scrollbar items-center">
-                <div className="relative min-w-[180px]">
-                  <MapPin className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 pointer-events-none z-10" aria-hidden="true" />
-                  <Select
-                    value={selectedLocation}
-                    onValueChange={(value) => {
-                      setSelectedLocation(value);
-                      setPage(1);
-                    }}
-                  >
-                    <SelectTrigger className="w-full pl-10 pr-8 py-1.5 rounded-lg border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-xs font-medium focus:ring-4 focus:ring-green-100 focus:border-[#006F4B] transition-colors duration-200">
-                      <SelectValue placeholder="Todas las ciudades" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Todas las ciudades</SelectItem>
-                      {LOCATIONS.map((loc) => (
-                        <SelectItem key={loc.id} value={loc.id}>
-                          {loc.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+                <CitySelect
+                  className="min-w-[220px]"
+                  value={selectedLocation}
+                  onValueChange={(value) => {
+                    setSelectedLocation(value);
+                    setPage(1);
+                  }}
+                />
                 <button 
                   onClick={() => {
                     setShowVerifiedOnly(!showVerifiedOnly);

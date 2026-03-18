@@ -209,3 +209,4 @@ export function generateBreadcrumbsStructuredData(items: Array<{ name: string; u
     }))
   };
 }
+

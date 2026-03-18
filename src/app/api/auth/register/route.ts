@@ -1,48 +1,59 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { type User as PrismaUser, type Professional as PrismaProfessional } from '@prisma/client';
-import type { CategoryGroup } from '@/types';
+import { type Professional as PrismaProfessional, type User as PrismaUser } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 import { prisma } from '@/lib/prisma';
 import { generateRandomToken } from '@/lib/utils';
 import { enqueueEmailVerify } from '@/jobs/email.producer';
-import { enqueueSlackAlert } from '@/jobs/slack.producer';
 import { normalizeWhatsAppNumber } from '@/lib/whatsapp-normalize';
+import { rateLimit, rateLimitHeaders } from '@/lib/rate-limit-memory';
+import { clientIp } from '@/lib/request-helpers';
+import type { CategoryGroup } from '@/types';
 
+const LIMIT = 10;
+const WINDOW_MS = 10 * 60 * 1000;
+
+type ServiceFormInput = {
+  categoryId: string;
+  title: string;
+  description: string;
+};
+
+type RegisterRequestPayload = {
+  email: string;
+  password: string;
+  firstName: string;
+  lastName: string;
+  dni?: string;
+  phone?: string;
+  birthDate?: string;
+  location?: string;
+  whatsapp?: string;
+  instagram?: string;
+  facebook?: string;
+  linkedin?: string;
+  website?: string;
+  portfolio?: string;
+  cv?: string;
+  picture?: string;
+  bio?: string;
+  experienceYears?: number;
+  professionalGroup?: CategoryGroup;
+  serviceLocations?: string[];
+  hasPhysicalStore?: boolean;
+  physicalStoreAddress?: string;
+  services?: ServiceFormInput[];
+};
 
 export async function POST(request: NextRequest) {
+  const rl = rateLimit(`auth-register:${clientIp(request)}`, LIMIT, WINDOW_MS);
+  if (!rl.allowed) {
+    return NextResponse.json(
+      { error: 'Demasiadas solicitudes. Intenta nuevamente mas tarde.' },
+      { status: 429, headers: rateLimitHeaders(rl) }
+    );
+  }
+
   try {
-    interface ServiceFormInput {
-      categoryId: string;
-      title: string;
-      description: string;
-    }
-
-    interface RegisterRequestPayload {
-      email: string;
-      password: string;
-      firstName: string;
-      lastName: string;
-      dni?: string; // Documento Nacional de Identidad (obligatorio)
-      phone?: string;
-      birthDate?: string;
-      location?: string;
-      whatsapp?: string;
-      instagram?: string;
-      facebook?: string;
-      linkedin?: string;
-      website?: string;
-      portfolio?: string;
-      cv?: string;
-      picture?: string;
-      bio?: string;
-      experienceYears?: number;
-      professionalGroup?: CategoryGroup;
-      serviceLocations?: string[];
-      hasPhysicalStore?: boolean;
-      physicalStoreAddress?: string;
-      services?: ServiceFormInput[];
-    }
-
     const {
       email,
       password,
@@ -69,38 +80,33 @@ export async function POST(request: NextRequest) {
       services,
     }: RegisterRequestPayload = await request.json();
 
-    // Validar datos requeridos
     if (!email || !password || !firstName || !lastName || !dni) {
       return NextResponse.json(
-        { error: 'Faltan datos requeridos (email, contraseña, nombre, apellido y DNI son obligatorios)' },
-        { status: 400 }
+        { error: 'Faltan datos requeridos (email, contrasena, nombre, apellido y DNI son obligatorios)' },
+        { status: 400, headers: rateLimitHeaders(rl) }
       );
     }
 
-    // Validar formato de DNI (7-8 dígitos)
     if (!/^\d{7,8}$/.test(dni.trim())) {
       return NextResponse.json(
-        { error: 'El DNI debe tener entre 7 y 8 dígitos' },
-        { status: 400 }
+        { error: 'El DNI debe tener entre 7 y 8 digitos' },
+        { status: 400, headers: rateLimitHeaders(rl) }
       );
     }
 
-    // Verificar si el usuario ya existe
     const existingUser = await prisma.user.findUnique({
-      where: { email }
+      where: { email },
     });
 
     if (existingUser) {
       return NextResponse.json(
         { error: 'El usuario ya existe' },
-        { status: 400 }
+        { status: 400, headers: rateLimitHeaders(rl) }
       );
     }
 
-    // Hashear la contraseña
     const hashedPassword = await bcrypt.hash(password, 12);
 
-    // Transacción: crear usuario, profesional y servicios
     const result = await prisma.$transaction(async (tx) => {
       const user = await tx.user.create({
         data: {
@@ -112,18 +118,14 @@ export async function POST(request: NextRequest) {
           phone: phone || null,
           birthDate: birthDate ? new Date(birthDate) : null,
           location: location || null,
-          // si picture se usa a futuro, guardar en otro modelo; por ahora ignorado
-        }
+        },
       });
 
       let professional: PrismaProfessional | null = null;
 
-      // Si vienen datos profesionales, crear el perfil
       if (bio || experienceYears || (services && services.length > 0) || professionalGroup) {
-        // Asegurarse de que el grupo de categorías existe
-        // Si no hay professionalGroup, usar 'oficios' por defecto
         const groupToUse = professionalGroup || 'oficios';
-        
+
         const categoryGroupRecord = await tx.categoryGroup.upsert({
           where: { id: groupToUse },
           update: {},
@@ -134,35 +136,39 @@ export async function POST(request: NextRequest) {
           },
         });
 
-        // Mapear category slug -> crear/usar Category y devolver su id
-        let servicesCreateData: Array<{ categoryId: string; title: string; description: string; categoryGroup?: CategoryGroup }> | undefined = undefined;
+        let servicesCreateData:
+          | Array<{ categoryId: string; title: string; description: string; categoryGroup?: CategoryGroup }>
+          | undefined;
+
         if (services && services.length > 0) {
           servicesCreateData = await Promise.all(
-            services.map(async (s: ServiceFormInput) => {
+            services.map(async (service: ServiceFormInput) => {
               let category = await tx.category.findUnique({
-                where: { slug: s.categoryId },
+                where: { slug: service.categoryId },
                 select: { id: true },
               });
+
               if (!category) {
-                const fallbackName = String(s.categoryId)
+                const fallbackName = String(service.categoryId)
                   .replace(/-/g, ' ')
-                  .replace(/\b\w/g, (m: string) => m.toUpperCase());
-                const created = await tx.category.create({
+                  .replace(/\b\w/g, (match: string) => match.toUpperCase());
+
+                category = await tx.category.create({
                   data: {
                     name: fallbackName,
                     description: '',
-                    slug: s.categoryId,
+                    slug: service.categoryId,
                     active: true,
-                    groupId: categoryGroupRecord.id, // Usar el ID del grupo que acabamos de crear/obtener
+                    groupId: categoryGroupRecord.id,
                   },
                   select: { id: true },
                 });
-                category = created;
               }
+
               return {
                 categoryId: category.id,
-                title: s.title,
-                description: s.description,
+                title: service.title,
+                description: service.description,
                 categoryGroup: professionalGroup || undefined,
               };
             })
@@ -187,23 +193,26 @@ export async function POST(request: NextRequest) {
             serviceLocations: serviceLocations || [],
             hasPhysicalStore: hasPhysicalStore || false,
             physicalStoreAddress: hasPhysicalStore ? physicalStoreAddress : null,
-            services: servicesCreateData && servicesCreateData.length > 0 ? {
-              create: servicesCreateData,
-            } : undefined,
-          }
+            services:
+              servicesCreateData && servicesCreateData.length > 0
+                ? {
+                    create: servicesCreateData,
+                  }
+                : undefined,
+          },
         });
       }
 
-      // Crear token de verificación
-      const token = generateRandomToken(48)
-      const expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24) // 24h
+      const token = generateRandomToken(48);
+      const expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24);
+
       await tx.verificationToken.create({
         data: {
           userId: user.id,
           token,
           expiresAt,
-        }
-      })
+        },
+      });
 
       return { user, professional, token };
     });
@@ -211,7 +220,6 @@ export async function POST(request: NextRequest) {
     const { password: _dbPassword, ...userWithoutPassword } = result.user as PrismaUser;
     void _dbPassword;
 
-    // Envio de correo de verificacion manejado por servicio externo
     try {
       await enqueueEmailVerify({
         userId: userWithoutPassword.id,
@@ -219,9 +227,8 @@ export async function POST(request: NextRequest) {
         email: userWithoutPassword.email,
         firstName: userWithoutPassword.firstName || undefined,
       });
-    } catch (e) {
-      console.error('Error encolando correo de verificación:', e);
-      // En desarrollo, imprimir info de debug
+    } catch (error) {
+      console.error('Error encolando correo de verificacion:', error);
       if (process.env.NODE_ENV !== 'production') {
         const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || process.env.VERCEL_URL || '';
         const origin = baseUrl.startsWith('http') ? baseUrl : `https://${baseUrl}`;
@@ -230,36 +237,39 @@ export async function POST(request: NextRequest) {
       }
     }
 
-   
+    const devVerifyUrl =
+      process.env.NODE_ENV !== 'production'
+        ? (() => {
+            const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || process.env.VERCEL_URL || '';
+            const origin = baseUrl.startsWith('http') ? baseUrl : `https://${baseUrl}`;
+            return `${origin}/auth/verify?token=${encodeURIComponent(result.token)}&email=${encodeURIComponent(userWithoutPassword.email)}`;
+          })()
+        : undefined;
 
-    const devVerifyUrl = process.env.NODE_ENV !== 'production' 
-      ? (() => {
-          const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || process.env.VERCEL_URL || '';
-          const origin = baseUrl.startsWith('http') ? baseUrl : `https://${baseUrl}`;
-          return `${origin}/auth/verify?token=${encodeURIComponent(result.token)}&email=${encodeURIComponent(userWithoutPassword.email)}`;
-        })()
-      : undefined
-
-    return NextResponse.json({
-      message: 'Usuario registrado. Te enviamos un correo para confirmar la cuenta.',
-      user: userWithoutPassword,
-      professional: result.professional,
-      ...(devVerifyUrl ? { devVerifyUrl } : {}),
-    });
-
+    return NextResponse.json(
+      {
+        message: 'Usuario registrado. Te enviamos un correo para confirmar la cuenta.',
+        user: userWithoutPassword,
+        professional: result.professional,
+        ...(devVerifyUrl ? { devVerifyUrl } : {}),
+      },
+      { headers: rateLimitHeaders(rl) }
+    );
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Error interno del servidor';
 
-    // Log detallado
     console.error('Error al registrar usuario:', error);
     if (error instanceof Error && error.stack) {
       console.error('Stack de registro:', error.stack);
     }
 
-    const isValidation = message.toLowerCase().includes('categoría no encontrada') || message.toLowerCase().includes('faltan datos');
+    const isValidation =
+      message.toLowerCase().includes('categoria no encontrada') ||
+      message.toLowerCase().includes('faltan datos');
+
     return NextResponse.json(
       { error: message },
-      { status: isValidation ? 400 : 500 }
+      { status: isValidation ? 400 : 500, headers: rateLimitHeaders(rl) }
     );
-  } 
+  }
 }

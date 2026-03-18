@@ -18,3 +18,4 @@ export function buildWhatsAppLink(
   return `https://wa.me/${digits}?text=${encodedText}`;
 }
 
+
