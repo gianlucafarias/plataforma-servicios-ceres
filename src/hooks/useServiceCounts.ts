@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { getErrorMessage } from '@/lib/api/client';
+import { getServiceCounts } from '@/lib/api/services';
 
 export type ServiceCountsBySlug = Record<string, number>;
 
@@ -16,19 +18,13 @@ export function useServiceCounts() {
       setLoading(true);
       setError(null);
       try {
-        const res = await fetch('/api/services/stats', {
-          signal: controller.signal,
-        });
-        const json = await res.json();
+        const countsBySlug = await getServiceCounts({ signal: controller.signal });
         if (controller.signal.aborted) return;
-        if (json.success) {
-          setCounts(json.data ?? {});
-        } else {
-          setError(json.error || 'No se pudieron obtener las estadisticas');
-        }
+
+        setCounts(countsBySlug ?? {});
       } catch (e) {
         if (controller.signal.aborted) return;
-        setError(e instanceof Error ? e.message : 'Error al obtener estadisticas');
+        setError(getErrorMessage(e, 'Error al obtener estadisticas'));
       } finally {
         if (!controller.signal.aborted) {
           setLoading(false);

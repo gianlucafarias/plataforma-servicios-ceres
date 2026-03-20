@@ -39,6 +39,9 @@ import { DateBirthPicker } from "../registro/_components/date-birth-picker";
 import WhatsAppIcon from "@/components/ui/whatsapp";
 import { Switch } from "@/components/ui/switch";
 import { normalizeWhatsAppNumber, validateWhatsAppNumber } from "@/lib/whatsapp-normalize";
+import { completeProfessionalProfile } from "@/lib/api/auth";
+import { getErrorMessage } from "@/lib/api/client";
+import { uploadExternalOAuthImage, uploadFile } from "@/lib/api/uploads";
 
 export default function CompletarPerfilPage() {
   const router = useRouter();
@@ -102,22 +105,9 @@ export default function CompletarPerfilPage() {
         // Si es una URL externa (OAuth), descargarla y guardarla en R2
         if (imageUrl && (imageUrl.startsWith('http://') || imageUrl.startsWith('https://'))) {
           // Descargar y guardar la imagen en R2 de forma asíncrona
-          fetch('/api/upload/external', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ imageUrl }),
-          })
-            .then(res => res.json())
-            .then(result => {
-              if (result.success) {
-                setFormData(current => ({ ...current, picture: result.url || result.value }));
-              } else {
-                console.error('Error al descargar imagen OAuth:', result.error);
-                // Si falla, usar la URL original como fallback
-                setFormData(current => ({ ...current, picture: imageUrl }));
-              }
+          uploadExternalOAuthImage(imageUrl)
+            .then((result) => {
+              setFormData(current => ({ ...current, picture: result.url || result.value }));
             })
             .catch(error => {
               console.error('Error al descargar imagen OAuth:', error);
@@ -309,12 +299,7 @@ export default function CompletarPerfilPage() {
     setIsLoading(true);
     
     try {
-      const response = await fetch('/api/auth/complete-profile', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
+      await completeProfessionalProfile({
           dni: formData.dni.trim(),
           gender: formData.gender,
           birthDate: formData.birthDate,
@@ -322,7 +307,7 @@ export default function CompletarPerfilPage() {
           location: formData.location,
           bio: formData.bio,
           experienceYears: parseInt(formData.experienceYears || '0'),
-          professionalGroup: formData.professionalGroup,
+          professionalGroup: formData.professionalGroup as CategoryGroup,
           serviceLocations: formData.serviceLocations,
           // Campos de redes sociales
           whatsapp: normalizeWhatsAppNumber(formData.whatsapp) ?? undefined,
@@ -341,31 +326,14 @@ export default function CompletarPerfilPage() {
             title: s.title,
             description: s.description,
           })),
-        }),
       });
 
-      if (!response.ok) {
-        let errorMessage = 'Error al completar el perfil';
-        try {
-          const errorData = await response.json();
-          errorMessage = errorData.error || errorMessage;
-        } catch {}
-        setErrors({ general: errorMessage });
-        setIsLoading(false);
-        return;
-      }
-
-      const result = await response.json();
-
-      if (result.success) {
-        router.push("/dashboard");
-      } else {
-        setErrors({ general: result.error || "Error al completar el perfil" });
-      }
+      router.push("/dashboard");
     } catch (error) {
       console.error("Error al completar perfil:", error);
-      const errorMessage = error instanceof Error ? error.message : "Error al completar el perfil. Intenta nuevamente.";
-      setErrors({ general: errorMessage });
+      setErrors({
+        general: getErrorMessage(error, "Error al completar el perfil. Intenta nuevamente."),
+      });
     } finally {
       setIsLoading(false);
     }
@@ -962,27 +930,14 @@ export default function CompletarPerfilPage() {
                           const file = e.target.files?.[0];
                           if (file) {
                             try {
-                              const formDataUpload = new FormData();
-                              formDataUpload.append('file', file);
-                              formDataUpload.append('type', 'image');
-                              
-                              const response = await fetch('/api/upload', {
-                                method: 'POST',
-                                body: formDataUpload,
+                              const result = await uploadFile(file, 'image');
+                              const pictureValue = result.value || (result.storage === 'r2' ? result.url : result.filename);
+                              handleInputChange('picture', pictureValue);
+                              setErrors(prev => {
+                                const newErrors = {...prev};
+                                delete newErrors.picture;
+                                return newErrors;
                               });
-                              
-                              const result = await response.json();
-                              if (result.success) {
-                                const pictureValue = result.value || (result.storage === 'r2' ? result.url : result.filename);
-                                handleInputChange('picture', pictureValue);
-                                setErrors(prev => {
-                                  const newErrors = {...prev};
-                                  delete newErrors.picture;
-                                  return newErrors;
-                                });
-                              } else {
-                                setErrors(prev => ({ ...prev, picture: result.error || 'Error al subir la imagen' }));
-                              }
                             } catch (error) {
                               console.error('Error uploading file:', error);
                               setErrors(prev => ({ ...prev, picture: 'Error al subir la imagen' }));
@@ -1012,29 +967,16 @@ export default function CompletarPerfilPage() {
                           const file = e.target.files?.[0];
                           if (file) {
                             try {
-                              const formData = new FormData();
-                              formData.append('file', file);
-                              formData.append('type', 'cv');
-                              
-                              const response = await fetch('/api/upload', {
-                                method: 'POST',
-                                body: formData,
+                              const result = await uploadFile(file, 'cv');
+                              handleInputChange(
+                                'cv',
+                                result.url || result.path || result.filename
+                              );
+                              setErrors(prev => {
+                                const newErrors = {...prev};
+                                delete newErrors.cv;
+                                return newErrors;
                               });
-                              
-                              const result = await response.json();
-                              if (result.success) {
-                                handleInputChange(
-                                  'cv',
-                                  result.url || result.path || result.filename
-                                );
-                                setErrors(prev => {
-                                  const newErrors = {...prev};
-                                  delete newErrors.cv;
-                                  return newErrors;
-                                });
-                              } else {
-                                setErrors(prev => ({ ...prev, cv: result.error || 'Error al subir el CV' }));
-                              }
                             } catch (error) {
                               console.error('Error uploading file:', error);
                               setErrors(prev => ({ ...prev, cv: 'Error al subir el CV' }));

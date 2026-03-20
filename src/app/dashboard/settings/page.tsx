@@ -21,6 +21,10 @@ import { toast } from "sonner";
 import { normalizeWhatsAppNumber, validateWhatsAppNumber } from "@/lib/whatsapp-normalize";
 import WhatsAppIcon from "@/components/ui/whatsapp";
 import { ImageCropper } from "@/components/ui/image-cropper";
+import { getErrorMessage } from "@/lib/api/client";
+import { getDashboardProfile, updateDashboardProfile } from "@/lib/api/dashboard";
+import { createService, deleteService, updateService } from "@/lib/api/services";
+import { uploadFile } from "@/lib/api/uploads";
 
 
 export default function SettingsPage() {
@@ -133,11 +137,7 @@ export default function SettingsPage() {
 
   const loadProfessionalData = async () => {
     try {
-      const response = await fetch('/api/professional/me');
-      const result = await response.json();
-      
-      if (result.success && result.data) {
-        const data = result.data;
+      const data = await getDashboardProfile();
         
         // Debug: ver qué está llegando
         console.log('birthDate recibido:', data.user.birthDate, typeof data.user.birthDate);
@@ -151,8 +151,6 @@ export default function SettingsPage() {
             // Prisma devuelve fechas como strings ISO cuando se serializa a JSON
             if (typeof data.user.birthDate === 'string') {
               date = new Date(data.user.birthDate);
-            } else if (data.user.birthDate instanceof Date) {
-              date = data.user.birthDate;
             } else {
               // Si viene como objeto con propiedades (puede pasar con Prisma)
               date = new Date(data.user.birthDate);
@@ -232,10 +230,9 @@ export default function SettingsPage() {
           physicalStoreAddress: data.physicalStoreAddress || "",
           services: data.services || []
         });
-      }
     } catch (error) {
       console.error('Error cargando datos del profesional:', error);
-      toast.error('Error al cargar los datos del perfil');
+      toast.error(getErrorMessage(error, 'Error al cargar los datos del perfil'));
     } finally {
       setLoading(false);
     }
@@ -386,60 +383,35 @@ export default function SettingsPage() {
 
       if (editingServiceId) {
         // Editar servicio existente
-        const response = await fetch(`/api/services/${editingServiceId}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            title: serviceToSave.title,
-            description: serviceToSave.description,
-            priceRange: serviceToSave.priceRange || null
-          })
+        await updateService(editingServiceId, {
+          title: serviceToSave.title,
+          description: serviceToSave.description,
+          priceRange: serviceToSave.priceRange || null
         });
-        const result = await response.json();
-        if (result.success) {
-          toast.success('Servicio actualizado correctamente');
-          setShowServiceDialog(false);
-          await loadProfessionalData();
-        } else {
-          toast.error(result.message || 'Error al actualizar el servicio');
-        }
+        toast.success('Servicio actualizado correctamente');
+        setShowServiceDialog(false);
+        await loadProfessionalData();
       } else {
         // Crear nuevo servicio
-        const response = await fetch('/api/services', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(serviceToSave)
-        });
-        const result = await response.json();
-        if (result.success) {
-          toast.success('Servicio agregado correctamente');
-          setShowServiceDialog(false);
-          await loadProfessionalData();
-        } else {
-          toast.error(result.message || 'Error al crear el servicio');
-        }
+        await createService(serviceToSave);
+        toast.success('Servicio agregado correctamente');
+        setShowServiceDialog(false);
+        await loadProfessionalData();
       }
     } catch (error) {
       console.error('Error guardando servicio:', error);
-      toast.error('Error al guardar el servicio');
+      toast.error(getErrorMessage(error, 'Error al guardar el servicio'));
     }
   };
 
   const handleDeleteService = async (serviceId: string) => {
     try {
-      const response = await fetch(`/api/services/${serviceId}`, {
-        method: 'DELETE',
-      });
-
-      if (response.ok) {
-        toast.success('Servicio eliminado correctamente');
-        await loadProfessionalData(); // Recargar datos
-      } else {
-        toast.error('Error al eliminar el servicio');
-      }
+      await deleteService(serviceId);
+      toast.success('Servicio eliminado correctamente');
+      await loadProfessionalData(); // Recargar datos
     } catch (error) {
       console.error('Error eliminando servicio:', error);
-      toast.error('Error al eliminar el servicio');
+      toast.error(getErrorMessage(error, 'Error al eliminar el servicio'));
     }
   };
 
@@ -485,26 +457,13 @@ export default function SettingsPage() {
         whatsapp: normalizeWhatsAppNumber(formData.whatsapp) || null,
       };
 
-      const response = await fetch('/api/professional/me', {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(dataToSend),
-      });
-
-      const result = await response.json();
-      
-      if (result.success) {
-        toast.success('Perfil actualizado correctamente');
-        setHasChanges(false);
-        await loadProfessionalData(); // Recargar datos
-      } else {
-        toast.error(result.message || result.error || 'Error al actualizar el perfil');
-      }
+      await updateDashboardProfile(dataToSend);
+      toast.success('Perfil actualizado correctamente');
+      setHasChanges(false);
+      await loadProfessionalData(); // Recargar datos
     } catch (error) {
       console.error('Error actualizando perfil:', error);
-      toast.error('Error al actualizar el perfil');
+      toast.error(getErrorMessage(error, 'Error al actualizar el perfil'));
     } finally {
       setSaving(false);
     }
@@ -1185,27 +1144,15 @@ export default function SettingsPage() {
                             const file = e.target.files?.[0];
                             if (file) {
                               try {
-                                const formDataUpload = new FormData();
-                                formDataUpload.append('file', file);
-                                
-                                const response = await fetch('/api/upload', {
-                                  method: 'POST',
-                                  body: formDataUpload,
-                                });
-                                
-                                const result = await response.json();
-                                if (result.success) {
-                                  handleInputChange(
-                                    'cv',
-                                    result.url || result.path || result.filename
-                                  );
-                                  toast.success('CV subido correctamente');
-                                } else {
-                                  toast.error(result.error || 'Error al subir el CV');
-                                }
+                                const result = await uploadFile(file, 'cv');
+                                handleInputChange(
+                                  'cv',
+                                  result.url || result.path || result.filename
+                                );
+                                toast.success('CV subido correctamente');
                               } catch (error) {
                                 console.error('Error uploading file:', error);
-                                toast.error('Error al subir el CV');
+                                toast.error(getErrorMessage(error, 'Error al subir el CV'));
                               }
                             }
                           }}
@@ -1440,30 +1387,17 @@ export default function SettingsPage() {
         aspect={1}
         onCropComplete={async (croppedImageBlob) => {
           try {
-            const formDataUpload = new FormData();
             // Crear un File desde el Blob para asegurar que tenga el tipo correcto
             const file = new File([croppedImageBlob], 'profile.jpg', { type: 'image/jpeg' });
-            formDataUpload.append('file', file);
-            formDataUpload.append('type', 'image'); // Indicar explícitamente que es una imagen
             
-            const response = await fetch('/api/upload', {
-              method: 'POST',
-              body: formDataUpload,
-            });
-            
-            const result = await response.json();
-            if (result.success) {
-              // Usar value si existe (normalizado), sino filename para local o url para R2
-              const pictureValue = result.value || (result.storage === 'r2' ? result.url : result.filename);
-              handleInputChange('picture', pictureValue);
-              toast.success('Imagen recortada y subida correctamente');
-              setImageToCrop("");
-            } else {
-              toast.error(result.error || 'Error al subir la imagen');
-            }
+            const result = await uploadFile(file, 'image');
+            const pictureValue = result.value || (result.storage === 'r2' ? result.url : result.filename);
+            handleInputChange('picture', pictureValue);
+            toast.success('Imagen recortada y subida correctamente');
+            setImageToCrop("");
           } catch (error) {
             console.error('Error uploading cropped image:', error);
-            toast.error('Error al subir la imagen');
+            toast.error(getErrorMessage(error, 'Error al subir la imagen'));
           }
         }}
       />
@@ -1563,8 +1497,3 @@ export default function SettingsPage() {
     </div>
   );
 }
-
-
-
-
-

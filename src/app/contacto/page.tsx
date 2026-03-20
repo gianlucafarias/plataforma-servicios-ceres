@@ -22,6 +22,8 @@ import {
   AlertCircle,
 } from "lucide-react";
 import Link from "next/link";
+import { getErrorMessage } from "@/lib/api/client";
+import { sendSupportContact } from "@/lib/api/support";
 
 type FormState = "idle" | "submitting" | "success" | "error";
 
@@ -97,28 +99,16 @@ export default function ContactoPage() {
     try {
       const topic = mapSubjectToTopic(formData.subject || "other");
 
-      const response = await fetch("/api/support/contact", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          name: formData.name || undefined,
-          email: formData.email,
-          topic: topic,
-          message: formData.message,
-          origin: "contacto_page",
-          url: currentUrl,
-          website: formData.website || undefined,
-          openedAt: openedAt || undefined,
-        }),
+      await sendSupportContact({
+        name: formData.name || undefined,
+        email: formData.email,
+        topic,
+        message: formData.message,
+        origin: "contacto_page",
+        url: currentUrl,
+        website: formData.website || undefined,
+        openedAt: openedAt || undefined,
       });
-
-      const data = await response.json();
-
-      if (!response.ok || !data?.success) {
-        throw new Error(data?.message || "No se pudo enviar el mensaje.");
-      }
 
       setFormState("success");
 
@@ -129,10 +119,10 @@ export default function ContactoPage() {
 
       resetForm();
     } catch (error) {
-      const message =
-        error instanceof Error
-          ? error.message
-          : "Ocurrió un error inesperado. Intenta nuevamente.";
+      const message = getErrorMessage(
+        error,
+        "Ocurrió un error inesperado. Intenta nuevamente."
+      );
       setErrorMessage(message);
       setFormState("error");
     }

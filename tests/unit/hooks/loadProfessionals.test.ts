@@ -4,13 +4,28 @@ import { server } from '../../testServer'
 import { loadProfessionals } from '@/hooks/loadProfessionals'
 
 describe('loadProfessionals', () => {
-  it('devuelve datos y paginación', async () => {
+  it('devuelve datos y paginacion', async () => {
     server.use(
-      http.get('/api/professionals', () => {
+      http.get('/api/v1/professionals', () => {
         return HttpResponse.json({
           success: true,
-          data: [ { id: 'p1', userId: 'u1', bio: 'b', experienceYears: 1, verified: true, status: 'active', rating: 0, reviewCount: 0, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() } ],
-          pagination: { page: 1, limit: 12, total: 1, totalPages: 1 }
+          data: [
+            {
+              id: 'p1',
+              userId: 'u1',
+              bio: 'b',
+              experienceYears: 1,
+              verified: true,
+              status: 'active',
+              rating: 0,
+              reviewCount: 0,
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+            },
+          ],
+          meta: {
+            pagination: { page: 1, pageSize: 12, total: 1, totalPages: 1 },
+          },
         })
       })
     )
@@ -23,11 +38,20 @@ describe('loadProfessionals', () => {
   })
 
   it('retorna mensaje en error', async () => {
-    server.use(http.get('/api/professionals', () => HttpResponse.json({ success: false, message: 'Fallo' }, { status: 400 })))
+    server.use(
+      http.get('/api/v1/professionals', () =>
+        HttpResponse.json(
+          {
+            success: false,
+            error: { code: 'bad_request', message: 'Fallo' },
+          },
+          { status: 400 }
+        )
+      )
+    )
+
     const res = await loadProfessionals()
     expect(res.success).toBe(false)
     expect(res.message).toBe('Fallo')
   })
 })
-
-

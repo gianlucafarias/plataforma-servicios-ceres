@@ -1,13 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { rateLimit, rateLimitHeaders } from '@/lib/rate-limit-memory';
 import { clientIp } from '@/lib/request-helpers';
-import { createUploadGrant } from '@/lib/upload-grant';
-
-const LIMIT = 20;
-const WINDOW_MS = 10 * 60 * 1000;
+import {
+  UPLOAD_GRANT_RATE_LIMIT,
+  UploadFlowError,
+  createRegisterUploadGrantFromPayload,
+} from '@/lib/server/uploads';
 
 export async function POST(request: NextRequest) {
-  const rl = rateLimit(`upload-grant:${clientIp(request)}`, LIMIT, WINDOW_MS);
+  const rl = rateLimit(
+    `upload-grant:${clientIp(request)}`,
+    UPLOAD_GRANT_RATE_LIMIT.limit,
+    UPLOAD_GRANT_RATE_LIMIT.windowMs
+  );
   if (!rl.allowed) {
     return NextResponse.json(
       {
@@ -20,23 +25,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const body = (await request.json()) as { context?: string; type?: string };
-
-    if (body.context !== 'register' || (body.type !== 'image' && body.type !== 'cv')) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'invalid_payload',
-          message: 'Se requiere context=register y type=image|cv.',
-        },
-        { status: 400, headers: rateLimitHeaders(rl) }
-      );
-    }
-
-    const grant = createUploadGrant({
-      context: 'register',
-      type: body.type,
-    });
+    const grant = createRegisterUploadGrantFromPayload(await request.json());
 
     return NextResponse.json(
       {
@@ -47,6 +36,17 @@ export async function POST(request: NextRequest) {
       { headers: rateLimitHeaders(rl) }
     );
   } catch (error) {
+    if (error instanceof UploadFlowError) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: error.code,
+          message: error.message,
+        },
+        { status: error.status, headers: rateLimitHeaders(rl) }
+      );
+    }
+
     console.error('Error creando upload grant:', error);
     return NextResponse.json(
       {

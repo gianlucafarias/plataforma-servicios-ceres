@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { trackProfessionalView } from "@/lib/api/professionals";
 
 interface ProfileViewTrackerProps {
   professionalId: string;
@@ -29,9 +30,7 @@ export function ProfileViewTracker({ professionalId }: ProfileViewTrackerProps) 
       // Si localStorage falla, seguimos igual pero sin throttle
     }
 
-    fetch(`/api/professional/${professionalId}/view`, {
-      method: "POST",
-    }).catch(() => {
+    trackProfessionalView(professionalId).catch(() => {
       // fallo silencioso; no rompemos la UI
     });
 

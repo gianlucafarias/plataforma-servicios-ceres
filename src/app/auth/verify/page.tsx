@@ -1,5 +1,8 @@
 "use client"
+
 import { useEffect, useState } from 'react'
+import { getErrorMessage } from '@/lib/api/client'
+import { verifyAccount } from '@/lib/api/auth'
 
 export default function VerifyPage() {
   const [status, setStatus] = useState<'pending'|'success'|'error'>('pending')
@@ -12,29 +15,22 @@ export default function VerifyPage() {
 
     async function run() {
       try {
-        const res = await fetch('/api/auth/verify', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ token, email }),
-        })
-        const data = await res.json()
-        if (!res.ok) throw new Error(data?.error || 'No se pudo verificar')
+        await verifyAccount(token, email)
         setStatus('success')
-        setMessage('¡Tu cuenta fue verificada! Ya podés iniciar sesión.')
-      } catch (e: unknown) {
+        setMessage('Â¡Tu cuenta fue verificada! Ya podÃ©s iniciar sesiÃ³n.')
+      } catch (error: unknown) {
         setStatus('error')
-        setMessage(e instanceof Error ? e.message : 'El enlace no es válido o expiró.')
+        setMessage(getErrorMessage(error, 'El enlace no es vÃ¡lido o expirÃ³.'))
       }
     }
-    run()
+
+    void run()
   }, [])
 
   return (
     <div className="max-w-xl mx-auto py-20 px-4">
-      <h1 className="text-2xl font-semibold mb-4">Confirmación de cuenta</h1>
+      <h1 className="text-2xl font-semibold mb-4">ConfirmaciÃ³n de cuenta</h1>
       <p className={status === 'error' ? 'text-red-600' : status === 'success' ? 'text-green-700' : ''}>{message}</p>
     </div>
   )
 }
-
-

@@ -29,7 +29,6 @@ import {
   X,
   Lightbulb
 } from "lucide-react";
-import { Professional, Service } from "@/types";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Input } from "@/components/ui/input"
@@ -42,13 +41,21 @@ import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { ApiClientError, getErrorMessage } from "@/lib/api/client";
+import {
+  createDashboardCertification,
+  type DashboardProfile,
+  type DashboardStats,
+  getDashboardProfile,
+  getDashboardStats,
+  listDashboardCertifications,
+  type ProfessionalCertification,
+  updateDashboardSchedule,
+} from "@/lib/api/dashboard";
+import { createService, deleteService, updateService } from "@/lib/api/services";
+import { uploadFile } from "@/lib/api/uploads";
 
-
-type DashboardService = Service & { category?: { name: string } };
-type ProfessionalWithServices = Professional & { 
-  services?: DashboardService[];
-  status?: 'pending' | 'active' | 'suspended';
-};
+type DashboardService = DashboardProfile["services"][number];
 
 interface ScheduleData {
   morning: {
@@ -75,26 +82,6 @@ const DAYS_OF_WEEK = [
   { id: 'sunday', name: 'Domingo', short: 'D' },
 ];
 
-type Stats = {
-  services: {
-    active: number;
-    total: number;
-    inactive: number;
-  };
-  rating: {
-    average: number;
-    totalReviews: number;
-  };
-  profile: {
-    verified: boolean;
-    status: string;
-    experienceYears: number;
-    locations: number;
-    views: number;
-    since: string;
-  };
-};
-
 type ProfessionalTip = {
   id: string;
   title: string;
@@ -106,10 +93,10 @@ type ProfessionalTip = {
 export default function DashboardPage() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState("overview");
-  const [me, setMe] = useState<ProfessionalWithServices | null>(null);
+  const [me, setMe] = useState<DashboardProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [isUnauthorized, setIsUnauthorized] = useState(false);
-  const [stats, setStats] = useState<Stats | null>(null);
+  const [stats, setStats] = useState<DashboardStats | null>(null);
   const [statsLoading, setStatsLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [newService, setNewService] = useState({ categorySlug: "", title: "", description: "", priceRange: "" });
@@ -118,19 +105,7 @@ export default function DashboardPage() {
   const [editCategorySlug, setEditCategorySlug] = useState<string>("");
   
   // Estados para certificaciones
-  type Certification = {
-    id: string;
-    categoryId: string | null;
-    certificationType: string;
-    certificationNumber: string;
-    issuingOrganization: string;
-    issueDate: string | null;
-    expiryDate: string | null;
-    documentUrl: string;
-    status: 'pending' | 'approved' | 'rejected';
-    category?: { id: string; name: string; slug: string } | null;
-  };
-  const [certifications, setCertifications] = useState<Certification[]>([]);
+  const [certifications, setCertifications] = useState<ProfessionalCertification[]>([]);
   const [showCertificationDialog, setShowCertificationDialog] = useState(false);
   const [newCertification, setNewCertification] = useState({
     categoryId: "",
@@ -262,27 +237,12 @@ export default function DashboardPage() {
   const saveSchedule = async () => {
     setScheduleSaving(true);
     try {
-      const response = await fetch('/api/professional/schedule', {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          schedule: scheduleData
-        }),
-      });
-
-      const result = await response.json();
-      
-      if (result.success) {
-        toast.success('Horarios actualizados correctamente');
-        setScheduleHasChanges(false);
-      } else {
-        toast.error(result.message || result.error || 'Error al actualizar los horarios');
-      }
+      await updateDashboardSchedule(scheduleData);
+      toast.success('Horarios actualizados correctamente');
+      setScheduleHasChanges(false);
     } catch (error) {
       console.error('Error actualizando horarios:', error);
-      toast.error('Error al actualizar los horarios');
+      toast.error(getErrorMessage(error, 'Error al actualizar los horarios'));
     } finally {
       setScheduleSaving(false);
     }
@@ -291,8 +251,14 @@ export default function DashboardPage() {
   useEffect(() => {
     const fetchMyProfessional = async () => {
       try {
-        const response = await fetch('/api/professional/me');
-        const result = await response.json();
+        const profile = await getDashboardProfile();
+        const response = { status: 200 } as Response;
+        const result = {
+          success: true,
+          data: profile,
+          error: undefined as string | undefined,
+        };
+        setMe(profile);
         
         // Si la respuesta es 401 (no autorizado), el usuario no está logueado
         if (response.status === 401 || result.error === 'unauthorized') {
@@ -315,6 +281,12 @@ export default function DashboardPage() {
           }
         }
       } catch (error) {
+        if (error instanceof ApiClientError && error.status === 404) {
+          setMe(null);
+          initializeDefaultSchedule();
+          return;
+        }
+
         console.error('Error cargando profesional:', error);
         // Si hay un error de red, podría ser que no esté autenticado
         setIsUnauthorized(true);
@@ -328,8 +300,12 @@ export default function DashboardPage() {
 
     const fetchStats = async () => {
       try {
-        const response = await fetch('/api/professional/stats');
-        const result = await response.json();
+        const response = { status: 200 } as Response;
+        const result = {
+          success: true,
+          data: await getDashboardStats(),
+          error: undefined as string | undefined,
+        };
 
         // Si no está autorizado, no mostramos toast ni marcamos error visual
         if (response.status === 401 || result.error === 'unauthorized') {
@@ -351,8 +327,10 @@ export default function DashboardPage() {
 
     const fetchCertifications = async () => {
       try {
-        const response = await fetch('/api/professional/certifications');
-        const result = await response.json();
+        const result = {
+          success: true,
+          data: await listDashboardCertifications(),
+        };
         if (result.success) {
           setCertifications(result.data || []);
         }
@@ -681,39 +659,26 @@ export default function DashboardPage() {
 
                                 // Si se subió un archivo, primero subirlo
                                 if (newCertification.documentFile) {
-                                  const formData = new FormData();
-                                  formData.append('file', newCertification.documentFile);
-                                  formData.append('type', 'cv'); // Usar el mismo endpoint de upload
-
-                                  const uploadRes = await fetch('/api/upload', {
-                                    method: 'POST',
-                                    body: formData
-                                  });
-
-                                  const uploadResult = await uploadRes.json();
-                                  if (!uploadResult.success) {
-                                    toast.error(uploadResult.error || 'Error al subir el documento');
-                                    return;
-                                  }
-                                  documentUrl = uploadResult.path;
+                                  const uploadResult = await uploadFile(newCertification.documentFile, 'cv');
+                                  documentUrl = uploadResult.url || uploadResult.path || uploadResult.filename;
                                 }
 
                                 // Crear la certificación (con o sin documento)
-                                const certRes = await fetch('/api/professional/certifications', {
-                                  method: 'POST',
-                                  headers: { 'Content-Type': 'application/json' },
-                                  body: JSON.stringify({
-                                    categoryId: newCertification.categoryId || null,
-                                    certificationType: newCertification.certificationType,
-                                    certificationNumber: newCertification.certificationNumber,
-                                    issuingOrganization: newCertification.issuingOrganization,
-                                    issueDate: newCertification.issueDate || null,
-                                    expiryDate: newCertification.expiryDate || null,
-                                    documentUrl
-                                  })
-                                });
-
-                                const certResult = await certRes.json();
+                                const certResult = {
+                                  success: true,
+                                  data: (
+                                    await createDashboardCertification({
+                                      categoryId: newCertification.categoryId || null,
+                                      certificationType: newCertification.certificationType,
+                                      certificationNumber: newCertification.certificationNumber,
+                                      issuingOrganization: newCertification.issuingOrganization,
+                                      issueDate: newCertification.issueDate || null,
+                                      expiryDate: newCertification.expiryDate || null,
+                                      documentUrl
+                                    })
+                                  ).certification,
+                                  message: undefined as string | undefined
+                                };
                                 if (certResult.success) {
                                   toast.success('Certificación enviada para revisión. Será revisada por nuestro equipo.', {
                                     duration: 5000
@@ -735,7 +700,7 @@ export default function DashboardPage() {
                                 }
                               } catch (error) {
                                 console.error('Error:', error);
-                                toast.error('Error al procesar la certificación');
+                                toast.error(getErrorMessage(error, 'Error al procesar la certificación'));
                               } finally {
                                 setUploadingCert(false);
                               }
@@ -1086,20 +1051,14 @@ export default function DashboardPage() {
                             ...newService,
                             title: newService.title.trim() || categoryName
                           };
-                          const res = await fetch('/api/services', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            credentials: 'include',
-                            body: JSON.stringify(serviceToSave),
-                          });
-                          const json = await res.json();
-                          if (json.success) {
+                          try {
+                            const createdService = await createService(serviceToSave);
                             toast.success('Servicio agregado correctamente');
-                            setMe(prev => prev ? { ...prev, services: [ ...(prev.services || []), json.data as DashboardService ] } : prev);
+                            setMe(prev => prev ? { ...prev, services: [ ...(prev.services || []), createdService as DashboardService ] } : prev);
                             setCreating(false);
                             setNewService({ categorySlug: '', title: '', description: '', priceRange: '' });
-                          } else {
-                            toast.error(json.message || 'Error al crear el servicio');
+                          } catch (error) {
+                            toast.error(getErrorMessage(error, 'Error al crear el servicio'));
                           }
                         }}
                         className="bg-[#006F4B] text-white rounded-xl">
@@ -1146,30 +1105,20 @@ export default function DashboardPage() {
 
                               // Activar directamente sin confirmación adicional
                               try {
-                                const res = await fetch(`/api/services/${service.id}`, {
-                                  method: 'PATCH',
-                                  headers: { 'Content-Type': 'application/json' },
-                                  credentials: 'include',
-                                  body: JSON.stringify({ available: true }),
-                                });
-                                const json = await res.json();
-                                if (json.success) {
-                                  setMe(prev =>
-                                    prev
-                                      ? {
-                                          ...prev,
-                                          services: prev.services?.map((s) =>
-                                            s.id === service.id ? { ...s, available: true } : s
-                                          ),
-                                        }
-                                      : prev
-                                  );
-                                } else {
-                                  toast.error(json.message || 'Error al actualizar el servicio');
-                                }
+                                await updateService(service.id, { available: true });
+                                setMe(prev =>
+                                  prev
+                                    ? {
+                                        ...prev,
+                                        services: prev.services?.map((s) =>
+                                          s.id === service.id ? { ...s, available: true } : s
+                                        ),
+                                      }
+                                    : prev
+                                );
                               } catch (error) {
                                 console.error('Error actualizando servicio:', error);
-                                toast.error('Error al actualizar el servicio');
+                                toast.error(getErrorMessage(error, 'Error al actualizar el servicio'));
                               }
                             }}
                           />
@@ -1337,20 +1286,14 @@ export default function DashboardPage() {
                                   payload.title = editData.title.trim() || categoryName;
                                   payload.description = editData.description;
                                   if (editData.priceRange) payload.priceRange = editData.priceRange;
-                                  const res = await fetch(`/api/services/${service.id}`, {
-                                    method: 'PATCH',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    credentials: 'include',
-                                    body: JSON.stringify(payload),
-                                  });
-                                  const json = await res.json();
-                                  if (json.success) {
+                                  try {
+                                    const updatedService = await updateService(service.id, payload);
                                     toast.success('Servicio actualizado correctamente');
-                                    setMe(prev => prev ? { ...prev, services: prev.services?.map((s) => s.id === service.id ? { ...s, ...(payload as Partial<DashboardService>) } : s) } : prev);
+                                    setMe(prev => prev ? { ...prev, services: prev.services?.map((s) => s.id === service.id ? { ...s, ...(updatedService as Partial<DashboardService>) } : s) } : prev);
                                     setEditingId(null);
                                     setEditData({ title: '', description: '', priceRange: '' });
-                                  } else {
-                                    toast.error(json.message || 'Error al actualizar el servicio');
+                                  } catch (error) {
+                                    toast.error(getErrorMessage(error, 'Error al actualizar el servicio'));
                                   }
                                 }}
                                 className="bg-[#006F4B] text-white rounded-xl">
@@ -1377,13 +1320,12 @@ export default function DashboardPage() {
                           cancelLabel="Cancelar"
                           confirmVariant="destructive"
                           onConfirm={async () => {
-                            const res = await fetch(`/api/services/${service.id}`, { method: 'DELETE', credentials: 'include' });
-                            const json = await res.json();
-                            if (json.success) {
+                            try {
+                              await deleteService(service.id);
                               setMe(prev => prev ? { ...prev, services: prev.services?.filter((s) => s.id !== service.id) } : prev);
                               toast.success('Servicio eliminado correctamente');
-                            } else {
-                              toast.error(json.message || 'Error al eliminar el servicio');
+                            } catch (error) {
+                              toast.error(getErrorMessage(error, 'Error al eliminar el servicio'));
                             }
                           }}
                           trigger={
@@ -1671,31 +1613,21 @@ export default function DashboardPage() {
                   onClick={async () => {
                     if (!serviceToDisable) return;
                     try {
-                      const res = await fetch(`/api/services/${serviceToDisable.id}`, {
-                        method: 'PATCH',
-                        headers: { 'Content-Type': 'application/json' },
-                        credentials: 'include',
-                        body: JSON.stringify({ available: false }),
-                      });
-                      const json = await res.json();
-                      if (json.success) {
-                        setMe(prev =>
-                          prev
-                            ? {
-                                ...prev,
-                                services: prev.services?.map((s) =>
-                                  s.id === serviceToDisable.id ? { ...s, available: false } : s
-                                ),
-                              }
-                            : prev
-                        );
-                        toast.success('Servicio desactivado. Ya no es visible en la plataforma.');
-                      } else {
-                        toast.error(json.message || 'Error al desactivar el servicio');
-                      }
+                      await updateService(serviceToDisable.id, { available: false });
+                      setMe(prev =>
+                        prev
+                          ? {
+                              ...prev,
+                              services: prev.services?.map((s) =>
+                                s.id === serviceToDisable.id ? { ...s, available: false } : s
+                              ),
+                            }
+                          : prev
+                      );
+                      toast.success('Servicio desactivado. Ya no es visible en la plataforma.');
                     } catch (error) {
                       console.error('Error desactivando servicio:', error);
-                      toast.error('Error al desactivar el servicio');
+                      toast.error(getErrorMessage(error, 'Error al desactivar el servicio'));
                     } finally {
                       setDisableDialogOpen(false);
                       setServiceToDisable(null);

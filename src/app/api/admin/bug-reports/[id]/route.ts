@@ -2,10 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireAdminApiKey } from '@/lib/auth-helpers';
 
-/**
- * GET /api/admin/bug-reports/[id]
- * Obtiene detalles completos de un bug report
- */
+export const dynamic = 'force-dynamic';
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -27,8 +25,8 @@ export async function GET(
             lastName: true,
             phone: true,
             role: true,
-          }
-        }
+          },
+        },
       },
     });
 
@@ -49,11 +47,6 @@ export async function GET(
   }
 }
 
-/**
- * PUT /api/admin/bug-reports/[id]
- * Actualiza un bug report (cambiar estado, agregar notas, etc.)
- * Body: { status?, severity?, adminNotes? }
- */
 export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -65,7 +58,6 @@ export async function PUT(
     const { id } = await params;
     const body = await request.json();
 
-    // Verificar que existe
     const existing = await prisma.bugReport.findUnique({ where: { id } });
     if (!existing) {
       return NextResponse.json(
@@ -74,23 +66,20 @@ export async function PUT(
       );
     }
 
-    // Validar status si se proporciona
     if (body.status && !['open', 'in_progress', 'resolved', 'closed'].includes(body.status)) {
       return NextResponse.json(
-        { success: false, error: 'validation_error', message: 'Estado inválido' },
+        { success: false, error: 'validation_error', message: 'Estado invalido' },
         { status: 400 }
       );
     }
 
-    // Validar severity si se proporciona
     if (body.severity && !['low', 'medium', 'high', 'critical'].includes(body.severity)) {
       return NextResponse.json(
-        { success: false, error: 'validation_error', message: 'Severidad inválida' },
+        { success: false, error: 'validation_error', message: 'Severidad invalida' },
         { status: 400 }
       );
     }
 
-    // Construir datos de actualización
     const updateData: {
       status?: 'open' | 'in_progress' | 'resolved' | 'closed';
       severity?: 'low' | 'medium' | 'high' | 'critical';
@@ -100,11 +89,9 @@ export async function PUT(
 
     if (body.status !== undefined) {
       updateData.status = body.status;
-      // Si se resuelve/cierra, marcar fecha de resolución
       if ((body.status === 'resolved' || body.status === 'closed') && !existing.resolvedAt) {
         updateData.resolvedAt = new Date();
       }
-      // Si se vuelve a abrir, limpiar fecha
       if (body.status === 'open' || body.status === 'in_progress') {
         updateData.resolvedAt = null;
       }
@@ -123,15 +110,15 @@ export async function PUT(
             email: true,
             firstName: true,
             lastName: true,
-          }
-        }
+          },
+        },
       },
     });
 
     return NextResponse.json({
       success: true,
       data: updated,
-      message: 'Bug report actualizado correctamente'
+      message: 'Bug report actualizado correctamente',
     });
   } catch (error) {
     console.error('Error actualizando bug report:', error);

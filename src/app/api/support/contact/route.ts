@@ -1,13 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
 import { rateLimit, rateLimitHeaders } from '@/lib/rate-limit-memory';
 import { clientIp } from '@/lib/request-helpers';
-
-const LIMIT = 20;
-const WINDOW_MS = 10 * 60 * 1000;
+import {
+  SUPPORT_CONTACT_RATE_LIMIT,
+  createSupportContactSubmission,
+  validateSupportContactPayload,
+} from '@/lib/server/support-submissions';
 
 export async function POST(request: NextRequest) {
-  const rl = rateLimit(`support-contact:${clientIp(request)}`, LIMIT, WINDOW_MS);
+  const rl = rateLimit(
+    `support-contact:${clientIp(request)}`,
+    SUPPORT_CONTACT_RATE_LIMIT.limit,
+    SUPPORT_CONTACT_RATE_LIMIT.windowMs
+  );
   if (!rl.allowed) {
     return NextResponse.json(
       {
@@ -21,86 +26,31 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { name, email, topic, message, origin, url, context, website, openedAt } = body ?? {};
+    const validation = validateSupportContactPayload(body);
 
-    if (typeof website === 'string' && website.trim().length > 0) {
+    if (validation.kind === 'ignored') {
       return NextResponse.json(
         {
           success: true,
           data: { ignored: true },
-          message: 'Mensaje recibido.',
+          message: validation.message,
         },
         { status: 200, headers: rateLimitHeaders(rl) }
       );
     }
 
-    if (typeof openedAt === 'number' && openedAt > 0) {
-      const elapsed = Date.now() - openedAt;
-      if (elapsed < 2000) {
-        return NextResponse.json(
-          {
-            success: true,
-            data: { ignored: true },
-            message: 'Mensaje recibido.',
-          },
-          { status: 200, headers: rateLimitHeaders(rl) }
-        );
-      }
-    }
-
-    if (!email || typeof email !== 'string') {
+    if (validation.kind === 'error') {
       return NextResponse.json(
         {
           success: false,
-          error: 'validation_error',
-          message: 'El email es obligatorio.',
+          error: validation.code,
+          message: validation.message,
         },
         { status: 400, headers: rateLimitHeaders(rl) }
       );
     }
 
-    if (!message || typeof message !== 'string') {
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'validation_error',
-          message: 'El mensaje es obligatorio.',
-        },
-        { status: 400, headers: rateLimitHeaders(rl) }
-      );
-    }
-
-    const normalizedTopic = topic === 'bug' || topic === 'improvement' ? topic : 'general';
-    const severity =
-      normalizedTopic === 'bug' ? 'high' : normalizedTopic === 'improvement' ? 'medium' : 'low';
-    const titleBase =
-      normalizedTopic === 'bug'
-        ? 'Reporte de problema desde la web'
-        : normalizedTopic === 'improvement'
-          ? 'Sugerencia de mejora desde la web'
-          : 'Consulta general desde la web';
-
-    const safeName =
-      typeof name === 'string' && name.trim().length > 0
-        ? name.trim().slice(0, 80)
-        : null;
-
-    const report = await prisma.bugReport.create({
-      data: {
-        title: titleBase,
-        description: message.trim().slice(0, 4000),
-        status: 'open',
-        severity,
-        userEmail: email.trim().slice(0, 120),
-        context: {
-          origin: typeof origin === 'string' ? origin : undefined,
-          url: typeof url === 'string' ? url : undefined,
-          topic: normalizedTopic,
-          name: safeName ?? undefined,
-          extra: context ?? undefined,
-        },
-      },
-    });
+    const report = await createSupportContactSubmission(validation.data);
 
     return NextResponse.json(
       {

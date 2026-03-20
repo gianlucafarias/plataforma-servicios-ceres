@@ -1,7 +1,8 @@
 'use client';
 
-import { Professional } from '@/types';
 import { useState, useEffect } from 'react';
+import type { Professional } from '@/types';
+import { loadProfessionals } from '@/lib/api/professionals';
 
 type Filters = {
   q?: string;
@@ -27,26 +28,17 @@ export function useProfessionals(filters: Filters = {}) {
       setLoading(true);
       setError(null);
       try {
-        const params = new URLSearchParams();
-        if (filters.q) params.set('q', filters.q);
-        if (filters.categoria) params.set('categoria', filters.categoria);
-        if (filters.grupo) params.set('grupo', filters.grupo);
-        if (filters.location) params.set('location', filters.location);
-        params.set('limit', String(filters.limit ?? 12));
-        params.set('page', String(filters.page ?? 1));
-        params.set('sortBy', String(filters.sortBy ?? 'recent'));
-
-        const res = await fetch(`/api/professionals?${params.toString()}`, {
+        const result = await loadProfessionals(filters, {
           signal: controller.signal,
         });
-        const json = await res.json();
         if (controller.signal.aborted) return;
-        if (json.success) {
-          setProfessionals(json.data);
-          setTotal(json.pagination?.total ?? json.data.length);
-          setTotalPages(json.pagination?.totalPages ?? 1);
+
+        if (result.success) {
+          setProfessionals(result.data);
+          setTotal(result.total);
+          setTotalPages(result.totalPages);
         } else {
-          setError(json.message || 'No se pudieron cargar los profesionales');
+          setError(result.message || 'No se pudieron cargar los profesionales');
         }
       } catch (e) {
         if (controller.signal.aborted) return;

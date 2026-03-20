@@ -9,8 +9,15 @@ import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { Clock, Save, Loader2, Calendar, CheckCircle } from "lucide-react";
 import { toast } from "sonner";
+import {
+  type DashboardSchedule,
+  type DashboardScheduleDay,
+  getDashboardProfile,
+  updateDashboardSchedule,
+} from "@/lib/api/dashboard";
+import { getErrorMessage } from "@/lib/api/client";
 
-interface ScheduleData {
+interface ScheduleData extends DashboardScheduleDay {
   morning: {
     enabled: boolean;
     start: string;
@@ -28,12 +35,25 @@ interface ScheduleData {
 const DAYS_OF_WEEK = [
   { id: 'monday', name: 'Lunes', short: 'L' },
   { id: 'tuesday', name: 'Martes', short: 'M' },
-  { id: 'wednesday', name: 'Miércoles', short: 'X' },
+  { id: 'wednesday', name: 'MiÃ©rcoles', short: 'X' },
   { id: 'thursday', name: 'Jueves', short: 'J' },
   { id: 'friday', name: 'Viernes', short: 'V' },
-  { id: 'saturday', name: 'Sábado', short: 'S' },
+  { id: 'saturday', name: 'SÃ¡bado', short: 'S' },
   { id: 'sunday', name: 'Domingo', short: 'D' },
 ];
+
+function buildDefaultSchedule(): Record<string, ScheduleData> {
+  const defaultSchedule: Record<string, ScheduleData> = {};
+  DAYS_OF_WEEK.forEach(day => {
+    defaultSchedule[day.id] = {
+      morning: { enabled: true, start: '08:00', end: '12:00' },
+      afternoon: { enabled: true, start: '14:00', end: '18:00' },
+      fullDay: false,
+      workOnHolidays: false
+    };
+  });
+  return defaultSchedule;
+}
 
 export default function SchedulePage() {
   const [loading, setLoading] = useState(true);
@@ -43,56 +63,24 @@ export default function SchedulePage() {
 
   useEffect(() => {
     const loadScheduleData = async () => {
-    try {
-      const response = await fetch('/api/professional/me');
-      const result = await response.json();
-      
-      if (result.success && result.data) {
-        const professional = result.data;
+      try {
+        const professional = await getDashboardProfile();
         if (professional.schedule && typeof professional.schedule === 'object') {
           setScheduleData(professional.schedule as Record<string, ScheduleData>);
         } else {
-          // Inicializar con horarios por defecto
-          initializeDefaultSchedule();
+          setScheduleData(buildDefaultSchedule());
         }
+      } catch (error) {
+        console.error('Error cargando horarios:', error);
+        toast.error(getErrorMessage(error, 'Error al cargar los horarios'));
+        setScheduleData(buildDefaultSchedule());
+      } finally {
+        setLoading(false);
       }
-    } catch (error) {
-      console.error('Error cargando horarios:', error);
-      toast.error('Error al cargar los horarios');
-      initializeDefaultSchedule();
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const initializeDefaultSchedule = () => {
-    const defaultSchedule: Record<string, ScheduleData> = {};
-    DAYS_OF_WEEK.forEach(day => {
-      defaultSchedule[day.id] = {
-        morning: { enabled: true, start: '08:00', end: '12:00' },
-        afternoon: { enabled: true, start: '14:00', end: '18:00' },
-        fullDay: false,
-        workOnHolidays: false
-      };
-    });
-    setScheduleData(defaultSchedule);
     };
-    
-    loadScheduleData();
-  }, []);
 
-  const initializeDefaultSchedule = () => {
-    const defaultSchedule: Record<string, ScheduleData> = {};
-    DAYS_OF_WEEK.forEach(day => {
-      defaultSchedule[day.id] = {
-        morning: { enabled: true, start: '08:00', end: '12:00' },
-        afternoon: { enabled: true, start: '14:00', end: '18:00' },
-        fullDay: false,
-        workOnHolidays: false
-      };
-    });
-    setScheduleData(defaultSchedule);
-  };
+    void loadScheduleData();
+  }, []);
 
   const handleDayScheduleChange = (dayId: string, field: keyof ScheduleData, value: boolean | string | {enabled: boolean; start: string; end: string}) => {
     setScheduleData(prev => ({
@@ -122,27 +110,12 @@ export default function SchedulePage() {
   const handleSave = async () => {
     setSaving(true);
     try {
-      const response = await fetch('/api/professional/me', {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          schedule: scheduleData
-        }),
-      });
-
-      const result = await response.json();
-      
-      if (result.success) {
-        toast.success('Horarios actualizados correctamente');
-        setHasChanges(false);
-      } else {
-        toast.error(result.message || result.error || 'Error al actualizar los horarios');
-      }
+      await updateDashboardSchedule(scheduleData as DashboardSchedule);
+      toast.success('Horarios actualizados correctamente');
+      setHasChanges(false);
     } catch (error) {
       console.error('Error actualizando horarios:', error);
-      toast.error('Error al actualizar los horarios');
+      toast.error(getErrorMessage(error, 'Error al actualizar los horarios'));
     } finally {
       setSaving(false);
     }
@@ -160,11 +133,11 @@ export default function SchedulePage() {
     
     setScheduleData(newSchedule);
     setHasChanges(true);
-    toast.success('Horarios copiados a todos los días');
+    toast.success('Horarios copiados a todos los dÃ­as');
   };
 
   const resetToDefault = () => {
-    initializeDefaultSchedule();
+    setScheduleData(buildDefaultSchedule());
     setHasChanges(true);
     toast.info('Horarios restaurados por defecto');
   };
@@ -182,7 +155,6 @@ export default function SchedulePage() {
   return (
     <div className="container mx-auto px-4 py-8 max-w-6xl">
       <div className="space-y-6">
-        {/* Header */}
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold flex items-center gap-3">
@@ -190,7 +162,7 @@ export default function SchedulePage() {
               Horarios de Disponibilidad
             </h1>
             <p className="text-muted-foreground mt-1">
-              Configura tus horarios de trabajo para que los clientes sepan cuándo estás disponible
+              Configura tus horarios de trabajo para que los clientes sepan cuÃ¡ndo estÃ¡s disponible
             </p>
           </div>
           <div className="flex gap-2">
@@ -216,20 +188,19 @@ export default function SchedulePage() {
           </div>
         </div>
 
-        {/* Configuración General */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Calendar className="h-5 w-5" />
-              Configuración General
+              ConfiguraciÃ³n General
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex items-center justify-between">
               <div>
-                <Label className="text-base font-medium">Trabajo en días feriados</Label>
+                <Label className="text-base font-medium">Trabajo en dÃ­as feriados</Label>
                 <p className="text-sm text-muted-foreground">
-                  Indica si trabajas durante los días feriados
+                  Indica si trabajas durante los dÃ­as feriados
                 </p>
               </div>
               <Switch
@@ -250,7 +221,6 @@ export default function SchedulePage() {
           </CardContent>
         </Card>
 
-        {/* Horarios por Día */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {DAYS_OF_WEEK.map((day) => {
             const daySchedule = scheduleData[day.id];
@@ -277,10 +247,9 @@ export default function SchedulePage() {
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  {/* 24 Horas */}
                   <div className="flex items-center justify-between">
                     <div>
-                      <Label className="text-sm font-medium">Todo el día (24hs)</Label>
+                      <Label className="text-sm font-medium">Todo el dÃ­a (24hs)</Label>
                       <p className="text-xs text-muted-foreground">
                         Disponible las 24 horas
                       </p>
@@ -290,7 +259,6 @@ export default function SchedulePage() {
                       onCheckedChange={(checked) => {
                         handleDayScheduleChange(day.id, 'fullDay', checked);
                         if (checked) {
-                          // Desactivar mañana y tarde si se activa 24hs
                           handleDayScheduleChange(day.id, 'morning', { ...daySchedule.morning, enabled: false });
                           handleDayScheduleChange(day.id, 'afternoon', { ...daySchedule.afternoon, enabled: false });
                         }
@@ -302,10 +270,9 @@ export default function SchedulePage() {
                     <>
                       <Separator />
                       
-                      {/* Horario Mañana */}
                       <div className="space-y-3">
                         <div className="flex items-center justify-between">
-                          <Label className="text-sm font-medium">Turno Mañana</Label>
+                          <Label className="text-sm font-medium">Turno MaÃ±ana</Label>
                           <Switch
                             checked={daySchedule.morning.enabled}
                             onCheckedChange={(checked) => handleDayScheduleChange(day.id, 'morning', { ...daySchedule.morning, enabled: checked })}
@@ -337,7 +304,6 @@ export default function SchedulePage() {
 
                       <Separator />
                       
-                      {/* Horario Tarde */}
                       <div className="space-y-3">
                         <div className="flex items-center justify-between">
                           <Label className="text-sm font-medium">Turno Tarde</Label>
@@ -372,7 +338,6 @@ export default function SchedulePage() {
                     </>
                   )}
 
-                  {/* Estado del día */}
                   <div className="mt-4 p-3 bg-gray-50 rounded-lg">
                     <div className="flex items-center gap-2">
                       <CheckCircle className="h-4 w-4 text-green-600" />
@@ -392,7 +357,6 @@ export default function SchedulePage() {
           })}
         </div>
 
-        {/* Resumen */}
         <Card>
           <CardHeader>
             <CardTitle>Resumen de Horarios</CardTitle>

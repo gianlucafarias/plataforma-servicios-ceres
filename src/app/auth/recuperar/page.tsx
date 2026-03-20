@@ -7,6 +7,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import Link from "next/link";
 import { Mail, ArrowLeft, ArrowRight } from "lucide-react";
+import { getErrorMessage } from "@/lib/api/client";
+import { requestPasswordReset } from "@/lib/api/auth";
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
@@ -21,23 +23,16 @@ export default function ForgotPasswordPage() {
     setError(null);
 
     try {
-      const res = await fetch("/api/auth/password/forgot", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
-      });
-      const json = await res.json();
-      if (!res.ok || !json.success) {
-        setError(
-          json.message ||
-            "No pudimos enviar el correo de recuperación. Intentá de nuevo más tarde."
-        );
-      } else {
-        setSent(true);
-      }
-    } catch (err) {
-      console.error(err);
-      setError("Ocurrió un error inesperado. Intentá nuevamente.");
+      await requestPasswordReset(email);
+      setSent(true);
+    } catch (error) {
+      console.error(error);
+      setError(
+        getErrorMessage(
+          error,
+          "No pudimos enviar el correo de recuperaciÃ³n. IntentÃ¡ de nuevo mÃ¡s tarde."
+        )
+      );
     } finally {
       setLoading(false);
     }
@@ -57,26 +52,26 @@ export default function ForgotPasswordPage() {
           </button>
 
           <h1 className="text-2xl font-bold text-gray-900 mb-2">
-            Recuperar contraseña
+            Recuperar contraseÃ±a
           </h1>
           <p className="text-sm text-gray-600 mb-6">
-            Ingresá el correo electrónico con el que te registraste. Si existe
+            IngresÃ¡ el correo electrÃ³nico con el que te registraste. Si existe
             una cuenta asociada, te enviaremos un enlace para restablecer tu
-            contraseña.
+            contraseÃ±a.
           </p>
 
           {sent ? (
             <div className="space-y-4">
               <div className="rounded-xl bg-emerald-50 border border-emerald-200 px-4 py-3 text-sm text-emerald-800">
                 Te enviamos un correo con instrucciones para restablecer tu
-                contraseña. Revisá tu bandeja de entrada (y correo no deseado).
+                contraseÃ±a. RevisÃ¡ tu bandeja de entrada (y correo no deseado).
               </div>
               <Button
                 type="button"
                 className="w-full rounded-xl bg-[#006F4B] hover:bg-[#005a3d] text-white"
                 onClick={() => router.push("/auth/login")}
               >
-                Ir al inicio de sesión
+                Ir al inicio de sesiÃ³n
               </Button>
             </div>
           ) : (
@@ -86,7 +81,7 @@ export default function ForgotPasswordPage() {
                   htmlFor="email"
                   className="text-sm font-medium text-gray-700 mb-2 block"
                 >
-                  Correo electrónico
+                  Correo electrÃ³nico
                 </Label>
                 <div className="relative">
                   <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
@@ -130,16 +125,14 @@ export default function ForgotPasswordPage() {
           )}
 
           <p className="mt-6 text-xs text-gray-500 text-center">
-            Si no tenés acceso a tu correo, podés crear una cuenta nueva o
+            Si no tenÃ©s acceso a tu correo, podÃ©s crear una cuenta nueva o
             comunicarte con el soporte del municipio.
           </p>
         </div>
         <p className="mt-4 text-center text-xs text-gray-400">
-          © {new Date().getFullYear()} Ceres en Red
+          Â© {new Date().getFullYear()} Ceres en Red
         </p>
       </div>
     </div>
   );
 }
-
-

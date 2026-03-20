@@ -106,6 +106,7 @@ export async function POST(request: NextRequest) {
     }
 
     const hashedPassword = await bcrypt.hash(password, 12);
+    const skipEmailVerification = process.env.DISABLE_EMAIL_VERIFICATION === 'true';
 
     const result = await prisma.$transaction(async (tx) => {
       const user = await tx.user.create({
@@ -118,6 +119,7 @@ export async function POST(request: NextRequest) {
           phone: phone || null,
           birthDate: birthDate ? new Date(birthDate) : null,
           location: location || null,
+          ...(skipEmailVerification ? { verified: true, emailVerifiedAt: new Date() } : {}),
         },
       });
 
@@ -203,16 +205,19 @@ export async function POST(request: NextRequest) {
         });
       }
 
-      const token = generateRandomToken(48);
-      const expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24);
+      let token: string | null = null;
 
-      await tx.verificationToken.create({
-        data: {
-          userId: user.id,
-          token,
-          expiresAt,
-        },
-      });
+      if (!skipEmailVerification) {
+        token = generateRandomToken(48);
+        const expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24);
+        await tx.verificationToken.create({
+          data: {
+            userId: user.id,
+            token,
+            expiresAt,
+          },
+        });
+      }
 
       return { user, professional, token };
     });
@@ -220,25 +225,29 @@ export async function POST(request: NextRequest) {
     const { password: _dbPassword, ...userWithoutPassword } = result.user as PrismaUser;
     void _dbPassword;
 
-    try {
-      await enqueueEmailVerify({
-        userId: userWithoutPassword.id,
-        token: result.token,
-        email: userWithoutPassword.email,
-        firstName: userWithoutPassword.firstName || undefined,
-      });
-    } catch (error) {
-      console.error('Error encolando correo de verificacion:', error);
-      if (process.env.NODE_ENV !== 'production') {
-        const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || process.env.VERCEL_URL || '';
-        const origin = baseUrl.startsWith('http') ? baseUrl : `https://${baseUrl}`;
-        const verifyUrl = `${origin}/auth/verify?token=${encodeURIComponent(result.token)}&email=${encodeURIComponent(userWithoutPassword.email)}`;
-        console.log('Verification URL (dev):', verifyUrl);
+    if (!skipEmailVerification && result.token) {
+      try {
+        await enqueueEmailVerify({
+          userId: userWithoutPassword.id,
+          token: result.token,
+          email: userWithoutPassword.email,
+          firstName: userWithoutPassword.firstName || undefined,
+        });
+      } catch (error) {
+        console.error('Error encolando correo de verificacion:', error);
+        if (process.env.NODE_ENV !== 'production') {
+          const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || process.env.VERCEL_URL || '';
+          const origin = baseUrl.startsWith('http') ? baseUrl : `https://${baseUrl}`;
+          const verifyUrl = `${origin}/auth/verify?token=${encodeURIComponent(result.token)}&email=${encodeURIComponent(userWithoutPassword.email)}`;
+          console.log('Verification URL (dev):', verifyUrl);
+        }
       }
+    } else if (skipEmailVerification) {
+      console.log(`[register] Email verification disabled – user ${userWithoutPassword.email} auto-verified`);
     }
 
     const devVerifyUrl =
-      process.env.NODE_ENV !== 'production'
+      !skipEmailVerification && result.token && process.env.NODE_ENV !== 'production'
         ? (() => {
             const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || process.env.VERCEL_URL || '';
             const origin = baseUrl.startsWith('http') ? baseUrl : `https://${baseUrl}`;
@@ -248,7 +257,9 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(
       {
-        message: 'Usuario registrado. Te enviamos un correo para confirmar la cuenta.',
+        message: skipEmailVerification
+          ? 'Usuario registrado exitosamente.'
+          : 'Usuario registrado. Te enviamos un correo para confirmar la cuenta.',
         user: userWithoutPassword,
         professional: result.professional,
         ...(devVerifyUrl ? { devVerifyUrl } : {}),
