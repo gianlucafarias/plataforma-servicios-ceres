@@ -163,7 +163,7 @@ export default async function ProfessionalDetailPage({ params }: { params: Promi
     name: `${data.user.firstName} ${data.user.lastName}`.trim(),
     bio: data.bio,
     years: data.experienceYears ?? 0,
-    verified: !!(data.user.verified || data.verified),
+    verified: data.verified,
     rating: data.rating ?? 0,
     reviews: data.reviewCount ?? 0,
     category: data.services[0]?.category?.name,

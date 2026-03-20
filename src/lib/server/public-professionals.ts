@@ -1,5 +1,6 @@
 import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
+import { getPublicProfessionalWhere } from '@/lib/server/public-professional-visibility';
 
 export const PROFESSIONALS_LIST_RATE_LIMIT = {
   limit: 120,
@@ -51,7 +52,7 @@ export async function listPublicProfessionals(
   const sortBy = (searchParams.get('sortBy') || 'recent') as 'name' | 'rating' | 'recent';
 
   const where: Prisma.ProfessionalWhereInput = {
-    status: 'active',
+    ...getPublicProfessionalWhere(),
   };
 
   if (grupo) {
@@ -151,7 +152,7 @@ export async function listPublicProfessionals(
         name: `${professional.user.firstName} ${professional.user.lastName}`.trim(),
       },
       bio: professional.bio,
-      verified: professional.verified || professional.user.verified,
+      verified: professional.verified,
       primaryCategory: {
         name: professional.services[0]?.category?.name ?? undefined,
       },

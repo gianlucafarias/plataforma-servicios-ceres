@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma';
+import { getPublicProfessionalWhere } from '@/lib/server/public-professional-visibility';
 
 const CACHE_TTL_MS = 60_000;
 
@@ -16,10 +17,7 @@ export async function getServiceCountsByCategorySlug(): Promise<Record<string, n
     _count: { _all: true },
     where: {
       available: true,
-      professional: {
-        status: 'active',
-        user: { verified: true },
-      },
+      professional: getPublicProfessionalWhere(),
     },
   });
 

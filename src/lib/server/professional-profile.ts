@@ -1,5 +1,6 @@
 import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
+import { isProfessionalPubliclyVisible } from '@/lib/server/public-professional-visibility';
 
 export type ProfessionalTimeSlot = {
   enabled: boolean;
@@ -231,7 +232,7 @@ export async function getProfessionalProfileContext(
   }
 
   const isOwner = !!viewerUserId && viewerUserId === professional.userId;
-  if (professional.status !== 'active' && !isOwner) {
+  if (!isOwner && !isProfessionalPubliclyVisible(professional)) {
     return { found: false };
   }
 

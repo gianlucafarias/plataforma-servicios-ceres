@@ -29,7 +29,7 @@ function makeRequest(url: string) {
 describe('GET /api/professionals', () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it('retorna lista con paginacion y mapeo de datos', async () => {
+  it('retorna lista con paginacion y mapeo de verificacion profesional', async () => {
     hoisted.prismaMock.professional.count.mockResolvedValueOnce(2);
     hoisted.prismaMock.professional.findMany.mockResolvedValueOnce([
       {
@@ -40,7 +40,7 @@ describe('GET /api/professionals', () => {
         rating: 4.2,
         reviewCount: 5,
         ProfilePicture: null,
-        user: { firstName: 'Ana', lastName: 'Garcia', verified: true },
+        user: { firstName: 'Ana', lastName: 'Garcia', verified: false },
         services: [{ category: { name: 'Plomeria' } }],
       },
       {
@@ -71,7 +71,25 @@ describe('GET /api/professionals', () => {
       id: 'p1',
       user: { name: 'Ana Garcia' },
       primaryCategory: { name: 'Plomeria' },
+      verified: true,
     });
+    expect(json.data[1].verified).toBe(false);
+    expect(hoisted.prismaMock.professional.count).toHaveBeenCalledWith({
+      where: expect.objectContaining({
+        status: 'active',
+        verified: true,
+        professionalGroup: 'oficios',
+      }),
+    });
+    expect(hoisted.prismaMock.professional.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          status: 'active',
+          verified: true,
+          professionalGroup: 'oficios',
+        }),
+      })
+    );
   });
 });
 
@@ -114,7 +132,7 @@ describe('GET /api/professional/[id]', () => {
     expect(json.data.id).toBe('p1');
   });
 
-  it('404 cuando el perfil no esta activo y no es el dueno', async () => {
+  it('404 cuando el perfil no esta disponible para el publico', async () => {
     hoisted.getProfessionalProfileContextMock.mockResolvedValueOnce({ found: false });
 
     const mockParams = Promise.resolve({ id: 'p1' });
