@@ -42,6 +42,9 @@ jobs:
             echo "🗄️ Generando Prisma Client..."
             npx prisma generate
             
+            echo "🧹 Limpiando build anterior (evita EACCES por permisos de root)..."
+            sudo rm -rf .next
+            
             echo "🔨 Construyendo aplicación (Next.js)..."
             npm run build
             
