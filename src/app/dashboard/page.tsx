@@ -467,7 +467,7 @@ export default function DashboardPage() {
     );
   }
 
-  const isVerified = me.user?.verified ?? me.verified;
+  const isVerified = me.verified;
  
   return (
     <div className="min-h-screen bg-gray-50">

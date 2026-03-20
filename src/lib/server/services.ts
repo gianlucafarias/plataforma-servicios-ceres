@@ -1,6 +1,7 @@
 import { CategoryGroupId, Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { getServiceCountsByCategorySlug } from '@/lib/service-stats';
+import { getPublicProfessionalWhere } from '@/lib/server/public-professional-visibility';
 import {
   AREAS_OFICIOS,
   SUBCATEGORIES_OFICIOS,
@@ -198,10 +199,7 @@ export async function listPublicServices(url: string): Promise<ListedServicesPag
 
   const where: Prisma.ServiceWhereInput = {
     available: true,
-    professional: {
-      status: 'active',
-      user: { verified: true },
-    },
+    professional: getPublicProfessionalWhere(),
   };
 
   if (grupo) {

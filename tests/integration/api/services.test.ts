@@ -33,7 +33,7 @@ describe('GET /api/services', () => {
     vi.clearAllMocks()
   })
 
-  it('retorna lista, totales y paginación', async () => {
+  it('retorna lista, totales y paginacion usando verificacion profesional', async () => {
     hoisted.prismaMock.service.count.mockResolvedValueOnce(2)
     hoisted.prismaMock.service.findMany.mockResolvedValueOnce([
       {
@@ -41,7 +41,8 @@ describe('GET /api/services', () => {
         category: { name: 'Cat 1' },
         professional: {
           id: 'p1', location: 'ceres', verified: true, rating: 4.5, reviewCount: 10, ProfilePicture: null,
-          user: { firstName: 'Ana', lastName: 'García', verified: true },
+          whatsapp: null,
+          user: { firstName: 'Ana', lastName: 'Garcia', verified: false, location: 'ceres', phone: '123' },
         },
       },
       {
@@ -49,7 +50,8 @@ describe('GET /api/services', () => {
         category: { name: 'Cat 2' },
         professional: {
           id: 'p2', location: 'hersilia', verified: true, rating: 5, reviewCount: 3, ProfilePicture: null,
-          user: { firstName: 'Juan', lastName: 'Pérez', verified: true },
+          whatsapp: null,
+          user: { firstName: 'Juan', lastName: 'Perez', verified: false, location: 'hersilia', phone: '456' },
         },
       },
     ])
@@ -63,6 +65,28 @@ describe('GET /api/services', () => {
     expect(json.pagination.total).toBe(2)
     expect(json.pagination.totalPages).toBe(1)
     expect(json.data[0]).toMatchObject({ id: 's1', category: { name: 'Cat 1' } })
+    expect(hoisted.prismaMock.service.count).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          available: true,
+          professional: expect.objectContaining({
+            status: 'active',
+            verified: true,
+          }),
+        }),
+      })
+    )
+    expect(hoisted.prismaMock.service.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          available: true,
+          professional: expect.objectContaining({
+            status: 'active',
+            verified: true,
+          }),
+        }),
+      })
+    )
   })
 })
 
@@ -71,7 +95,7 @@ describe('POST /api/services', () => {
     vi.clearAllMocks()
   })
 
-  it('401 si no hay sesión', async () => {
+  it('401 si no hay sesion', async () => {
     hoisted.getServerSessionMock.mockResolvedValueOnce(null)
     const req = makeRequest('http://localhost/api/services', {
       method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({})
@@ -99,7 +123,7 @@ describe('POST /api/services', () => {
     expect(res.status).toBe(404)
   })
 
-  it('404 si la categoría no existe y no está en taxonomy', async () => {
+  it('404 si la categoria no existe y no esta en taxonomy', async () => {
     hoisted.getServerSessionMock.mockResolvedValueOnce({ user: { id: 'u1' } })
     hoisted.prismaMock.professional.findUnique.mockResolvedValueOnce({ id: 'p1', professionalGroup: 'oficios' })
     hoisted.prismaMock.category.findUnique.mockResolvedValueOnce(null)
@@ -110,7 +134,7 @@ describe('POST /api/services', () => {
     expect(res.status).toBe(404)
   })
 
-  it('201 crea servicio cuando la categoría existe', async () => {
+  it('201 crea servicio cuando la categoria existe', async () => {
     hoisted.getServerSessionMock.mockResolvedValueOnce({ user: { id: 'u1' } })
     hoisted.prismaMock.professional.findUnique.mockResolvedValueOnce({ id: 'p1', professionalGroup: 'oficios' })
     hoisted.prismaMock.category.findUnique.mockResolvedValueOnce({ id: 'c1', slug: 'plomero' })
@@ -122,5 +146,3 @@ describe('POST /api/services', () => {
     expect(res.status).toBe(201)
   })
 })
-
-
