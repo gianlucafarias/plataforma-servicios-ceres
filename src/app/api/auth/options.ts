@@ -78,7 +78,7 @@ export const authOptions: AuthOptions = {
                         throw new Error('Esta cuenta usa login social. Iniciá sesión con Google o Facebook.')
                     }
 
-                    if (!user.verified) {
+                    if (!user.verified && process.env.DISABLE_EMAIL_VERIFICATION !== 'true') {
                         throw new Error('Tu cuenta aún no ha sido verificada. Te notificaremos por email cuando sea aprobada.')
                     }
 

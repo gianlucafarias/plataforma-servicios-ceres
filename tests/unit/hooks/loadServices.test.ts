@@ -4,15 +4,27 @@ import { server } from '../../testServer'
 import { loadServices } from '@/hooks/loadServices'
 
 describe('loadServices', () => {
-  it('retorna datos y paginación cuando success=true', async () => {
+  it('retorna datos y paginacion cuando success=true', async () => {
     server.use(
-      http.get('/api/services', () => {
+      http.get('/api/v1/services', () => {
         return HttpResponse.json({
           success: true,
           data: [
-            { id: '1', professionalId: 'p1', categoryId: 'c1', title: 'S1', description: 'd', priceRange: '$', available: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }
+            {
+              id: '1',
+              professionalId: 'p1',
+              categoryId: 'c1',
+              title: 'S1',
+              description: 'd',
+              priceRange: '$',
+              available: true,
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+            },
           ],
-          pagination: { page: 1, limit: 20, total: 1, totalPages: 1 }
+          meta: {
+            pagination: { page: 1, pageSize: 20, total: 1, totalPages: 1 },
+          },
         })
       })
     )
@@ -26,9 +38,15 @@ describe('loadServices', () => {
 
   it('retorna mensaje cuando success=false', async () => {
     server.use(
-      http.get('/api/services', () => {
-        return HttpResponse.json({ success: false, message: 'Fallo' }, { status: 400 })
-      })
+      http.get('/api/v1/services', () =>
+        HttpResponse.json(
+          {
+            success: false,
+            error: { code: 'bad_request', message: 'Fallo' },
+          },
+          { status: 400 }
+        )
+      )
     )
 
     const res = await loadServices()
@@ -36,5 +54,3 @@ describe('loadServices', () => {
     expect(res.message).toBe('Fallo')
   })
 })
-
-

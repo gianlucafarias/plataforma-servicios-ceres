@@ -13,6 +13,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { getErrorMessage } from "@/lib/api/client";
+import { sendCategorySuggestion } from "@/lib/api/support";
 
 interface CategorySuggestionModalProps {
   origin?: string;
@@ -32,7 +34,7 @@ export function CategorySuggestionModal({ origin, triggerClassName, triggerLabel
     suggestedName: "",
     details: "",
     email: "",
-    website: "", // honeypot
+    website: "",
     openedAt: 0,
   });
 
@@ -79,42 +81,28 @@ export function CategorySuggestionModal({ origin, triggerClassName, triggerLabel
     setErrorMessage(null);
 
     try {
-      const response = await fetch("/api/support/category-suggestions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          suggestedName: formData.suggestedName,
-          description: formData.details,
-          email: formData.email,
-          origin: origin ?? "category_suggestion_modal",
-          url: currentUrl,
-          website: formData.website || undefined,
-          openedAt: formData.openedAt || undefined,
-        }),
+      await sendCategorySuggestion({
+        suggestedName: formData.suggestedName,
+        description: formData.details,
+        email: formData.email,
+        origin: origin ?? "category_suggestion_modal",
+        url: currentUrl,
+        website: formData.website || undefined,
+        openedAt: formData.openedAt || undefined,
       });
-
-      const data = await response.json();
-
-      if (!response.ok || !data?.success) {
-        throw new Error(data?.message || "No se pudo enviar la sugerencia.");
-      }
 
       setFormState("success");
 
       toast.success("Sugerencia enviada", {
-        description: "Gracias, vamos a revisar tu propuesta de categoría.",
+        description: "Gracias, vamos a revisar tu propuesta de categorÃ­a.",
       });
 
       setOpen(false);
       resetForm();
     } catch (error) {
-      const message =
-        error instanceof Error
-          ? error.message
-          : "Ocurrió un error inesperado. Intenta nuevamente.";
-      setErrorMessage(message);
+      setErrorMessage(
+        getErrorMessage(error, "OcurriÃ³ un error inesperado. Intenta nuevamente.")
+      );
       setFormState("error");
     }
   };
@@ -131,22 +119,21 @@ export function CategorySuggestionModal({ origin, triggerClassName, triggerLabel
           type="button"
           className={triggerClassName || defaultTriggerClass}
         >
-          {triggerLabel || "Sugerir Categoría"}
+          {triggerLabel || "Sugerir CategorÃ­a"}
         </button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-md max-h-[85vh] overflow-y-auto rounded-2xl">
         <DialogHeader>
           <DialogTitle className="text-xl font-rutan">
-            Sugerir una nueva categoría
+            Sugerir una nueva categorÃ­a
           </DialogTitle>
           <DialogDescription>
-            Contanos qué categoría te gustaría que agreguemos a la plataforma. Esto nos
-            ayuda a priorizar los próximos servicios.
+            Contanos quÃ© categorÃ­a te gustarÃ­a que agreguemos a la plataforma. Esto nos
+            ayuda a priorizar los prÃ³ximos servicios.
           </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4 mt-4">
-          {/* Honeypot para bots: no debe ser visible ni usable para usuarios reales */}
           <div className="hidden" aria-hidden="true">
             <label htmlFor="website">No completar este campo</label>
             <input
@@ -164,14 +151,14 @@ export function CategorySuggestionModal({ origin, triggerClassName, triggerLabel
               htmlFor="suggestedName"
               className="text-sm font-semibold text-gray-700"
             >
-              Nombre de la categoría
+              Nombre de la categorÃ­a
             </Label>
             <Input
               id="suggestedName"
               value={formData.suggestedName}
               onChange={(e) => handleChange("suggestedName", e.target.value)}
               className="mt-1 rounded-xl border-2 focus:ring-4 focus:ring-green-100 focus:border-[#006F4B] transition-all duration-200"
-              placeholder="Ej: Flete, Fisioterapia, Diseño gráfico..."
+              placeholder="Ej: Flete, Fisioterapia, DiseÃ±o grÃ¡fico..."
               required
               maxLength={80}
             />
@@ -186,7 +173,7 @@ export function CategorySuggestionModal({ origin, triggerClassName, triggerLabel
               value={formData.details}
               onChange={(e) => handleChange("details", e.target.value)}
               className="mt-1 block w-full rounded-xl border-2 border-gray-200 px-3 py-2 text-sm focus:ring-4 focus:ring-green-100 focus:border-[#006F4B] transition-all duration-200 resize-y overflow-x-hidden"
-              placeholder="Contanos brevemente para qué usarías esta categoría o qué tipo de trabajos incluiría."
+              placeholder="Contanos brevemente para quÃ© usarÃ­as esta categorÃ­a o quÃ© tipo de trabajos incluirÃ­a."
               rows={4}
               maxLength={1000}
             />
@@ -205,7 +192,7 @@ export function CategorySuggestionModal({ origin, triggerClassName, triggerLabel
               value={formData.email}
               onChange={(e) => handleChange("email", e.target.value)}
               className="mt-1 rounded-xl border-2 focus:ring-4 focus:ring-green-100 focus:border-[#006F4B] transition-all duration-200"
-              placeholder="Para que podamos contactarte si necesitamos más información"
+              placeholder="Para que podamos contactarte si necesitamos mÃ¡s informaciÃ³n"
               required
               maxLength={120}
             />
@@ -219,8 +206,8 @@ export function CategorySuggestionModal({ origin, triggerClassName, triggerLabel
 
           {formState === "success" && (
             <p className="text-sm text-green-700 bg-green-50 border border-green-200 rounded-xl px-3 py-2">
-              ¡Gracias! Registramos tu sugerencia y la tendremos en cuenta para las
-              próximas categorías.
+              Â¡Gracias! Registramos tu sugerencia y la tendremos en cuenta para las
+              prÃ³ximas categorÃ­as.
             </p>
           )}
 
@@ -247,5 +234,3 @@ export function CategorySuggestionModal({ origin, triggerClassName, triggerLabel
     </Dialog>
   );
 }
-
-

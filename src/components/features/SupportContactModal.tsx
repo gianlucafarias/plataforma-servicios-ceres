@@ -13,6 +13,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { getErrorMessage } from "@/lib/api/client";
+import { sendSupportContact } from "@/lib/api/support";
 
 interface SupportContactModalProps {
   origin?: string;
@@ -87,28 +89,16 @@ export function SupportContactModal({
     setErrorMessage(null);
 
     try {
-      const response = await fetch("/api/support/contact", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          name: formData.name || undefined,
-          email: formData.email,
-          topic: formData.topic,
-          message: formData.message,
-          origin: origin ?? "support_contact_modal",
-          url: currentUrl,
-          website: formData.website || undefined,
-          openedAt: formData.openedAt || undefined,
-        }),
+      await sendSupportContact({
+        name: formData.name || undefined,
+        email: formData.email,
+        topic: formData.topic,
+        message: formData.message,
+        origin: origin ?? "support_contact_modal",
+        url: currentUrl,
+        website: formData.website || undefined,
+        openedAt: formData.openedAt || undefined,
       });
-
-      const data = await response.json();
-
-      if (!response.ok || !data?.success) {
-        throw new Error(data?.message || "No se pudo enviar el mensaje.");
-      }
 
       setFormState("success");
 
@@ -119,11 +109,9 @@ export function SupportContactModal({
       setOpen(false);
       resetForm();
     } catch (error) {
-      const message =
-        error instanceof Error
-          ? error.message
-          : "Ocurrió un error inesperado. Intenta nuevamente.";
-      setErrorMessage(message);
+      setErrorMessage(
+        getErrorMessage(error, "OcurriÃ³ un error inesperado. Intenta nuevamente.")
+      );
       setFormState("error");
     }
   };
@@ -157,7 +145,6 @@ export function SupportContactModal({
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4 mt-4">
-          {/* Honeypot */}
           <div className="hidden" aria-hidden="true">
             <label htmlFor="support-website">No completar este campo</label>
             <input
@@ -225,7 +212,7 @@ export function SupportContactModal({
                   onChange={(e) => handleChange("topic", e.target.value)}
                   className="h-4 w-4 text-[#006F4B]"
                 />
-                <span>Encontré un problema en la plataforma</span>
+                <span>EncontrÃ© un problema en la plataforma</span>
               </label>
               <label className="flex items-center gap-2">
                 <input
@@ -250,7 +237,7 @@ export function SupportContactModal({
               value={formData.message}
               onChange={(e) => handleChange("message", e.target.value)}
               className="mt-1 block w-full rounded-xl border-2 border-gray-200 px-3 py-2 text-sm focus:ring-4 focus:ring-green-100 focus:border-[#006F4B] transition-all duration-200 resize-y overflow-x-hidden"
-              placeholder="Contanos brevemente qué necesitás o qué problema encontraste."
+              placeholder="Contanos brevemente quÃ© necesitÃ¡s o quÃ© problema encontraste."
               rows={4}
               maxLength={2000}
             />
@@ -267,7 +254,7 @@ export function SupportContactModal({
 
           {formState === "success" && (
             <p className="text-sm text-green-700 bg-green-50 border border-green-200 rounded-xl px-3 py-2">
-              ¡Gracias! Recibimos tu mensaje y lo revisaremos a la brevedad.
+              Â¡Gracias! Recibimos tu mensaje y lo revisaremos a la brevedad.
             </p>
           )}
 
@@ -294,5 +281,3 @@ export function SupportContactModal({
     </Dialog>
   );
 }
-
-

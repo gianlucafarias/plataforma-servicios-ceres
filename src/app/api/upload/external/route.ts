@@ -1,18 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
-import { downloadAndSaveImage, isExternalOAuthImage } from '@/lib/download-image';
 import { authOptions } from '@/app/api/auth/options';
 import { rateLimit, rateLimitHeaders } from '@/lib/rate-limit-memory';
 import { clientIp } from '@/lib/request-helpers';
-
-const LIMIT = 20;
-const WINDOW_MS = 10 * 60 * 1000;
+import {
+  UPLOAD_EXTERNAL_RATE_LIMIT,
+  UploadFlowError,
+  processExternalOAuthUpload,
+} from '@/lib/server/uploads';
 
 /**
  * Endpoint para descargar y guardar imagenes externas (OAuth) en R2.
  */
 export async function POST(request: NextRequest) {
-  const rl = rateLimit(`upload-external:${clientIp(request)}`, LIMIT, WINDOW_MS);
+  const rl = rateLimit(
+    `upload-external:${clientIp(request)}`,
+    UPLOAD_EXTERNAL_RATE_LIMIT.limit,
+    UPLOAD_EXTERNAL_RATE_LIMIT.windowMs
+  );
+
   if (!rl.allowed) {
     return NextResponse.json(
       {
@@ -26,41 +32,28 @@ export async function POST(request: NextRequest) {
 
   try {
     const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
-      return NextResponse.json(
-        { success: false, error: 'unauthorized' },
-        { status: 401, headers: rateLimitHeaders(rl) }
-      );
-    }
-
     const body = await request.json();
-    const { imageUrl } = body;
-
-    if (!imageUrl || typeof imageUrl !== 'string') {
-      return NextResponse.json(
-        { success: false, error: 'Se requiere una URL de imagen valida' },
-        { status: 400, headers: rateLimitHeaders(rl) }
-      );
-    }
-
-    if (!isExternalOAuthImage(imageUrl)) {
-      return NextResponse.json(
-        { success: false, error: 'La URL proporcionada no es una imagen externa valida' },
-        { status: 400, headers: rateLimitHeaders(rl) }
-      );
-    }
-
-    const savedUrl = await downloadAndSaveImage(imageUrl);
+    const result = await processExternalOAuthUpload({
+      sessionUserId: session?.user?.id,
+      imageUrl: body.imageUrl,
+    });
 
     return NextResponse.json(
       {
         success: true,
-        url: savedUrl,
-        value: savedUrl,
+        url: result.url,
+        value: result.value,
       },
       { headers: rateLimitHeaders(rl) }
     );
   } catch (error) {
+    if (error instanceof UploadFlowError) {
+      return NextResponse.json(
+        { success: false, error: error.message },
+        { status: error.status, headers: rateLimitHeaders(rl) }
+      );
+    }
+
     console.error('Error al descargar imagen externa:', error);
     const message = error instanceof Error ? error.message : 'Error al descargar la imagen';
     return NextResponse.json(

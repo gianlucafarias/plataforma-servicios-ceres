@@ -1,13 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
 import { rateLimit, rateLimitHeaders } from '@/lib/rate-limit-memory';
 import { clientIp } from '@/lib/request-helpers';
-
-const LIMIT = 20;
-const WINDOW_MS = 10 * 60 * 1000;
+import {
+  CATEGORY_SUGGESTION_RATE_LIMIT,
+  createCategorySuggestionSubmission,
+  validateCategorySuggestionPayload,
+} from '@/lib/server/support-submissions';
 
 export async function POST(request: NextRequest) {
-  const rl = rateLimit(`category-suggestion:${clientIp(request)}`, LIMIT, WINDOW_MS);
+  const rl = rateLimit(
+    `category-suggestion:${clientIp(request)}`,
+    CATEGORY_SUGGESTION_RATE_LIMIT.limit,
+    CATEGORY_SUGGESTION_RATE_LIMIT.windowMs
+  );
   if (!rl.allowed) {
     return NextResponse.json(
       {
@@ -21,90 +26,31 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const {
-      suggestedName,
-      description,
-      email,
-      userId,
-      origin,
-      url,
-      context,
-      relatedCategoryId,
-      perspective,
-      website,
-      openedAt,
-    } = body ?? {};
+    const validation = validateCategorySuggestionPayload(body);
 
-    if (typeof website === 'string' && website.trim().length > 0) {
+    if (validation.kind === 'ignored') {
       return NextResponse.json(
         {
           success: true,
           data: { ignored: true },
-          message: 'Sugerencia registrada.',
+          message: validation.message,
         },
         { status: 200, headers: rateLimitHeaders(rl) }
       );
     }
 
-    if (typeof openedAt === 'number' && openedAt > 0) {
-      const elapsed = Date.now() - openedAt;
-      if (elapsed < 2000) {
-        return NextResponse.json(
-          {
-            success: true,
-            data: { ignored: true },
-            message: 'Sugerencia registrada.',
-          },
-          { status: 200, headers: rateLimitHeaders(rl) }
-        );
-      }
-    }
-
-    if (!suggestedName || typeof suggestedName !== 'string') {
+    if (validation.kind === 'error') {
       return NextResponse.json(
         {
           success: false,
-          error: 'validation_error',
-          message: 'El nombre de la categoria sugerida es obligatorio.',
+          error: validation.code,
+          message: validation.message,
         },
         { status: 400, headers: rateLimitHeaders(rl) }
       );
     }
 
-    if (!userId && (!email || typeof email !== 'string')) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'validation_error',
-          message: 'Debe proporcionar un email si no hay usuario autenticado.',
-        },
-        { status: 400, headers: rateLimitHeaders(rl) }
-      );
-    }
-
-    const suggestion = await prisma.categorySuggestion.create({
-      data: {
-        title: suggestedName.trim().slice(0, 150),
-        description:
-          typeof description === 'string'
-            ? description.trim().slice(0, 2000)
-            : null,
-        status: 'open',
-        userId: typeof userId === 'string' ? userId : null,
-        userEmail: typeof email === 'string' ? email.trim() : null,
-        origin: typeof origin === 'string' ? origin : null,
-        url: typeof url === 'string' ? url : null,
-        context: context ?? undefined,
-        relatedCategoryId:
-          typeof relatedCategoryId === 'string' && relatedCategoryId.length > 0
-            ? relatedCategoryId
-            : null,
-        perspective:
-          perspective === 'provider' || perspective === 'seeker'
-            ? perspective
-            : null,
-      },
-    });
+    const suggestion = await createCategorySuggestionSubmission(validation.data);
 
     return NextResponse.json(
       {

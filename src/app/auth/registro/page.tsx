@@ -19,6 +19,8 @@ import WhatsAppIcon from "@/components/ui/whatsapp";
 import Link from "next/link";
 import { DateBirthPicker } from "./_components/date-birth-picker";
 import { normalizeWhatsAppNumber, validateWhatsAppNumber } from "@/lib/whatsapp-normalize";
+import { checkEmailExists } from "@/lib/api/auth";
+import { uploadRegistrationFile } from "@/lib/api/uploads";
 
 // Iconos de redes sociales
 const GoogleIcon = () => (
@@ -183,39 +185,8 @@ export default function RegistroPage() {
     }
   };
 
-  const requestUploadGrant = async (type: "image" | "cv") => {
-    const response = await fetch("/api/upload/grant", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        context: "register",
-        type,
-      }),
-    });
-
-    const result = await response.json();
-    if (!response.ok || !result.success || !result.token) {
-      throw new Error(result.message || result.error || "Error al preparar la subida");
-    }
-
-    return result.token as string;
-  };
-
   const uploadPublicFile = async (file: File, type: "image" | "cv") => {
-    const token = await requestUploadGrant(type);
-    const uploadFormData = new FormData();
-    uploadFormData.append("file", file);
-    uploadFormData.append("type", type);
-
-    return fetch("/api/upload", {
-      method: "POST",
-      headers: {
-        "x-upload-token": token,
-      },
-      body: uploadFormData,
-    }).then((response) => response.json());
+    return uploadRegistrationFile(file, type);
   };
 
   const handleServiceChange = (index: number, field: string, value: string) => {
@@ -386,18 +357,8 @@ export default function RegistroPage() {
     // Paso 1: Validar que el email no exista
     if (isValid && currentStep === 1) {
       try {
-        const response = await fetch('/api/auth/check-email', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ email: formData.email }),
-        });
-        if (!response.ok) {
-          throw new Error('Error al verificar el email');
-        }
-        const data = await response.json();
-        if (data.exists) {
+        const exists = await checkEmailExists(formData.email);
+        if (exists) {
           setErrors(prev => ({ ...prev, email: "Ya existe un usuario con este email" }));
           return; // No avanzar
         }
@@ -1160,24 +1121,18 @@ export default function RegistroPage() {
                       /*
                       formData.append('type', 'image'); // Indicar explícitamente que es una imagen
                       
-                      const response = await fetch('/api/upload', {
                         method: 'POST',
                         body: formData,
                       });
                       
                       */
-                      if (result.success) {
-                        // Usar value si existe (normalizado), sino filename para local o url para R2
-                        const pictureValue = result.value || (result.storage === 'r2' ? result.url : result.filename);
-                        handleInputChange('picture', pictureValue);
-                        setErrors(prev => {
-                          const newErrors = {...prev};
-                          delete newErrors.picture;
-                          return newErrors;
-                        });
-                      } else {
-                        setErrors(prev => ({ ...prev, picture: result.error || 'Error al subir la imagen' }));
-                      }
+                      const pictureValue = result.value || (result.storage === 'r2' ? result.url : result.filename);
+                      handleInputChange('picture', pictureValue);
+                      setErrors(prev => {
+                        const newErrors = {...prev};
+                        delete newErrors.picture;
+                        return newErrors;
+                      });
                     } catch (error) {
                       console.error('Error uploading file:', error);
                       setErrors(prev => ({ ...prev, picture: 'Error al subir la imagen' }));
@@ -1210,25 +1165,20 @@ export default function RegistroPage() {
                       formData.append('file', file);
                       formData.append('type', 'cv'); // Indicar explícitamente que es un CV
                       
-                      const response = await fetch('/api/upload', {
                         method: 'POST',
                         body: formData,
                       });
                       
                       */
-                      if (result.success) {
-                        handleInputChange(
-                          'cv',
-                          result.url || result.path || result.filename
-                        );
-                        setErrors(prev => {
-                          const newErrors = {...prev};
-                          delete newErrors.cv;
-                          return newErrors;
-                        });
-                      } else {
-                        setErrors(prev => ({ ...prev, cv: result.error || 'Error al subir el CV' }));
-                      }
+                      handleInputChange(
+                        'cv',
+                        result.url || result.path || result.filename
+                      );
+                      setErrors(prev => {
+                        const newErrors = {...prev};
+                        delete newErrors.cv;
+                        return newErrors;
+                      });
                     } catch (error) {
                       console.error('Error uploading file:', error);
                       setErrors(prev => ({ ...prev, cv: 'Error al subir el CV' }));

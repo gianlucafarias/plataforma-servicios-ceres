@@ -3,7 +3,8 @@
 import { createContext, useContext, ReactNode } from 'react';
 import { User, RegisterFormData } from '@/types';
 import { signIn, signOut, useSession } from 'next-auth/react';
-
+import { registerUser } from '@/lib/api/auth';
+import { getDashboardProfile } from '@/lib/api/dashboard';
 
 interface AuthContextType {
   user: User | null;
@@ -12,7 +13,7 @@ interface AuthContextType {
   logout: () => Promise<void>;
   loading: boolean;
   isAuthenticated: boolean;
-  profile: () => Promise<User | null>;
+  profile: () => Promise<{ id: string } | null>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -22,50 +23,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const user = (session?.user as User) ?? null;
   const loading = status === 'loading';
 
- 
-
   const login = async (email: string, password: string) => {
     const response = await signIn('credentials', {
       email,
       password,
       redirect: false,
     });
-    
+
     if (response?.error) {
       throw new Error(response.error);
     }
-    
+
     if (response?.ok) {
-      // La sesión se actualizará automáticamente y se reflejará en el efecto useEffect
       return;
-    } else {
-      throw new Error('Error al iniciar sesión');
     }
+
+    throw new Error('Error al iniciar sesiÃ³n');
   };
 
   const register = async (data: RegisterFormData) => {
     try {
-      const response = await fetch('/api/auth/register', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(data),
-      });
-
-      if (!response.ok) {
-        let message = 'Error al registrar usuario';
-        try {
-          const error = await response.json();
-          message = error?.error || error?.message || message;
-        } catch {}
-        throw new Error(message);
-      }
-
-      // Registro exitoso: no iniciar sesión automáticamente.
-      // El usuario debe verificar su email antes de poder iniciar sesión.
-      await response.json();
-      
+      await registerUser(data);
     } catch (error) {
       console.error('Error en registro:', error);
       throw error;
@@ -77,17 +55,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await signOut();
     } catch (error) {
       console.error('Error during logout:', error);
-    } finally {
-      // La sesión se limpiará por NextAuth
     }
   };
 
   const profile = async () => {
-    const response = await fetch('/api/professional/me');
-    const json = await response.json();
-    return json.data;
+    return getDashboardProfile();
   };
-     
 
   const value: AuthContextType = {
     user,

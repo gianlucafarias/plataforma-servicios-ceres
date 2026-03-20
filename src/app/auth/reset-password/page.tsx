@@ -7,6 +7,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import Link from "next/link";
 import { Lock, ArrowLeft } from "lucide-react";
+import { getErrorMessage } from "@/lib/api/client";
+import { resetPassword } from "@/lib/api/auth";
 
 export default function ResetPasswordPage() {
   const router = useRouter();
@@ -22,34 +24,24 @@ export default function ResetPasswordPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!tokenFromUrl) {
-      setError("El enlace no es válido.");
+      setError("El enlace no es vÃ¡lido.");
       return;
     }
     if (password !== confirmPassword) {
-      setError("Las contraseñas no coinciden.");
+      setError("Las contraseÃ±as no coinciden.");
       return;
     }
     setLoading(true);
     setError(null);
 
     try {
-      const res = await fetch("/api/auth/password/reset", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token: tokenFromUrl, password }),
-      });
-      const json = await res.json();
-      if (!res.ok || !json.success) {
-        setError(
-          json.message ||
-            "No pudimos restablecer tu contraseña. Intentá nuevamente."
-        );
-      } else {
-        setDone(true);
-      }
-    } catch (err) {
-      console.error(err);
-      setError("Ocurrió un error inesperado. Intentá nuevamente.");
+      await resetPassword(tokenFromUrl, password);
+      setDone(true);
+    } catch (error) {
+      console.error(error);
+      setError(
+        getErrorMessage(error, "No pudimos restablecer tu contraseÃ±a. IntentÃ¡ nuevamente.")
+      );
     } finally {
       setLoading(false);
     }
@@ -65,40 +57,40 @@ export default function ResetPasswordPage() {
             className="mb-4 inline-flex items-center text-sm text-gray-500 hover:text-gray-700"
           >
             <ArrowLeft className="h-4 w-4 mr-1" />
-            Volver al inicio de sesión
+            Volver al inicio de sesiÃ³n
           </button>
 
           <h1 className="text-2xl font-bold text-gray-900 mb-2">
-            Crear nueva contraseña
+            Crear nueva contraseÃ±a
           </h1>
           <p className="text-sm text-gray-600 mb-6">
-            Elegí una nueva contraseña segura para tu cuenta.
+            ElegÃ­ una nueva contraseÃ±a segura para tu cuenta.
           </p>
 
           {!tokenFromUrl ? (
             <div className="space-y-4">
               <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-xl px-3 py-2">
-                El enlace de recuperación no es válido. Volvé a solicitar uno
-                desde la pantalla de inicio de sesión.
+                El enlace de recuperaciÃ³n no es vÃ¡lido. VolvÃ© a solicitar uno
+                desde la pantalla de inicio de sesiÃ³n.
               </p>
               <Link href="/auth/recuperar">
                 <Button className="w-full rounded-xl bg-[#006F4B] hover:bg-[#005a3d] text-white">
-                  Ir a recuperar contraseña
+                  Ir a recuperar contraseÃ±a
                 </Button>
               </Link>
             </div>
           ) : done ? (
             <div className="space-y-4">
               <p className="text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2">
-                Tu contraseña se actualizó correctamente. Ahora podés iniciar
-                sesión con la nueva contraseña.
+                Tu contraseÃ±a se actualizÃ³ correctamente. Ahora podÃ©s iniciar
+                sesiÃ³n con la nueva contraseÃ±a.
               </p>
               <Button
                 type="button"
                 className="w-full rounded-xl bg-[#006F4B] hover:bg-[#005a3d] text-white"
                 onClick={() => router.push("/auth/login")}
               >
-                Ir al inicio de sesión
+                Ir al inicio de sesiÃ³n
               </Button>
             </div>
           ) : (
@@ -108,14 +100,14 @@ export default function ResetPasswordPage() {
                   htmlFor="password"
                   className="text-sm font-medium text-gray-700 mb-2 block"
                 >
-                  Nueva contraseña
+                  Nueva contraseÃ±a
                 </Label>
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
                   <Input
                     id="password"
                     type="password"
-                    placeholder="••••••••"
+                    placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
@@ -124,7 +116,7 @@ export default function ResetPasswordPage() {
                   />
                 </div>
                 <p className="text-xs text-gray-500 mt-1">
-                  Mínimo 8 caracteres. Evitá usar contraseñas fáciles de
+                  MÃ­nimo 8 caracteres. EvitÃ¡ usar contraseÃ±as fÃ¡ciles de
                   adivinar.
                 </p>
               </div>
@@ -134,14 +126,14 @@ export default function ResetPasswordPage() {
                   htmlFor="confirmPassword"
                   className="text-sm font-medium text-gray-700 mb-2 block"
                 >
-                  Repetir contraseña
+                  Repetir contraseÃ±a
                 </Label>
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
                   <Input
                     id="confirmPassword"
                     type="password"
-                    placeholder="••••••••"
+                    placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     required
@@ -168,18 +160,16 @@ export default function ResetPasswordPage() {
                     Actualizando...
                   </>
                 ) : (
-                  "Guardar nueva contraseña"
+                  "Guardar nueva contraseÃ±a"
                 )}
               </Button>
             </form>
           )}
         </div>
         <p className="mt-4 text-center text-xs text-gray-400">
-          © {new Date().getFullYear()} Ceres en Red
+          Â© {new Date().getFullYear()} Ceres en Red
         </p>
       </div>
     </div>
   );
 }
-
-
