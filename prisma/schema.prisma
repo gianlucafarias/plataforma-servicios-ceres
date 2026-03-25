@@ -8,29 +8,29 @@ datasource db {
 }
 
 model User {
-  id                 String              @id @default(uuid())
-  email              String              @unique
-  name               String?
-  phone              String?
-  dni                String?             // Documento Nacional de Identidad
-  gender             String?             // Género del usuario
-  emailVerifiedAt    DateTime?
-  role               UserRole            @default(professional)
-  verified           Boolean             @default(false)
-  createdAt          DateTime            @default(now())
-  password           String?             // Opcional para usuarios OAuth
-  updatedAt          DateTime            @updatedAt
-  birthDate          DateTime?
-  firstName          String
-  lastName           String
-  location           String?
-  image              String?             // Foto de perfil de OAuth
-  contactRequests    ContactRequest[]
-  professional       Professional?
-  reviews            Review[]
-  verificationTokens VerificationToken[]
-  accounts           Account[]
-  bugReports         BugReport[]
+  id                  String               @id @default(uuid())
+  email               String               @unique
+  name                String?
+  phone               String?
+  dni                 String? // Documento Nacional de Identidad
+  gender              String? // Género del usuario
+  emailVerifiedAt     DateTime?
+  role                UserRole             @default(professional)
+  verified            Boolean              @default(false)
+  createdAt           DateTime             @default(now())
+  password            String? // Opcional para usuarios OAuth
+  updatedAt           DateTime             @updatedAt
+  birthDate           DateTime?
+  firstName           String
+  lastName            String
+  location            String?
+  image               String? // Foto de perfil de OAuth
+  contactRequests     ContactRequest[]
+  professional        Professional?
+  reviews             Review[]
+  verificationTokens  VerificationToken[]
+  accounts            Account[]
+  bugReports          BugReport[]
   categorySuggestions CategorySuggestion[]
 
   @@map("users")
@@ -67,57 +67,58 @@ model CategoryGroup {
 }
 
 model Category {
-  id               String        @id @default(uuid())
-  name             String
-  description      String
-  icon             String?
-  slug             String        @unique
-  active           Boolean       @default(true)
-  backgroundUrl    String?
-  groupId          String
-  parentCategoryId String?
-  group            CategoryGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
-  parent           Category?     @relation("CategoryToParent", fields: [parentCategoryId], references: [id])
-  children         Category[]    @relation("CategoryToParent")
-  services         Service[]
-  certifications   ProfessionalCertification[]
+  id                  String                      @id @default(uuid())
+  name                String
+  description         String
+  icon                String?
+  slug                String                      @unique
+  active              Boolean                     @default(true)
+  backgroundUrl       String?
+  showOnHome          Boolean                     @default(false)
+  groupId             String
+  parentCategoryId    String?
+  group               CategoryGroup               @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  parent              Category?                   @relation("CategoryToParent", fields: [parentCategoryId], references: [id])
+  children            Category[]                  @relation("CategoryToParent")
+  services            Service[]
+  certifications      ProfessionalCertification[]
   categorySuggestions CategorySuggestion[]
 
   @@map("categories")
 }
 
 model Professional {
-  id                String             @id @default(uuid())
-  userId            String             @unique
-  bio               String
-  experienceYears   Int?               @default(0)
-  verified          Boolean            @default(false)
-  status            ProfessionalStatus @default(pending)
-  rating            Float?             @default(0)
-  reviewCount       Int?               @default(0)
-  profileViews      Int                @default(0)
-  createdAt         DateTime           @default(now())
-  updatedAt         DateTime           @updatedAt
-  whatsapp          String?
-  instagram         String?
-  facebook          String?
-  location          String?
-  schedule          Json?
-  specialties       String[]
-  professionalGroup CategoryGroupId?
-  CV                String?
-  ProfilePicture    String?
-  linkedin          String?
-  portfolio         String?
-  website           String?
-  serviceLocations  String[]           @default([])
-  hasPhysicalStore  Boolean           @default(false)
+  id                   String                      @id @default(uuid())
+  userId               String                      @unique
+  bio                  String
+  experienceYears      Int?                        @default(0)
+  verified             Boolean                     @default(false)
+  status               ProfessionalStatus          @default(pending)
+  rating               Float?                      @default(0)
+  reviewCount          Int?                        @default(0)
+  profileViews         Int                         @default(0)
+  createdAt            DateTime                    @default(now())
+  updatedAt            DateTime                    @updatedAt
+  whatsapp             String?
+  instagram            String?
+  facebook             String?
+  location             String?
+  schedule             Json?
+  specialties          String[]
+  professionalGroup    CategoryGroupId?
+  CV                   String?
+  ProfilePicture       String?
+  linkedin             String?
+  portfolio            String?
+  website              String?
+  serviceLocations     String[]                    @default([])
+  hasPhysicalStore     Boolean                     @default(false)
   physicalStoreAddress String?
-  contactRequests   ContactRequest[]
-  user              User               @relation(fields: [userId], references: [id], onDelete: Cascade)
-  reviews           Review[]
-  services          Service[]
-  certifications    ProfessionalCertification[]
+  contactRequests      ContactRequest[]
+  user                 User                        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reviews              Review[]
+  services             Service[]
+  certifications       ProfessionalCertification[]
 
   @@map("professionals")
 }
@@ -203,19 +204,19 @@ enum ContactRequestStatus {
 }
 
 model BugReport {
-  id          String        @id @default(uuid())
+  id          String            @id @default(uuid())
   title       String
-  description String        @db.Text
-  status      BugReportStatus @default(open)
+  description String            @db.Text
+  status      BugReportStatus   @default(open)
   severity    BugReportSeverity @default(medium)
   userId      String?
   userEmail   String?
-  context     Json?         // Info técnica adicional (navegador, OS, URL, etc.)
-  adminNotes  String?       @db.Text // Notas internas del admin
+  context     Json? // Info técnica adicional (navegador, OS, URL, etc.)
+  adminNotes  String?           @db.Text // Notas internas del admin
   resolvedAt  DateTime?
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
-  user        User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  user        User?             @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   @@map("bug_reports")
 }
@@ -235,23 +236,23 @@ enum BugReportSeverity {
 }
 
 model CategorySuggestion {
-  id          String              @id @default(uuid())
-  title       String
-  description String?             @db.Text
-  status      CategorySuggestionStatus @default(open)
-  userId      String?
-  userEmail   String?
-  origin      String?
-  url         String?
-  context     Json?
-  adminNotes  String?             @db.Text
+  id                String                         @id @default(uuid())
+  title             String
+  description       String?                        @db.Text
+  status            CategorySuggestionStatus       @default(open)
+  userId            String?
+  userEmail         String?
+  origin            String?
+  url               String?
+  context           Json?
+  adminNotes        String?                        @db.Text
   relatedCategoryId String?
   perspective       CategorySuggestionPerspective?
 
-  relatedCategory   Category?          @relation(fields: [relatedCategoryId], references: [id], onDelete: SetNull)
-  createdAt   DateTime            @default(now())
-  updatedAt   DateTime            @updatedAt
-  user        User?               @relation(fields: [userId], references: [id], onDelete: SetNull)
+  relatedCategory Category? @relation(fields: [relatedCategoryId], references: [id], onDelete: SetNull)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  user            User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   @@map("category_suggestions")
 }
@@ -264,27 +265,27 @@ enum CategorySuggestionStatus {
 }
 
 enum CategorySuggestionPerspective {
-  provider   // El usuario trabaja de esto / ofrece este servicio
-  seeker     // El usuario está buscando este servicio
+  provider // El usuario trabaja de esto / ofrece este servicio
+  seeker // El usuario está buscando este servicio
 }
 
 model ProfessionalCertification {
-  id                    String                      @id @default(uuid())
-  professionalId        String
-  categoryId            String?                     // Categoría específica que certifica (opcional)
-  certificationType     String                      // Tipo: "matricula", "certificado", "licencia", "curso", etc.
-  certificationNumber   String                      // Número de matrícula/certificado
-  issuingOrganization   String                      // Organización que emitió (ej: "Colegio de Abogados de Santa Fe")
-  issueDate             DateTime?                   // Fecha de emisión
-  expiryDate            DateTime?                   // Fecha de vencimiento (opcional)
-  documentUrl           String?                     // URL del documento subido (opcional por ahora)
-  status                CertificationStatus         @default(pending)
-  adminNotes            String?                     @db.Text // Notas del admin
-  reviewedAt            DateTime?
-  createdAt             DateTime                    @default(now())
-  updatedAt             DateTime                    @updatedAt
-  professional          Professional                @relation(fields: [professionalId], references: [id], onDelete: Cascade)
-  category              Category?                  @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  id                  String              @id @default(uuid())
+  professionalId      String
+  categoryId          String? // Categoría específica que certifica (opcional)
+  certificationType   String // Tipo: "matricula", "certificado", "licencia", "curso", etc.
+  certificationNumber String // Número de matrícula/certificado
+  issuingOrganization String // Organización que emitió (ej: "Colegio de Abogados de Santa Fe")
+  issueDate           DateTime? // Fecha de emisión
+  expiryDate          DateTime? // Fecha de vencimiento (opcional)
+  documentUrl         String? // URL del documento subido (opcional por ahora)
+  status              CertificationStatus @default(pending)
+  adminNotes          String?             @db.Text // Notas del admin
+  reviewedAt          DateTime?
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+  professional        Professional        @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+  category            Category?           @relation(fields: [categoryId], references: [id], onDelete: SetNull)
 
   @@map("professional_certifications")
 }

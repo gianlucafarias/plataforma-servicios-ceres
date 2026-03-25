@@ -1,13 +1,8 @@
 import { memo, useCallback, useEffect, useMemo, useRef } from "react";
 import Link from "next/link";
 import { Building2, Search, User } from "lucide-react";
-import {
-  AREAS_OFICIOS,
-  SUBCATEGORIES_OFICIOS,
-  SUBCATEGORIES_PROFESIONES,
-  type Area,
-  type Subcategory,
-} from "@/lib/taxonomy";
+import { usePublicCategoriesTree } from "@/hooks/usePublicCategoriesTree";
+import type { PublicCategoriesTree } from "@/lib/api/professionals";
 
 interface SearchSuggestionsProps {
   query: string;
@@ -17,13 +12,21 @@ interface SearchSuggestionsProps {
   navigateOnSelect?: boolean;
 }
 
-interface SearchResult {
-  type: "subcategory" | "area";
-  item: Subcategory | Area;
-  parentArea?: Area;
-}
+type SearchArea = PublicCategoriesTree["areas"][number];
+type SearchSubcategory =
+  | PublicCategoriesTree["subcategoriesOficios"][number]
+  | PublicCategoriesTree["subcategoriesProfesiones"][number];
 
-const AREAS_MAP = new Map(AREAS_OFICIOS.map((area) => [area.slug, area]));
+type SearchResult =
+  | {
+      type: "area";
+      item: SearchArea;
+    }
+  | {
+      type: "subcategory";
+      item: SearchSubcategory;
+      parentArea?: SearchArea;
+    };
 
 function SearchSuggestionsComponent({
   query,
@@ -33,6 +36,12 @@ function SearchSuggestionsComponent({
   navigateOnSelect = true,
 }: SearchSuggestionsProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const { data } = usePublicCategoriesTree();
+
+  const areasMap = useMemo(
+    () => new Map(data.areas.map((area) => [area.slug, area])),
+    [data.areas]
+  );
 
   const results = useMemo(() => {
     const trimmed = query.trim();
@@ -43,21 +52,17 @@ function SearchSuggestionsComponent({
     const searchTerm = trimmed.toLowerCase();
     const searchResults: SearchResult[] = [];
 
-    for (const subcategory of SUBCATEGORIES_OFICIOS) {
+    for (const subcategory of data.subcategoriesOficios) {
       if (subcategory.name.toLowerCase().includes(searchTerm)) {
-        const parentArea = subcategory.areaSlug
-          ? AREAS_MAP.get(subcategory.areaSlug)
-          : undefined;
-
         searchResults.push({
           type: "subcategory",
           item: subcategory,
-          parentArea,
+          parentArea: subcategory.areaSlug ? areasMap.get(subcategory.areaSlug) : undefined,
         });
       }
     }
 
-    for (const subcategory of SUBCATEGORIES_PROFESIONES) {
+    for (const subcategory of data.subcategoriesProfesiones) {
       if (subcategory.name.toLowerCase().includes(searchTerm)) {
         searchResults.push({
           type: "subcategory",
@@ -66,7 +71,7 @@ function SearchSuggestionsComponent({
       }
     }
 
-    for (const area of AREAS_OFICIOS) {
+    for (const area of data.areas) {
       if (area.name.toLowerCase().includes(searchTerm)) {
         searchResults.push({
           type: "area",
@@ -76,7 +81,7 @@ function SearchSuggestionsComponent({
     }
 
     return searchResults.slice(0, 8);
-  }, [query]);
+  }, [areasMap, data.areas, data.subcategoriesOficios, data.subcategoriesProfesiones, query]);
 
   useEffect(() => {
     if (!isVisible) {
@@ -102,19 +107,16 @@ function SearchSuggestionsComponent({
 
   const getSuggestionLink = useCallback((result: SearchResult) => {
     if (result.type === "subcategory") {
-      const subcategory = result.item as Subcategory;
-
-      if (subcategory.group === "oficios" && result.parentArea) {
-        return `/servicios?grupo=${subcategory.group}&categoria=${result.parentArea.slug}&subcategoria=${subcategory.slug}`;
+      if (result.item.group === "oficios" && result.parentArea) {
+        return `/servicios?grupo=${result.item.group}&categoria=${result.parentArea.slug}&subcategoria=${result.item.slug}`;
       }
 
-      if (subcategory.group === "profesiones") {
-        return `/profesionales?categoria=${subcategory.slug}`;
+      if (result.item.group === "profesiones") {
+        return `/profesionales?categoria=${result.item.slug}`;
       }
     }
 
-    const area = result.item as Area;
-    return `/servicios?grupo=${area.group}&categoria=${area.slug}`;
+    return `/servicios?grupo=${result.item.group}&categoria=${result.item.slug}`;
   }, []);
 
   if (!isVisible || results.length === 0) {
@@ -124,7 +126,7 @@ function SearchSuggestionsComponent({
   return (
     <div
       ref={containerRef}
-      className="absolute left-0 right-0 top-full z-50 mt-1 max-h-80 overflow-y-auto rounded-lg border border-gray-200 bg-white text-left shadow-lg"
+      className="w-full max-h-80 overflow-y-auto rounded-lg border border-gray-200 bg-white text-left shadow-lg"
     >
       {results.map((result) => {
         const isSubcategory = result.type === "subcategory";
@@ -151,7 +153,7 @@ function SearchSuggestionsComponent({
               )}
               {!isSubcategory && (
                 <div className="truncate text-left text-sm text-gray-500">
-                  Categoria completa
+                  Categoría completa
                 </div>
               )}
             </div>

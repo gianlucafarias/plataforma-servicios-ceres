@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
-import { GROUPS, getAreasByGroup, getSubcategories, getLocations, getGenders } from "@/lib/taxonomy";
+import { GROUPS, getLocations, getGenders } from "@/lib/taxonomy";
 import type { CategoryGroup } from "@/types";
 import { Eye, EyeOff, User, Mail, Lock, Building2, Award, Send, ArrowLeft, CheckCircle, MapPin, CircleUser, Upload, FileText, Globe, Linkedin, Instagram, Facebook, Store, IdCard } from "lucide-react";
 import WhatsAppIcon from "@/components/ui/whatsapp";
@@ -21,6 +21,7 @@ import { DateBirthPicker } from "./_components/date-birth-picker";
 import { normalizeWhatsAppNumber, validateWhatsAppNumber } from "@/lib/whatsapp-normalize";
 import { checkEmailExists } from "@/lib/api/auth";
 import { uploadRegistrationFile } from "@/lib/api/uploads";
+import { usePublicCategoriesTree } from "@/hooks/usePublicCategoriesTree";
 
 // Iconos de redes sociales
 const GoogleIcon = () => (
@@ -41,6 +42,7 @@ const FacebookIcon = () => (
 export default function RegistroPage() {
   const router = useRouter();
   const { register } = useAuth();
+  const { data: categoryTree, loading: categoriesLoading, error: categoriesError } = usePublicCategoriesTree();
   const [currentStep, setCurrentStep] = useState(1);
   const [formData, setFormData] = useState({
     // Paso 1: Información personal
@@ -87,9 +89,66 @@ export default function RegistroPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [socialLoading, setSocialLoading] = useState<string | null>(null);
 
-  const areas = useMemo(() => getAreasByGroup(formData.professionalGroup as CategoryGroup), [formData.professionalGroup]);
+  const areas = useMemo(
+    () =>
+      formData.professionalGroup === "oficios"
+        ? categoryTree.areas.filter((area) => area.active)
+        : [],
+    [categoryTree.areas, formData.professionalGroup]
+  );
+  const oficioSubcategoriesByArea = useMemo(() => {
+    const byArea = new Map<string, Array<{ slug: string; name: string }>>();
+
+    for (const subcategory of categoryTree.subcategoriesOficios) {
+      if (!subcategory.active || !subcategory.areaSlug) {
+        continue;
+      }
+
+      const current = byArea.get(subcategory.areaSlug) ?? [];
+      current.push({ slug: subcategory.slug, name: subcategory.name });
+      byArea.set(subcategory.areaSlug, current);
+    }
+
+    return byArea;
+  }, [categoryTree.subcategoriesOficios]);
+  const professionCategories = useMemo(
+    () =>
+      categoryTree.subcategoriesProfesiones
+        .filter((subcategory) => subcategory.active)
+        .map((subcategory) => ({ slug: subcategory.slug, name: subcategory.name })),
+    [categoryTree.subcategoriesProfesiones]
+  );
+  const categoryNameBySlug = useMemo(() => {
+    const bySlug = new Map<string, string>();
+
+    for (const subcategory of categoryTree.subcategoriesOficios) {
+      if (subcategory.active) {
+        bySlug.set(subcategory.slug, subcategory.name);
+      }
+    }
+
+    for (const subcategory of categoryTree.subcategoriesProfesiones) {
+      if (subcategory.active) {
+        bySlug.set(subcategory.slug, subcategory.name);
+      }
+    }
+
+    return bySlug;
+  }, [categoryTree.subcategoriesOficios, categoryTree.subcategoriesProfesiones]);
   const locations = useMemo(() => getLocations(), []);
   const genders = useMemo(() => getGenders(), []);
+
+  const getAvailableCategories = (group: CategoryGroup | "", areaSlug?: string) => {
+    if (group === "profesiones") {
+      return professionCategories;
+    }
+
+    if (group === "oficios" && areaSlug) {
+      return oficioSubcategoriesByArea.get(areaSlug) ?? [];
+    }
+
+    return [];
+  };
 
   // Registrarse con redes sociales y luego completar perfil profesional
   const handleSocialRegister = async (provider: "google" | "facebook") => {
@@ -199,9 +258,7 @@ export default function RegistroPage() {
       updatedService.title = '';
     } else if (field === 'categoryId') {
       updatedService.categoryId = value;
-      const subcategories = getSubcategories((formData.professionalGroup || 'oficios') as CategoryGroup, updatedService.areaSlug || undefined);
-      const selected = subcategories.find((sub) => sub.slug === value);
-      updatedService.title = selected ? selected.name : '';
+      updatedService.title = categoryNameBySlug.get(value) || '';
     } else if (field === 'title') {
       updatedService.title = value;
     } else if (field === 'description') {
@@ -1238,6 +1295,12 @@ export default function RegistroPage() {
         </p>
       </div>
 
+      {categoriesError && (
+        <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          No se pudieron cargar las categorias actualizadas. Intenta nuevamente en unos segundos.
+        </p>
+      )}
+
       {formData.services.map((service, index) => (
         <Card key={index} className="rounded-2xl border border-gray-100 shadow-sm">
           <CardContent className="p-6">
@@ -1263,9 +1326,10 @@ export default function RegistroPage() {
                   <Select
                     value={service.areaSlug}
                     onValueChange={(value) => handleServiceChange(index, 'areaSlug', value)}
+                    disabled={categoriesLoading || areas.length === 0}
                   >
                     <SelectTrigger className="mt-1 w-full rounded-lg border-2 focus:ring-4 focus:ring-green-100 focus:border-[#006F4B] transition-all duration-200">
-                      <SelectValue placeholder="Selecciona un área" />
+                      <SelectValue placeholder={categoriesLoading ? "Cargando áreas..." : "Selecciona un área"} />
                     </SelectTrigger>
                     <SelectContent>
                       {areas.map((a) => (
@@ -1282,19 +1346,24 @@ export default function RegistroPage() {
                   onValueChange={(value) => handleServiceChange(index, 'categoryId', value)}
                 >
                   <SelectTrigger
-                    disabled={formData.professionalGroup === 'oficios' && !service.areaSlug}
+                    disabled={
+                      categoriesLoading ||
+                      (formData.professionalGroup === 'oficios' && !service.areaSlug)
+                    }
                     className={`mt-1 w-full rounded-lg border-2 focus:ring-4 focus:ring-green-100 focus:border-[#006F4B] transition-all duration-200 ${
                       errors[`service_${index}_category`] ? 'border-red-300' : 'border-gray-200'
-                    } ${formData.professionalGroup === 'oficios' && !service.areaSlug ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    } ${categoriesLoading || (formData.professionalGroup === 'oficios' && !service.areaSlug) ? 'opacity-50 cursor-not-allowed' : ''}`}
                   >
                     <SelectValue placeholder={
-                      formData.professionalGroup === 'profesiones'
+                      categoriesLoading
+                        ? 'Cargando categorías...'
+                        : formData.professionalGroup === 'profesiones'
                         ? 'Selecciona tu profesión'
                         : (service.areaSlug ? 'Selecciona una categoría' : 'Selecciona un área primero')
                     } />
                   </SelectTrigger>
                   <SelectContent>
-                    {getSubcategories((formData.professionalGroup || 'oficios') as CategoryGroup, service.areaSlug || undefined).map((sub) => (
+                    {getAvailableCategories(formData.professionalGroup, service.areaSlug).map((sub) => (
                       <SelectItem key={sub.slug} value={sub.slug}>{sub.name}</SelectItem>
                     ))}
                   </SelectContent>

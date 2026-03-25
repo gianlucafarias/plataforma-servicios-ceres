@@ -30,10 +30,11 @@ export interface Category {
   id: string;
   name: string;
   description: string;
-  icon: string;
+  icon?: string | null;
   slug: string;
   active: boolean;
   backgroundUrl?: string;
+  showOnHome?: boolean;
   // Nuevo: a qué grupo pertenece esta categoría (oficios o profesiones)
   group: CategoryGroup;
   // Opcional: subcategoría padre si modelamos niveles adicionales (p.ej. Construcción y mantenimiento)

@@ -1,8 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { revalidateTag } from 'next/cache';
 import { prisma } from '@/lib/prisma';
 import { requireAdminApiKey } from '@/lib/auth-helpers';
+import { isCategoryIconKey } from '@/lib/category-icon-keys';
 
 export const dynamic = 'force-dynamic';
+
+function normalizeIcon(value: unknown) {
+  if (value === undefined) return undefined;
+  if (value === null || value === '') return null;
+
+  if (!isCategoryIconKey(value)) {
+    throw new Error('invalid_icon');
+  }
+
+  return value;
+}
+
+function canShowOnHome(type: 'area' | 'subcategory', group: string) {
+  return type === 'area' || group === 'profesiones';
+}
 
 export async function GET(
   request: NextRequest,
@@ -52,14 +69,17 @@ export async function GET(
       success: true,
       data: {
         id: category.id,
-        type: category.parentCategoryId ? 'subcategory' : 'area',
+        type:
+          category.groupId === 'oficios' && !category.parentCategoryId ? 'area' : 'subcategory',
         name: category.name,
         slug: category.slug,
         group: category.groupId,
         parentId: category.parentCategoryId,
+        icon: category.icon,
         image: category.backgroundUrl,
         description: category.description,
         active: category.active,
+        showOnHome: category.showOnHome,
         parent: category.parent,
         subcategories: category.children,
         professionals: category.services.map((service) => service.professional),
@@ -94,15 +114,47 @@ export async function PUT(
     const updateData: {
       name?: string;
       description?: string;
+      icon?: string | null;
       backgroundUrl?: string | null;
       active?: boolean;
+      showOnHome?: boolean;
       parentCategoryId?: string | null;
     } = {};
 
     if (body.name !== undefined) updateData.name = body.name;
     if (body.description !== undefined) updateData.description = body.description;
+    if (body.icon !== undefined) {
+      try {
+        updateData.icon = normalizeIcon(body.icon);
+      } catch {
+        return NextResponse.json(
+          {
+            success: false,
+            error: 'validation_error',
+            message: 'Icono invalido. Debe pertenecer al catalogo permitido',
+          },
+          { status: 400 }
+        );
+      }
+    }
     if (body.image !== undefined) updateData.backgroundUrl = body.image;
     if (body.active !== undefined) updateData.active = body.active;
+    if (body.showOnHome !== undefined) {
+      const categoryType =
+        existing.groupId === 'oficios' && !existing.parentCategoryId ? 'area' : 'subcategory';
+      if (body.showOnHome && !canShowOnHome(categoryType, existing.groupId)) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: 'validation_error',
+            message: 'Solo las areas de oficios y las categorias de profesiones pueden mostrarse en el inicio',
+          },
+          { status: 400 }
+        );
+      }
+
+      updateData.showOnHome = body.showOnHome;
+    }
     if (body.parentId !== undefined) {
       if (body.parentId) {
         const parent = await prisma.category.findUnique({ where: { id: body.parentId } });
@@ -121,6 +173,8 @@ export async function PUT(
       where: { id },
       data: updateData,
     });
+
+    revalidateTag('categories');
 
     return NextResponse.json({
       success: true,
@@ -184,6 +238,8 @@ export async function DELETE(
         data: { active: false },
       });
 
+      revalidateTag('categories');
+
       return NextResponse.json({
         success: true,
         message: 'Categoria desactivada exitosamente',
@@ -192,6 +248,7 @@ export async function DELETE(
     }
 
     await prisma.category.delete({ where: { id } });
+    revalidateTag('categories');
 
     return NextResponse.json({
       success: true,

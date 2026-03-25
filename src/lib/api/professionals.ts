@@ -17,9 +17,11 @@ export type PublicCategoriesTree = {
     name: string;
     slug: string;
     group: string;
+    icon: string | null;
     image: string | null;
     description: string | null;
     active: boolean;
+    showOnHome: boolean;
     subcategoryCount: number;
     professionalCount: number;
   }>;
@@ -30,9 +32,11 @@ export type PublicCategoriesTree = {
     group: string;
     areaId: string | null;
     areaSlug: string | null;
+    icon: string | null;
     image: string | null;
     description: string | null;
     active: boolean;
+    showOnHome: boolean;
     professionalCount: number;
   }>;
   subcategoriesProfesiones: Array<{
@@ -42,9 +46,11 @@ export type PublicCategoriesTree = {
     group: string;
     areaId: null;
     areaSlug: null;
+    icon: string | null;
     image: string | null;
     description: string | null;
     active: boolean;
+    showOnHome: boolean;
     professionalCount: number;
   }>;
 };

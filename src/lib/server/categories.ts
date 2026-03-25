@@ -1,3 +1,4 @@
+import { unstable_cache } from 'next/cache';
 import { prisma } from '@/lib/prisma';
 
 export const CATEGORIES_LIST_RATE_LIMIT = {
@@ -11,9 +12,11 @@ export type PublicCategoryTree = {
     name: string;
     slug: string;
     group: string;
+    icon: string | null;
     image: string | null;
     description: string | null;
     active: boolean;
+    showOnHome: boolean;
     subcategoryCount: number;
     professionalCount: number;
   }>;
@@ -24,9 +27,11 @@ export type PublicCategoryTree = {
     group: string;
     areaId: string | null;
     areaSlug: string | null;
+    icon: string | null;
     image: string | null;
     description: string | null;
     active: boolean;
+    showOnHome: boolean;
     professionalCount: number;
   }>;
   subcategoriesProfesiones: Array<{
@@ -36,14 +41,16 @@ export type PublicCategoryTree = {
     group: string;
     areaId: null;
     areaSlug: null;
+    icon: string | null;
     image: string | null;
     description: string | null;
     active: boolean;
+    showOnHome: boolean;
     professionalCount: number;
   }>;
 };
 
-export async function getPublicCategoryTree(): Promise<PublicCategoryTree> {
+async function getPublicCategoryTreeUncached(): Promise<PublicCategoryTree> {
   const [areas, subcategoriesOficios, subcategoriesProfesiones, serviceCounts, childrenCounts] =
     await Promise.all([
       prisma.category.findMany({
@@ -57,9 +64,11 @@ export async function getPublicCategoryTree(): Promise<PublicCategoryTree> {
           name: true,
           slug: true,
           groupId: true,
+          icon: true,
           backgroundUrl: true,
           description: true,
           active: true,
+          showOnHome: true,
         },
         orderBy: { name: 'asc' },
       }),
@@ -118,9 +127,11 @@ export async function getPublicCategoryTree(): Promise<PublicCategoryTree> {
     group: subcategory.groupId,
     areaId: subcategory.parentCategoryId,
     areaSlug: subcategory.parent?.slug ?? null,
+    icon: subcategory.icon,
     image: subcategory.backgroundUrl,
     description: subcategory.description,
     active: subcategory.active,
+    showOnHome: subcategory.showOnHome,
     professionalCount: serviceCountMap.get(subcategory.id) || 0,
   }));
 
@@ -131,9 +142,11 @@ export async function getPublicCategoryTree(): Promise<PublicCategoryTree> {
     group: subcategory.groupId,
     areaId: null,
     areaSlug: null,
+    icon: subcategory.icon,
     image: subcategory.backgroundUrl,
     description: subcategory.description,
     active: subcategory.active,
+    showOnHome: subcategory.showOnHome,
     professionalCount: serviceCountMap.get(subcategory.id) || 0,
   }));
 
@@ -152,9 +165,11 @@ export async function getPublicCategoryTree(): Promise<PublicCategoryTree> {
         name: area.name,
         slug: area.slug,
         group: area.groupId,
+        icon: area.icon,
         image: area.backgroundUrl,
         description: area.description,
         active: area.active,
+        showOnHome: area.showOnHome,
         subcategoryCount: childrenCountMap.get(area.id) || 0,
         professionalCount,
       };
@@ -163,3 +178,12 @@ export async function getPublicCategoryTree(): Promise<PublicCategoryTree> {
     subcategoriesProfesiones: normalizedSubcategoriesProfesiones,
   };
 }
+
+export const getPublicCategoryTree = unstable_cache(
+  async () => getPublicCategoryTreeUncached(),
+  ['public-category-tree'],
+  {
+    revalidate: 300,
+    tags: ['categories'],
+  }
+);

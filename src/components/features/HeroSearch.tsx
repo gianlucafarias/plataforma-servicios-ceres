@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import { MapPin, Search } from "lucide-react";
 import { SearchSuggestions } from "@/components/features/SearchSuggestions";
 import { CategorySuggest } from "@/components/features/CategorySuggest";
-import { LOCATIONS, SUBCATEGORIES_OFICIOS } from "@/lib/taxonomy";
+import { LOCATIONS } from "@/lib/taxonomy";
+import { usePublicCategoriesTree } from "@/hooks/usePublicCategoriesTree";
 import {
   Select,
   SelectContent,
@@ -23,6 +24,7 @@ const HERO_LOCATIONS = LOCATIONS
 
 export function HeroSearch() {
   const router = useRouter();
+  const { data, loading } = usePublicCategoriesTree();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedLocation, setSelectedLocation] = useState("all");
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -129,7 +131,8 @@ export function HeroSearch() {
         <CategorySuggest
           handleSuggestionClick={handleSuggestionClick}
           randomSuggestionsNumber={4}
-          categories={SUBCATEGORIES_OFICIOS}
+          categories={data.subcategoriesOficios}
+          loading={loading}
         />
       </div>
     </>

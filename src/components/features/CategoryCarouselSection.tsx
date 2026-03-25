@@ -3,9 +3,13 @@
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { CategoryCarousel } from "@/components/features/CategoryCarousel";
-import { AREAS_OFICIOS } from "@/lib/taxonomy";
+import { usePublicCategoriesTree } from "@/hooks/usePublicCategoriesTree";
 
 export function CategoryCarouselSection() {
+  const { data, loading, error } = usePublicCategoriesTree();
+  const pinnedCategories = data.areas.filter((category) => category.showOnHome);
+  const categories = pinnedCategories.length > 0 ? pinnedCategories : data.areas;
+
   return (
     <section className="py-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <div className="text-center mb-12">
@@ -18,33 +22,50 @@ export function CategoryCarouselSection() {
         <div className="flex gap-2">
           <button
             onClick={() => {
-              const container = document.querySelector('.carousel-3d') as HTMLElement;
+              const container = document.querySelector(".carousel-3d") as HTMLElement;
               if (container) {
                 const itemWidth = container.clientWidth * 0.8;
                 container.scrollBy({ left: -itemWidth, behavior: "smooth" });
               }
             }}
-            className="cursor-pointer w-10 h-10 rounded-full border border-gray-200 dark:border-gray-700 flex items-center justify-center hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-300 transition-colors focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 focus-visible:ring-offset-[#f8f9fa] dark:focus-visible:ring-offset-gray-900"
+            disabled={categories.length === 0}
+            className="cursor-pointer w-10 h-10 rounded-full border border-gray-200 dark:border-gray-700 flex items-center justify-center hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-300 transition-colors focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 focus-visible:ring-offset-[#f8f9fa] dark:focus-visible:ring-offset-gray-900 disabled:cursor-not-allowed disabled:opacity-50"
             aria-label="Anterior"
           >
             <ArrowRight className="h-5 w-5 rotate-180" aria-hidden="true" />
           </button>
           <button
             onClick={() => {
-              const container = document.querySelector('.carousel-3d') as HTMLElement;
+              const container = document.querySelector(".carousel-3d") as HTMLElement;
               if (container) {
                 const itemWidth = container.clientWidth * 0.8;
                 container.scrollBy({ left: itemWidth, behavior: "smooth" });
               }
             }}
-            className="cursor-pointer w-10 h-10 rounded-full border border-gray-200 flex items-center justify-center hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-300 transition-colors focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 focus-visible:ring-offset-[#f8f9fa] dark:focus-visible:ring-offset-gray-900"
+            disabled={categories.length === 0}
+            className="cursor-pointer w-10 h-10 rounded-full border border-gray-200 flex items-center justify-center hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-300 transition-colors focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 focus-visible:ring-offset-[#f8f9fa] dark:focus-visible:ring-offset-gray-900 disabled:cursor-not-allowed disabled:opacity-50"
             aria-label="Siguiente"
           >
             <ArrowRight className="h-5 w-5" aria-hidden="true" />
           </button>
         </div>
       </div>
-      <CategoryCarousel categories={AREAS_OFICIOS} showViewAll={true} />
+      {loading ? (
+        <div className="flex gap-4 overflow-hidden">
+          {Array.from({ length: 4 }).map((_, index) => (
+            <div
+              key={index}
+              className="h-[360px] shrink-0 basis-[240px] rounded-2xl bg-gray-200 dark:bg-gray-800 animate-pulse"
+            />
+          ))}
+        </div>
+      ) : categories.length > 0 ? (
+        <CategoryCarousel categories={categories} showViewAll={true} />
+      ) : (
+        <div className="rounded-2xl border border-dashed border-gray-300 dark:border-gray-700 px-6 py-10 text-center text-sm text-gray-500 dark:text-gray-400">
+          {error ?? "No hay categorías activas para mostrar por ahora."}
+        </div>
+      )}
       <div className="text-center mt-8">
         <Link
           href="/categorias"

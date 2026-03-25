@@ -1,8 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { getErrorMessage } from '@/lib/api/client';
-import { getPublicCategoriesTree } from '@/lib/api/professionals';
+import { useMemo } from 'react';
+import { usePublicCategoriesTree } from '@/hooks/usePublicCategoriesTree';
 
 export type CategoryWithCount = {
   id: string;
@@ -24,90 +23,60 @@ export type SubcategoryWithCount = {
 };
 
 export function useCategoriesWithCount() {
-  const [categories, setCategories] = useState<CategoryWithCount[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { data, loading, error } = usePublicCategoriesTree();
 
-  useEffect(() => {
-    const controller = new AbortController();
+  const categories = useMemo(() => {
+    const categoriesMap = new Map<string, CategoryWithCount>();
 
-    const fetchCategories = async () => {
-      try {
-        setLoading(true);
-        setError(null);
+    data.areas.forEach((area) => {
+      categoriesMap.set(area.slug, {
+        id: area.id,
+        name: area.name,
+        slug: area.slug,
+        group: 'oficios',
+        professionalCount: area.professionalCount || 0,
+        subcategories: [],
+      });
+    });
 
-        const data = await getPublicCategoriesTree({ signal: controller.signal });
-        const categoriesMap = new Map<string, CategoryWithCount>();
+    data.subcategoriesOficios.forEach((sub) => {
+      if (!sub.areaSlug) return;
 
-        data.areas.forEach((area) => {
-          categoriesMap.set(area.slug, {
-            id: area.id,
-            name: area.name,
-            slug: area.slug,
-            group: 'oficios',
-            professionalCount: area.professionalCount || 0,
-            subcategories: [],
-          });
-        });
+      const category = categoriesMap.get(sub.areaSlug);
+      if (!category) return;
 
-        data.subcategoriesOficios.forEach((sub) => {
-          if (!sub.areaSlug) return;
+      category.subcategories = category.subcategories || [];
+      category.subcategories.push({
+        id: sub.id,
+        name: sub.name,
+        slug: sub.slug,
+        group: 'oficios',
+        areaSlug: sub.areaSlug,
+        professionalCount: sub.professionalCount || 0,
+      });
+    });
 
-          const category = categoriesMap.get(sub.areaSlug);
-          if (!category) return;
+    if (data.subcategoriesProfesiones.length > 0) {
+      const subcategories = data.subcategoriesProfesiones.map((sub) => ({
+        id: sub.id,
+        name: sub.name,
+        slug: sub.slug,
+        group: 'profesiones' as const,
+        professionalCount: sub.professionalCount || 0,
+      }));
 
-          category.subcategories = category.subcategories || [];
-          category.subcategories.push({
-            id: sub.id,
-            name: sub.name,
-            slug: sub.slug,
-            group: 'oficios',
-            areaSlug: sub.areaSlug,
-            professionalCount: sub.professionalCount || 0,
-          });
-        });
+      categoriesMap.set('profesiones', {
+        id: 'profesiones',
+        name: 'Profesiones',
+        slug: 'profesiones',
+        group: 'profesiones',
+        professionalCount: subcategories.reduce((sum, sub) => sum + sub.professionalCount, 0),
+        subcategories,
+      });
+    }
 
-        if (data.subcategoriesProfesiones.length > 0) {
-          const subcategories = data.subcategoriesProfesiones.map((sub) => ({
-            id: sub.id,
-            name: sub.name,
-            slug: sub.slug,
-            group: 'profesiones' as const,
-            professionalCount: sub.professionalCount || 0,
-          }));
-
-          categoriesMap.set('profesiones', {
-            id: 'profesiones',
-            name: 'Profesiones',
-            slug: 'profesiones',
-            group: 'profesiones',
-            professionalCount: subcategories.reduce((sum, sub) => sum + sub.professionalCount, 0),
-            subcategories,
-          });
-        }
-
-        if (!controller.signal.aborted) {
-          setCategories(Array.from(categoriesMap.values()));
-        }
-      } catch (error) {
-        if (controller.signal.aborted) return;
-
-        console.error('Error cargando categorias:', error);
-        setError(getErrorMessage(error, 'Error al obtener categorias'));
-        setCategories([]);
-      } finally {
-        if (!controller.signal.aborted) {
-          setLoading(false);
-        }
-      }
-    };
-
-    void fetchCategories();
-
-    return () => {
-      controller.abort();
-    };
-  }, []);
+    return Array.from(categoriesMap.values());
+  }, [data]);
 
   return { categories, loading, error };
 }

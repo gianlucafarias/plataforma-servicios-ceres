@@ -39,6 +39,9 @@ jobs:
             echo "📦 Instalando dependencias..."
             npm install
             
+            echo "🗄️ Aplicando migraciones de base de datos..."
+            npx prisma migrate deploy
+
             echo "🗄️ Generando Prisma Client..."
             npx prisma generate
             
@@ -47,9 +50,6 @@ jobs:
             
             echo "🔨 Construyendo aplicación (Next.js)..."
             npm run build
-            
-            echo "🗄️ Aplicando migraciones de base de datos..."
-            npx prisma migrate deploy
             
             # 4. Reiniciar con PM2 (Unificado como ROOT)
             echo "🔄 Actualizando servicios Ceres..."
