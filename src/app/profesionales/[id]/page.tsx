@@ -655,9 +655,7 @@ export default async function ProfessionalDetailPage({ params }: { params: Promi
           <div className="self-start lg:sticky lg:top-24">
             <div className="rounded-[28px] border border-gray-100 bg-white p-5 shadow-sm lg:p-6">
               <h2 className="text-xl font-semibold text-gray-900">Contacto y datos del perfil</h2>
-              <p className="mt-2 text-sm leading-relaxed text-gray-600">
-                Informacion practica para coordinar con {p.name.split(" ")[0]} sin salir de la ficha.
-              </p>
+              
 
               <div className="mt-6 space-y-6">
             
@@ -780,7 +778,7 @@ export default async function ProfessionalDetailPage({ params }: { params: Promi
                 <div className="flex items-start gap-3 rounded-2xl bg-gray-50 px-4 py-3">
                   <MapPin className="mt-0.5 h-5 w-5 flex-shrink-0 text-[#006F4B]" />
                   <div>
-                    <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Ciudad base</p>
+                    <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Vive en</p>
                     <p className="text-sm font-medium text-gray-900">{p.location}</p>
                   </div>
                 </div>

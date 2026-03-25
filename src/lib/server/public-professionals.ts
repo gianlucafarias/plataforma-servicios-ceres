@@ -1,4 +1,5 @@
 import { Prisma } from '@prisma/client';
+import { unstable_cache } from 'next/cache';
 import { prisma } from '@/lib/prisma';
 import { getPublicProfessionalWhere } from '@/lib/server/public-professional-visibility';
 
@@ -36,6 +37,10 @@ export type PublicProfessionalsListResult = {
     total: number;
     totalPages: number;
   };
+};
+
+export type FeaturedHomeProfessional = PublicProfessionalsListResult['data'][number] & {
+  serviceLocations: string[];
 };
 
 export async function listPublicProfessionals(
@@ -175,4 +180,28 @@ export async function listPublicProfessionals(
       totalPages: Math.max(1, Math.ceil(total / pageSize)),
     },
   };
+}
+
+const listFeaturedHomeProfessionalsCached = unstable_cache(
+  async (limit: number): Promise<FeaturedHomeProfessional[]> => {
+    const result = await listPublicProfessionals(
+      `https://ceres.local/api/v1/professionals?grupo=oficios&limit=${limit}&sortBy=recent`,
+      {
+        includeServiceLocations: true,
+      }
+    );
+
+    return result.data.map((professional) => ({
+      ...professional,
+      serviceLocations: professional.serviceLocations ?? [],
+    }));
+  },
+  ['home-featured-professionals'],
+  {
+    revalidate: 300,
+  }
+);
+
+export async function listFeaturedHomeProfessionals(limit = 24) {
+  return listFeaturedHomeProfessionalsCached(limit);
 }

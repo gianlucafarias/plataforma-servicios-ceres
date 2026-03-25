@@ -1,12 +1,15 @@
 "use client"
+
 import { useRef } from "react";
-import { Area } from "@/lib/taxonomy";
-import { CategoryCard } from "./CategoryCard";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
+import { CategoryCard } from "./CategoryCard";
+import type { PublicCategoriesTree } from "@/lib/api/professionals";
+
+type CarouselCategory = PublicCategoriesTree["areas"][number];
 
 interface CategoryCarouselProps {
-  categories: Area[];
+  categories: CarouselCategory[];
   showViewAll?: boolean;
 }
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -33,7 +33,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { SUBCATEGORIES_OFICIOS, AREAS_OFICIOS } from "@/lib/taxonomy";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger, DialogClose } from "@/components/ui/dialog";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Switch } from "@/components/ui/switch";
@@ -54,6 +53,7 @@ import {
 } from "@/lib/api/dashboard";
 import { createService, deleteService, updateService } from "@/lib/api/services";
 import { uploadFile } from "@/lib/api/uploads";
+import { usePublicCategoriesTree } from "@/hooks/usePublicCategoriesTree";
 
 type DashboardService = DashboardProfile["services"][number];
 
@@ -92,6 +92,7 @@ type ProfessionalTip = {
 
 export default function DashboardPage() {
   const router = useRouter();
+  const { data: categoryTree, loading: categoriesLoading, error: categoriesError } = usePublicCategoriesTree();
   const [activeTab, setActiveTab] = useState("overview");
   const [me, setMe] = useState<DashboardProfile | null>(null);
   const [loading, setLoading] = useState(true);
@@ -178,6 +179,67 @@ export default function DashboardPage() {
   ];
 
   const [currentTip, setCurrentTip] = useState<ProfessionalTip | null>(null);
+  const oficioAreas = useMemo(
+    () => categoryTree.areas.filter((area) => area.active),
+    [categoryTree.areas]
+  );
+  const oficioCategoriesByArea = useMemo(() => {
+    const byArea = new Map<string, Array<{ slug: string; name: string }>>();
+
+    for (const subcategory of categoryTree.subcategoriesOficios) {
+      if (!subcategory.active || !subcategory.areaSlug) {
+        continue;
+      }
+
+      const current = byArea.get(subcategory.areaSlug) ?? [];
+      current.push({ slug: subcategory.slug, name: subcategory.name });
+      byArea.set(subcategory.areaSlug, current);
+    }
+
+    return byArea;
+  }, [categoryTree.subcategoriesOficios]);
+  const professionCategories = useMemo(
+    () =>
+      categoryTree.subcategoriesProfesiones
+        .filter((subcategory) => subcategory.active)
+        .map((subcategory) => ({ slug: subcategory.slug, name: subcategory.name })),
+    [categoryTree.subcategoriesProfesiones]
+  );
+  const categoryNameBySlug = useMemo(() => {
+    const bySlug = new Map<string, string>();
+
+    for (const subcategory of categoryTree.subcategoriesOficios) {
+      if (subcategory.active) {
+        bySlug.set(subcategory.slug, subcategory.name);
+      }
+    }
+
+    for (const subcategory of categoryTree.subcategoriesProfesiones) {
+      if (subcategory.active) {
+        bySlug.set(subcategory.slug, subcategory.name);
+      }
+    }
+
+    return bySlug;
+  }, [categoryTree.subcategoriesOficios, categoryTree.subcategoriesProfesiones]);
+  const categorySlugByName = useMemo(() => {
+    const byName = new Map<string, string>();
+
+    for (const subcategory of categoryTree.subcategoriesOficios) {
+      if (subcategory.active) {
+        byName.set(subcategory.name, subcategory.slug);
+      }
+    }
+
+    for (const subcategory of categoryTree.subcategoriesProfesiones) {
+      if (subcategory.active) {
+        byName.set(subcategory.name, subcategory.slug);
+      }
+    }
+
+    return byName;
+  }, [categoryTree.subcategoriesOficios, categoryTree.subcategoriesProfesiones]);
+  const dashboardGroup = me?.professionalGroup ?? 'oficios';
 
   // Función para inicializar horarios por defecto
   const initializeDefaultSchedule = () => {
@@ -970,37 +1032,48 @@ export default function DashboardPage() {
                     </DialogHeader>
                     <div className="space-y-4">
                       {/* Categoría organizada por áreas */}
+                      {categoriesError && (
+                        <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                          No se pudieron cargar las categorias actualizadas. Intenta nuevamente en unos segundos.
+                        </p>
+                      )}
                       <div>
                         <Label htmlFor="category">Categoría *</Label>
                         <Select value={newService.categorySlug} onValueChange={(v) => {
-                          const selectedCategory = SUBCATEGORIES_OFICIOS.find(cat => cat.slug === v);
+                          const selectedCategoryName = categoryNameBySlug.get(v) || '';
                           setNewService(s => ({ 
                             ...s, 
                             categorySlug: v,
                             // Auto-completar título con el nombre de la categoría si no hay título personalizado
-                            title: s.title || selectedCategory?.name || ''
+                            title: s.title || selectedCategoryName
                           }));
-                        }}>
+                        }} disabled={categoriesLoading}>
                           <SelectTrigger className="rounded-xl mt-1">
-                            <SelectValue placeholder="Seleccionar categoría" />
+                            <SelectValue placeholder={categoriesLoading ? "Cargando categorías..." : "Seleccionar categoría"} />
                           </SelectTrigger>
                           <SelectContent>
-                            {AREAS_OFICIOS.map(area => {
-                              const subcategories = SUBCATEGORIES_OFICIOS.filter(sub => sub.areaSlug === area.slug);
-                              if (subcategories.length === 0) return null;
-                              return (
-                                <div key={area.slug}>
-                                  <div className="px-2 py-1.5 text-xs font-semibold text-gray-500 uppercase">
-                                    {area.name}
-                                  </div>
-                                  {subcategories.map(cat => (
-                                    <SelectItem key={cat.slug} value={cat.slug} className="pl-6">
-                                      {cat.name}
-                                    </SelectItem>
-                                  ))}
-                                </div>
-                              );
-                            })}
+                            {dashboardGroup === 'profesiones'
+                              ? professionCategories.map((category) => (
+                                  <SelectItem key={category.slug} value={category.slug}>
+                                    {category.name}
+                                  </SelectItem>
+                                ))
+                              : oficioAreas.map((area) => {
+                                  const subcategories = oficioCategoriesByArea.get(area.slug) ?? [];
+                                  if (subcategories.length === 0) return null;
+                                  return (
+                                    <div key={area.slug}>
+                                      <div className="px-2 py-1.5 text-xs font-semibold text-gray-500 uppercase">
+                                        {area.name}
+                                      </div>
+                                      {subcategories.map((category) => (
+                                        <SelectItem key={category.slug} value={category.slug} className="pl-6">
+                                          {category.name}
+                                        </SelectItem>
+                                      ))}
+                                    </div>
+                                  );
+                                })}
                           </SelectContent>
                         </Select>
                       </div>
@@ -1008,7 +1081,7 @@ export default function DashboardPage() {
                         <Label htmlFor="title">Título personalizado (opcional)</Label>
                         <Input 
                           id="title"
-                          placeholder={newService.categorySlug ? SUBCATEGORIES_OFICIOS.find(c => c.slug === newService.categorySlug)?.name || 'Título del servicio' : 'Seleccioná una categoría primero'} 
+                          placeholder={newService.categorySlug ? categoryNameBySlug.get(newService.categorySlug) || 'Título del servicio' : 'Seleccioná una categoría primero'} 
                           value={newService.title} 
                           onChange={e => setNewService(s => ({ ...s, title: e.target.value }))}
                           className="rounded-xl mt-1"
@@ -1046,7 +1119,7 @@ export default function DashboardPage() {
                             return;
                           }
                           // Si no hay título personalizado, usar el nombre de la categoría
-                          const categoryName = SUBCATEGORIES_OFICIOS.find(c => c.slug === newService.categorySlug)?.name || '';
+                          const categoryName = categoryNameBySlug.get(newService.categorySlug) || '';
                           const serviceToSave = {
                             ...newService,
                             title: newService.title.trim() || categoryName
@@ -1158,10 +1231,8 @@ export default function DashboardPage() {
                                   priceRange: service.priceRange || '',
                                 });
                                 // Inferir el slug de la categoría a partir del nombre, igual que en ajustes
-                                const matchedCategory = SUBCATEGORIES_OFICIOS.find(
-                                  (cat) => cat.name === service.category?.name
-                                );
-                                setEditCategorySlug(matchedCategory?.slug || '');
+                                const matchedCategorySlug = categorySlugByName.get(service.category?.name || '') || '';
+                                setEditCategorySlug(matchedCategorySlug);
                               }}
                               variant="outline"
                               size="sm"
@@ -1176,51 +1247,59 @@ export default function DashboardPage() {
                               <DialogTitle>Editar Servicio</DialogTitle>
                             </DialogHeader>
                             <div className="space-y-4 py-2">
+                              {categoriesError && (
+                                <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                                  No se pudieron cargar las categorias actualizadas. Intenta nuevamente en unos segundos.
+                                </p>
+                              )}
                               <div>
                                 <Label htmlFor={`edit-category-${service.id}`}>Categoría *</Label>
                                 <Select
                                   value={editCategorySlug}
                                   onValueChange={(v) => {
-                                    const selectedCategory = SUBCATEGORIES_OFICIOS.find(
-                                      (cat) => cat.slug === v
-                                    );
+                                    const selectedCategoryName = categoryNameBySlug.get(v) || '';
                                     setEditCategorySlug(v);
                                     setEditData((prev) => ({
                                       ...prev,
                                       // Autocompletar título solo si no hay uno personalizado
-                                      title: prev.title || selectedCategory?.name || '',
+                                      title: prev.title || selectedCategoryName,
                                     }));
                                   }}
+                                  disabled={categoriesLoading}
                                 >
                                   <SelectTrigger
                                     id={`edit-category-${service.id}`}
                                     className="rounded-xl mt-1"
                                   >
-                                    <SelectValue placeholder="Seleccionar categoría" />
+                                    <SelectValue placeholder={categoriesLoading ? "Cargando categorías..." : "Seleccionar categoría"} />
                                   </SelectTrigger>
                                   <SelectContent>
-                                    {AREAS_OFICIOS.map((area) => {
-                                      const subcategories = SUBCATEGORIES_OFICIOS.filter(
-                                        (sub) => sub.areaSlug === area.slug
-                                      );
-                                      if (subcategories.length === 0) return null;
-                                      return (
-                                        <div key={area.slug}>
-                                          <div className="px-2 py-1.5 text-xs font-semibold text-gray-500 uppercase">
-                                            {area.name}
-                                          </div>
-                                          {subcategories.map((cat) => (
-                                            <SelectItem
-                                              key={cat.slug}
-                                              value={cat.slug}
-                                              className="pl-6"
-                                            >
-                                              {cat.name}
-                                            </SelectItem>
-                                          ))}
-                                        </div>
-                                      );
-                                    })}
+                                    {dashboardGroup === 'profesiones'
+                                      ? professionCategories.map((category) => (
+                                          <SelectItem key={category.slug} value={category.slug}>
+                                            {category.name}
+                                          </SelectItem>
+                                        ))
+                                      : oficioAreas.map((area) => {
+                                          const subcategories = oficioCategoriesByArea.get(area.slug) ?? [];
+                                          if (subcategories.length === 0) return null;
+                                          return (
+                                            <div key={area.slug}>
+                                              <div className="px-2 py-1.5 text-xs font-semibold text-gray-500 uppercase">
+                                                {area.name}
+                                              </div>
+                                              {subcategories.map((category) => (
+                                                <SelectItem
+                                                  key={category.slug}
+                                                  value={category.slug}
+                                                  className="pl-6"
+                                                >
+                                                  {category.name}
+                                                </SelectItem>
+                                              ))}
+                                            </div>
+                                          );
+                                        })}
                                   </SelectContent>
                                 </Select>
                               </div>
@@ -1230,9 +1309,7 @@ export default function DashboardPage() {
                                   id="edit-title"
                                   placeholder={
                                     editCategorySlug
-                                      ? SUBCATEGORIES_OFICIOS.find(
-                                          (c) => c.slug === editCategorySlug
-                                        )?.name || 'Título del servicio'
+                                      ? categoryNameBySlug.get(editCategorySlug) || 'Título del servicio'
                                       : 'Seleccioná una categoría primero'
                                   }
                                   value={editData.title}
@@ -1280,9 +1357,7 @@ export default function DashboardPage() {
                                   const payload: Record<string, string> = {};
                                   // Si hay título personalizado, usarlo; sino usar el nombre de la categoría
                                   const categoryName =
-                                    SUBCATEGORIES_OFICIOS.find(
-                                      (c) => c.slug === editCategorySlug
-                                    )?.name || service.category?.name || '';
+                                    categoryNameBySlug.get(editCategorySlug) || service.category?.name || '';
                                   payload.title = editData.title.trim() || categoryName;
                                   payload.description = editData.description;
                                   if (editData.priceRange) payload.priceRange = editData.priceRange;

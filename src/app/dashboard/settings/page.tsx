@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,7 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
-import { getLocations, GROUPS, SUBCATEGORIES_PROFESIONES, SUBCATEGORIES_OFICIOS, AREAS_OFICIOS } from "@/lib/taxonomy";
+import { getLocations, GROUPS } from "@/lib/taxonomy";
 import { User, Mail, Phone, MapPin, Calendar, Briefcase, Award, Save, Loader2, Linkedin, Globe, Upload, FileText, X, Store, AlertCircle } from "lucide-react";
 import { Badge as BadgeComponent } from "@/components/ui/badge";
 import { toast } from "sonner";
@@ -25,10 +25,12 @@ import { getErrorMessage } from "@/lib/api/client";
 import { getDashboardProfile, updateDashboardProfile } from "@/lib/api/dashboard";
 import { createService, deleteService, updateService } from "@/lib/api/services";
 import { uploadFile } from "@/lib/api/uploads";
+import { usePublicCategoriesTree } from "@/hooks/usePublicCategoriesTree";
 
 
 export default function SettingsPage() {
   const router = useRouter();
+  const { data: categoryTree, loading: categoriesLoading, error: categoriesError } = usePublicCategoriesTree();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [formData, setFormData] = useState({
@@ -72,6 +74,66 @@ export default function SettingsPage() {
   // Estados para el recorte de imagen
   const [showCropper, setShowCropper] = useState(false);
   const [imageToCrop, setImageToCrop] = useState<string>("");
+  const oficioAreas = useMemo(
+    () => categoryTree.areas.filter((area) => area.active),
+    [categoryTree.areas]
+  );
+  const oficioCategoriesByArea = useMemo(() => {
+    const byArea = new Map<string, Array<{ slug: string; name: string }>>();
+
+    for (const subcategory of categoryTree.subcategoriesOficios) {
+      if (!subcategory.active || !subcategory.areaSlug) {
+        continue;
+      }
+
+      const current = byArea.get(subcategory.areaSlug) ?? [];
+      current.push({ slug: subcategory.slug, name: subcategory.name });
+      byArea.set(subcategory.areaSlug, current);
+    }
+
+    return byArea;
+  }, [categoryTree.subcategoriesOficios]);
+  const professionCategories = useMemo(
+    () =>
+      categoryTree.subcategoriesProfesiones
+        .filter((subcategory) => subcategory.active)
+        .map((subcategory) => ({ slug: subcategory.slug, name: subcategory.name })),
+    [categoryTree.subcategoriesProfesiones]
+  );
+  const categoryNameBySlug = useMemo(() => {
+    const bySlug = new Map<string, string>();
+
+    for (const subcategory of categoryTree.subcategoriesOficios) {
+      if (subcategory.active) {
+        bySlug.set(subcategory.slug, subcategory.name);
+      }
+    }
+
+    for (const subcategory of categoryTree.subcategoriesProfesiones) {
+      if (subcategory.active) {
+        bySlug.set(subcategory.slug, subcategory.name);
+      }
+    }
+
+    return bySlug;
+  }, [categoryTree.subcategoriesOficios, categoryTree.subcategoriesProfesiones]);
+  const categorySlugByName = useMemo(() => {
+    const byName = new Map<string, string>();
+
+    for (const subcategory of categoryTree.subcategoriesOficios) {
+      if (subcategory.active) {
+        byName.set(subcategory.name, subcategory.slug);
+      }
+    }
+
+    for (const subcategory of categoryTree.subcategoriesProfesiones) {
+      if (subcategory.active) {
+        byName.set(subcategory.name, subcategory.slug);
+      }
+    }
+
+    return byName;
+  }, [categoryTree.subcategoriesOficios, categoryTree.subcategoriesProfesiones]);
   
   // Función para detectar el tipo de perfil
   const getProfileType = () => {
@@ -83,7 +145,12 @@ export default function SettingsPage() {
   const getAvailableSpecialties = () => {
     const profileType = getProfileType();
     // Solo mostrar especialidades para profesiones
-    return profileType === "profesiones" ? SUBCATEGORIES_PROFESIONES : [];
+    return profileType === "profesiones"
+      ? professionCategories.map((subcategory) => ({
+          id: subcategory.slug,
+          name: subcategory.name,
+        }))
+      : [];
   };
 
   useEffect(() => {
@@ -355,9 +422,9 @@ export default function SettingsPage() {
     const service = formData.services.find(s => s.id === serviceId);
     if (service) {
       // Necesitamos obtener el slug de la categoría desde el nombre
-      const category = SUBCATEGORIES_OFICIOS.find(cat => cat.name === service.category.name);
+      const categorySlug = categorySlugByName.get(service.category.name) || '';
       setServiceForm({
-        categorySlug: category?.slug || '',
+        categorySlug,
         title: service.title,
         description: service.description,
         priceRange: '' // El priceRange no está en el tipo de service en settings
@@ -375,7 +442,7 @@ export default function SettingsPage() {
 
     try {
       // Si no hay título personalizado, usar el nombre de la categoría
-      const categoryName = SUBCATEGORIES_OFICIOS.find(c => c.slug === serviceForm.categorySlug)?.name || '';
+      const categoryName = categoryNameBySlug.get(serviceForm.categorySlug) || '';
       const serviceToSave = {
         ...serviceForm,
         title: serviceForm.title.trim() || categoryName
@@ -1294,40 +1361,52 @@ export default function SettingsPage() {
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
+            {categoriesError && (
+              <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                No se pudieron cargar las categorias actualizadas. Intenta nuevamente en unos segundos.
+              </p>
+            )}
             <div>
               <Label htmlFor="service-category">Categoría *</Label>
               <Select 
                 value={serviceForm.categorySlug} 
                 onValueChange={(v) => {
-                  const selectedCategory = SUBCATEGORIES_OFICIOS.find(cat => cat.slug === v);
+                  const selectedCategoryName = categoryNameBySlug.get(v) || '';
                   setServiceForm(prev => ({ 
                     ...prev, 
                     categorySlug: v,
                     // Auto-completar título con el nombre de la categoría si no hay título personalizado
-                    title: prev.title || selectedCategory?.name || ''
+                    title: prev.title || selectedCategoryName
                   }));
                 }}
+                disabled={categoriesLoading}
               >
                 <SelectTrigger className="rounded-xl mt-1">
-                  <SelectValue placeholder="Seleccionar categoría" />
+                  <SelectValue placeholder={categoriesLoading ? "Cargando categorías..." : "Seleccionar categoría"} />
                 </SelectTrigger>
                 <SelectContent>
-                  {AREAS_OFICIOS.map(area => {
-                    const subcategories = SUBCATEGORIES_OFICIOS.filter(sub => sub.areaSlug === area.slug);
-                    if (subcategories.length === 0) return null;
-                    return (
-                      <div key={area.slug}>
-                        <div className="px-2 py-1.5 text-xs font-semibold text-gray-500 uppercase">
-                          {area.name}
-                        </div>
-                        {subcategories.map(cat => (
-                          <SelectItem key={cat.slug} value={cat.slug} className="pl-6">
-                            {cat.name}
-                          </SelectItem>
-                        ))}
-                      </div>
-                    );
-                  })}
+                  {getProfileType() === "profesiones"
+                    ? professionCategories.map((category) => (
+                        <SelectItem key={category.slug} value={category.slug}>
+                          {category.name}
+                        </SelectItem>
+                      ))
+                    : oficioAreas.map((area) => {
+                        const subcategories = oficioCategoriesByArea.get(area.slug) ?? [];
+                        if (subcategories.length === 0) return null;
+                        return (
+                          <div key={area.slug}>
+                            <div className="px-2 py-1.5 text-xs font-semibold text-gray-500 uppercase">
+                              {area.name}
+                            </div>
+                            {subcategories.map((category) => (
+                              <SelectItem key={category.slug} value={category.slug} className="pl-6">
+                                {category.name}
+                              </SelectItem>
+                            ))}
+                          </div>
+                        );
+                      })}
                 </SelectContent>
               </Select>
             </div>
@@ -1335,7 +1414,7 @@ export default function SettingsPage() {
               <Label htmlFor="service-title">Título personalizado (opcional)</Label>
               <Input 
                 id="service-title"
-                placeholder={serviceForm.categorySlug ? SUBCATEGORIES_OFICIOS.find(c => c.slug === serviceForm.categorySlug)?.name || 'Título del servicio' : 'Seleccioná una categoría primero'} 
+                placeholder={serviceForm.categorySlug ? categoryNameBySlug.get(serviceForm.categorySlug) || 'Título del servicio' : 'Seleccioná una categoría primero'} 
                 value={serviceForm.title} 
                 onChange={e => setServiceForm(prev => ({ ...prev, title: e.target.value }))}
                 className="rounded-xl mt-1"

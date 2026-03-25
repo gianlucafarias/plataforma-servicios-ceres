@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { GROUPS, getAreasByGroup, getSubcategories, getLocations, getGenders } from "@/lib/taxonomy";
+import { GROUPS, getLocations, getGenders } from "@/lib/taxonomy";
 import type { CategoryGroup } from "@/types";
 import { 
   Phone, 
@@ -42,10 +42,12 @@ import { normalizeWhatsAppNumber, validateWhatsAppNumber } from "@/lib/whatsapp-
 import { completeProfessionalProfile } from "@/lib/api/auth";
 import { getErrorMessage } from "@/lib/api/client";
 import { uploadExternalOAuthImage, uploadFile } from "@/lib/api/uploads";
+import { usePublicCategoriesTree } from "@/hooks/usePublicCategoriesTree";
 
 export default function CompletarPerfilPage() {
   const router = useRouter();
   const { data: session, status } = useSession();
+  const { data: categoryTree, loading: categoriesLoading, error: categoriesError } = usePublicCategoriesTree();
   
   const [currentStep, setCurrentStep] = useState(1);
   const [formData, setFormData] = useState({
@@ -80,9 +82,66 @@ export default function CompletarPerfilPage() {
   const [errors, setErrors] = useState<{[key: string]: string}>({});
   const [isLoading, setIsLoading] = useState(false);
 
-  const areas = useMemo(() => getAreasByGroup(formData.professionalGroup as CategoryGroup), [formData.professionalGroup]);
+  const areas = useMemo(
+    () =>
+      formData.professionalGroup === "oficios"
+        ? categoryTree.areas.filter((area) => area.active)
+        : [],
+    [categoryTree.areas, formData.professionalGroup]
+  );
+  const oficioSubcategoriesByArea = useMemo(() => {
+    const byArea = new Map<string, Array<{ slug: string; name: string }>>();
+
+    for (const subcategory of categoryTree.subcategoriesOficios) {
+      if (!subcategory.active || !subcategory.areaSlug) {
+        continue;
+      }
+
+      const current = byArea.get(subcategory.areaSlug) ?? [];
+      current.push({ slug: subcategory.slug, name: subcategory.name });
+      byArea.set(subcategory.areaSlug, current);
+    }
+
+    return byArea;
+  }, [categoryTree.subcategoriesOficios]);
+  const professionCategories = useMemo(
+    () =>
+      categoryTree.subcategoriesProfesiones
+        .filter((subcategory) => subcategory.active)
+        .map((subcategory) => ({ slug: subcategory.slug, name: subcategory.name })),
+    [categoryTree.subcategoriesProfesiones]
+  );
+  const categoryNameBySlug = useMemo(() => {
+    const bySlug = new Map<string, string>();
+
+    for (const subcategory of categoryTree.subcategoriesOficios) {
+      if (subcategory.active) {
+        bySlug.set(subcategory.slug, subcategory.name);
+      }
+    }
+
+    for (const subcategory of categoryTree.subcategoriesProfesiones) {
+      if (subcategory.active) {
+        bySlug.set(subcategory.slug, subcategory.name);
+      }
+    }
+
+    return bySlug;
+  }, [categoryTree.subcategoriesOficios, categoryTree.subcategoriesProfesiones]);
   const locations = useMemo(() => getLocations(), []);
   const genders = useMemo(() => getGenders(), []);
+
+  const getAvailableCategories = (group: CategoryGroup | "", areaSlug?: string) => {
+    if (group === "profesiones") {
+      return professionCategories;
+    }
+
+    if (group === "oficios" && areaSlug) {
+      return oficioSubcategoriesByArea.get(areaSlug) ?? [];
+    }
+
+    return [];
+  };
 
   // Redirigir si no está logueado
   useEffect(() => {
@@ -173,9 +232,7 @@ export default function CompletarPerfilPage() {
       updatedService.title = '';
     } else if (field === 'categoryId') {
       updatedService.categoryId = value;
-      const subcategories = getSubcategories((formData.professionalGroup || 'oficios') as CategoryGroup, updatedService.areaSlug || undefined);
-      const selected = subcategories.find((sub) => sub.slug === value);
-      updatedService.title = selected ? selected.name : '';
+      updatedService.title = categoryNameBySlug.get(value) || '';
     } else if (field === 'title') {
       updatedService.title = value;
     } else if (field === 'description') {
@@ -1041,16 +1098,23 @@ export default function CompletarPerfilPage() {
                       )}
                     </div>
 
+                    {categoriesError && (
+                      <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                        No se pudieron cargar las categorias actualizadas. Intenta nuevamente en unos segundos.
+                      </p>
+                    )}
+
                     {formData.services.map((service, index) => (
                       <Card key={index} className="p-4 rounded-xl border-2 border-gray-100">
                         <div className="space-y-3">
-                          {formData.professionalGroup === 'oficios' && areas.length > 0 && (
+                          {formData.professionalGroup === 'oficios' && (
                             <Select
                               value={service.areaSlug}
                               onValueChange={(value) => handleServiceChange(index, 'areaSlug', value)}
+                              disabled={categoriesLoading || areas.length === 0}
                             >
                               <SelectTrigger className="rounded-xl">
-                                <SelectValue placeholder="Selecciona un área" />
+                                <SelectValue placeholder={categoriesLoading ? "Cargando áreas..." : "Selecciona un área"} />
                               </SelectTrigger>
                               <SelectContent>
                                 {areas.map((area) => (
@@ -1064,11 +1128,27 @@ export default function CompletarPerfilPage() {
                             value={service.categoryId}
                             onValueChange={(value) => handleServiceChange(index, 'categoryId', value)}
                           >
-                            <SelectTrigger className={`rounded-xl ${errors[`service_${index}_category`] ? 'border-red-300' : ''}`}>
-                              <SelectValue placeholder="Selecciona una especialidad" />
+                            <SelectTrigger
+                              disabled={
+                                categoriesLoading ||
+                                (formData.professionalGroup === 'oficios' && !service.areaSlug)
+                              }
+                              className={`rounded-xl ${errors[`service_${index}_category`] ? 'border-red-300' : ''}`}
+                            >
+                              <SelectValue
+                                placeholder={
+                                  categoriesLoading
+                                    ? "Cargando categorías..."
+                                    : formData.professionalGroup === "profesiones"
+                                      ? "Selecciona tu profesión"
+                                      : service.areaSlug
+                                        ? "Selecciona una subcategoría"
+                                        : "Selecciona un área primero"
+                                }
+                              />
                             </SelectTrigger>
                             <SelectContent>
-                              {getSubcategories(formData.professionalGroup as CategoryGroup, service.areaSlug || undefined).map((sub) => (
+                              {getAvailableCategories(formData.professionalGroup, service.areaSlug).map((sub) => (
                                 <SelectItem key={sub.slug} value={sub.slug}>{sub.name}</SelectItem>
                               ))}
                             </SelectContent>

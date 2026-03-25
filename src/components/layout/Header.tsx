@@ -44,9 +44,9 @@ export function Header() {
   };
 
   return (
-    <nav className="sticky top-0 z-50 bg-white/90 dark:bg-gray-900/90 backdrop-blur-md border-b border-gray-100 dark:border-gray-800 shadow-sm">
+    <nav className="sticky top-0 z-50 overflow-visible bg-white/90 dark:bg-gray-900/90 backdrop-blur-md border-b border-gray-100 dark:border-gray-800 shadow-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between h-20 items-center">
+        <div className="flex justify-between h-20 items-center overflow-visible">
           {/* Logo y marca */}
           <div className="flex items-center gap-3">
             <Link href="/" className="flex items-center gap-3">
@@ -63,7 +63,7 @@ export function Header() {
           </div>
 
           {/* Barra de búsqueda - Desktop */}
-          <div className="hidden md:flex relative">
+          <div className="hidden md:flex relative w-80 flex-none overflow-visible">
             <form onSubmit={handleSearchSubmit} className="relative w-full">
               <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
                 <Search className="text-lg" />
@@ -74,14 +74,23 @@ export function Header() {
                 onChange={handleSearchChange}
                 onFocus={() => setShowSuggestions(searchQuery.length > 0)}
                 placeholder="Buscar servicios..."
-                className="pl-10 pr-4 py-2.5 border border-gray-200 dark:border-gray-700 rounded-full text-base bg-gray-50 dark:bg-gray-800 focus:ring-2 focus:ring-primary focus:border-transparent dark:text-white w-80 transition-all"
+                className="pl-10 pr-14 py-2.5 border border-gray-200 dark:border-gray-700 rounded-full text-base bg-gray-50 dark:bg-gray-800 focus:ring-2 focus:ring-primary focus:border-transparent dark:text-white w-80 transition-all"
               />
-              <SearchSuggestions
-                query={searchQuery}
-                isVisible={showSuggestions}
-                onSelect={handleSuggestionSelect}
-                onClose={() => setShowSuggestions(false)}
-              />
+              <button
+                type="submit"
+                aria-label="Buscar"
+                className="absolute right-1 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-primary text-white transition-colors hover:bg-emerald-800"
+              >
+                <Search className="h-4 w-4" aria-hidden="true" />
+              </button>
+              <div className="absolute left-0 right-0 top-full z-[60] mt-2">
+                <SearchSuggestions
+                  query={searchQuery}
+                  isVisible={showSuggestions}
+                  onSelect={handleSuggestionSelect}
+                  onClose={() => setShowSuggestions(false)}
+                />
+              </div>
             </form>
           </div>
 
@@ -175,7 +184,7 @@ export function Header() {
 
       {/* Barra de búsqueda móvil (toggleable) */}
       {showMobileSearch && (
-        <div className="md:hidden border-t p-4 bg-white dark:bg-gray-900">
+        <div className="md:hidden overflow-visible border-t p-4 bg-white dark:bg-gray-900">
           <form onSubmit={handleSearchSubmit} className="relative">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <input
@@ -184,15 +193,24 @@ export function Header() {
               onChange={handleSearchChange}
               onFocus={() => setShowSuggestions(searchQuery.length > 0)}
               placeholder="Buscar servicios..."
-              className="w-full rounded-full border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 px-10 py-2 text-sm focus:ring-2 focus:ring-primary focus:border-transparent dark:text-white transition-all"
+              className="w-full rounded-full border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 pl-10 pr-12 py-2 text-sm focus:ring-2 focus:ring-primary focus:border-transparent dark:text-white transition-all"
               autoFocus
             />
-            <SearchSuggestions
-              query={searchQuery}
-              isVisible={showSuggestions}
-              onSelect={handleSuggestionSelect}
-              onClose={() => setShowSuggestions(false)}
-            />
+            <button
+              type="submit"
+              aria-label="Buscar"
+              className="absolute right-1 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-primary text-white transition-colors hover:bg-emerald-800"
+            >
+              <Search className="h-4 w-4" aria-hidden="true" />
+            </button>
+            <div className="absolute left-0 right-0 top-full z-[60] mt-2">
+              <SearchSuggestions
+                query={searchQuery}
+                isVisible={showSuggestions}
+                onSelect={handleSuggestionSelect}
+                onClose={() => setShowSuggestions(false)}
+              />
+            </div>
           </form>
         </div>
       )}

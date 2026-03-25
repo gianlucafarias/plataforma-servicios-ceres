@@ -1,13 +1,19 @@
 import { ArrowRight, Rocket, CheckCircle2, UserPlus, MessageCircle, MapPin, Verified } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
-import { SUBCATEGORIES_PROFESIONES } from "@/lib/taxonomy";
 import { HeroSearch } from "@/components/features/HeroSearch";
 import { FeaturedProfessionals } from "@/components/features/FeaturedProfessionals";
 import { CategoryCarouselSection } from "@/components/features/CategoryCarouselSection";
+import { HomeProfessionsSection } from "@/components/features/HomeProfessionsSection";
+import { listFeaturedHomeProfessionals } from "@/lib/server/public-professionals";
 
 
-export default function Home() {
+export default async function Home() {
+  const featuredProfessionals = await listFeaturedHomeProfessionals(24).catch((error) => {
+    console.error("Error loading featured professionals for home:", error);
+    return [];
+  });
+
   return (
     <div className="bg-[#f8f9fa] dark:bg-background-dark text-gray-800 dark:text-gray-200 transition-colors duration-300">
       {/* Hero Section */}
@@ -109,51 +115,12 @@ export default function Home() {
 
       <CategoryCarouselSection />
 
-      {/* Profesiones */}
-      <section className="py-12 bg-white dark:bg-surface-dark">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h4 className="text-2xl font-bold text-gray-800 dark:text-gray-100 mb-8 text-center">Profesiones</h4>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {SUBCATEGORIES_PROFESIONES.map((p) => (
-              <Link key={p.slug} href={`/profesionales?categoria=${p.slug}`}>
-                <div className="group relative h-48 rounded-2xl overflow-hidden shadow-md">
-                  {/* Imagen de fondo */}
-                  {p.image && (
-                    <Image
-                      src={p.image}
-                      alt={p.name}
-                      fill
-                      sizes="(max-width: 768px) 100vw, 33vw"
-                      className="object-cover"
-                      priority={false}
-                      placeholder="blur"
-                      blurDataURL="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMSIgaGVpZ2h0PSIxIiBmaWxsPSIjRTlGNkYwIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciLz4="
-                    />
-                  )}
-                  {/* Overlay */}
-                  <div className="absolute inset-0 bg-primary/80 group-hover:bg-primary/70 transition-colors flex items-center justify-center">
-                    <h5 className="text-white font-bold text-xl tracking-wide">{p.name}</h5>
-                  </div>
-                </div>
-              </Link>
-            ))}
-          </div>
-          <div className="text-center mt-8">
-            <Link 
-              href="/profesionales"
-              className="inline-flex items-center gap-2 px-6 py-2 rounded-full border border-gray-300 dark:border-gray-600 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-            >
-              Ver todos los profesionales
-              <ArrowRight className="h-4 w-4" aria-hidden="true" />
-            </Link>
-          </div>
-        </div>
-      </section>
+      <HomeProfessionsSection />
 
 
       {/* Profesionales destacados */}
       <section className="py-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <FeaturedProfessionals />
+        <FeaturedProfessionals professionals={featuredProfessionals} />
       </section>
 
       {/* CTA para profesionales */}

@@ -8,6 +8,8 @@ import { authOptions } from "@/app/api/auth/options";
 import { getServerSession } from "next-auth";
 import { Toaster } from "sonner";
 import { getBaseUrl, generateOrganizationStructuredData } from "@/lib/seo";
+import { getPublicCategoryTree } from "@/lib/server/categories";
+import { PublicCategoriesTreeProvider } from "@/hooks/usePublicCategoriesTree";
 
 const baseUrl = getBaseUrl();
 const inter = Inter({
@@ -79,7 +81,17 @@ export const metadata: Metadata = {
 };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
-  const session = await getServerSession(authOptions);
+  const [session, publicCategories] = await Promise.all([
+    getServerSession(authOptions),
+    getPublicCategoryTree().catch((error) => {
+      console.error("Error cargando categorias publicas en layout:", error);
+      return {
+        areas: [],
+        subcategoriesOficios: [],
+        subcategoriesProfesiones: [],
+      };
+    }),
+  ]);
   const organizationData = generateOrganizationStructuredData();
 
   return (
@@ -96,17 +108,19 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationData) }}
         />
         <AuthProviders session={session}>
-          <Header />
-          <main
-            id="main-content"
-            tabIndex={-1}
-            className="flex-1 w-full overflow-x-hidden"
-            style={{ overflowY: 'auto' }}
-          >
-            {children}
-          </main>
-          <Footer />
-          <Toaster position="top-right" />
+          <PublicCategoriesTreeProvider data={publicCategories}>
+            <Header />
+            <main
+              id="main-content"
+              tabIndex={-1}
+              className="flex-1 w-full overflow-x-hidden"
+              style={{ overflowY: 'auto' }}
+            >
+              {children}
+            </main>
+            <Footer />
+            <Toaster position="top-right" />
+          </PublicCategoriesTreeProvider>
         </AuthProviders>
       </body>
     </html>
