@@ -4,6 +4,11 @@ import { authOptions } from '../options';
 import { prisma } from '@/lib/prisma';
 import { normalizeWhatsAppNumber } from '@/lib/whatsapp-normalize';
 import { downloadAndSaveImage, isExternalOAuthImage } from '@/lib/download-image';
+import {
+  normalizeProfessionalDocumentationInput,
+  ProfessionalDocumentationError,
+  upsertProfessionalDocumentation,
+} from '@/lib/server/professional-documentation';
 
 export async function POST(request: NextRequest) {
   try {
@@ -59,6 +64,7 @@ export async function POST(request: NextRequest) {
       picture,
       hasPhysicalStore,
       physicalStoreAddress,
+      documentation,
       services
     } = body;
 
@@ -102,6 +108,8 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+
+    const normalizedDocumentation = normalizeProfessionalDocumentationInput(documentation);
 
     // Actualizar usuario y crear perfil profesional
     const result = await prisma.$transaction(async (tx) => {
@@ -166,6 +174,14 @@ export async function POST(request: NextRequest) {
           verified: false,
         }
       });
+
+      if (normalizedDocumentation.provided) {
+        await upsertProfessionalDocumentation(
+          tx,
+          professional.id,
+          normalizedDocumentation.documentation
+        );
+      }
 
       // Crear servicios
       for (const service of services) {
@@ -234,7 +250,8 @@ export async function POST(request: NextRequest) {
     const message = error instanceof Error ? error.message : 'Error interno del servidor';
     
     // Determinar si es un error de validación o del servidor
-    const isValidationError = message.toLowerCase().includes('required') || 
+    const isValidationError = error instanceof ProfessionalDocumentationError ||
+                               message.toLowerCase().includes('required') || 
                                message.toLowerCase().includes('invalid') ||
                                message.toLowerCase().includes('not found');
     
