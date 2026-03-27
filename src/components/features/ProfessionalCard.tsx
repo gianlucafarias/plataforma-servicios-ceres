@@ -6,6 +6,7 @@ import { Clock, MapPin } from "lucide-react";
 import Image from "next/image";
 import { LOCATIONS } from "@/lib/taxonomy";
 import { buildWhatsAppLink } from "@/lib/whatsapp";
+import { resolvePublicUploadUrl } from "@/lib/public-upload-url";
 
 
 interface ProfessionalCardProps {
@@ -50,12 +51,7 @@ export function ProfessionalCard({ professional }: ProfessionalCardProps) {
                 <Avatar className="h-12 w-12 sm:h-14 sm:w-14 flex-shrink-0 ring-2 ring-white shadow-sm">
                   <div className="w-full h-full rounded-full overflow-hidden">
                     <Image
-                      src={
-                        professional.socialNetworks.profilePicture.startsWith('http') ||
-                        professional.socialNetworks.profilePicture.startsWith('/uploads/profiles/')
-                          ? professional.socialNetworks.profilePicture
-                          : `/uploads/profiles/${professional.socialNetworks.profilePicture}`
-                      }
+                      src={resolvePublicUploadUrl(professional.socialNetworks.profilePicture)}
                       alt={professional.user.name}
                       width={56}
                       height={56}

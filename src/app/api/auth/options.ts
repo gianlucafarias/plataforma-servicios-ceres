@@ -68,7 +68,14 @@ export const authOptions: AuthOptions = {
 
                 try {
                     const user = await prisma.user.findUnique({
-                        where: { email: credentials.email as string }
+                        where: { email: credentials.email as string },
+                        include: {
+                            professional: {
+                                select: {
+                                    status: true,
+                                },
+                            },
+                        },
                     })
 
                     if (!user) return null
@@ -78,8 +85,14 @@ export const authOptions: AuthOptions = {
                         throw new Error('Esta cuenta usa login social. Iniciá sesión con Google o Facebook.')
                     }
 
-                    if (!user.verified && process.env.DISABLE_EMAIL_VERIFICATION !== 'true') {
-                        throw new Error('Tu cuenta aún no ha sido verificada. Te notificaremos por email cuando sea aprobada.')
+                    const hasApprovedProfessional = user.professional?.status === 'active'
+
+                    if (!user.verified && !hasApprovedProfessional && process.env.DISABLE_EMAIL_VERIFICATION !== 'true') {
+                        if (user.professional) {
+                            throw new Error('Tu cuenta profesional aún está pendiente de aprobación. Te notificaremos por email cuando sea aprobada.')
+                        }
+
+                        throw new Error('Debes verificar tu email antes de iniciar sesión.')
                     }
 
                     const passwordsMatch = await bcrypt.compare(

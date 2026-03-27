@@ -100,14 +100,15 @@ export default function DashboardPage() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [statsLoading, setStatsLoading] = useState(true);
   const [creating, setCreating] = useState(false);
-  const [newService, setNewService] = useState({ categorySlug: "", title: "", description: "", priceRange: "" });
+  const [newService, setNewService] = useState({ categorySlug: "", description: "" });
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [editData, setEditData] = useState({ title: "", description: "", priceRange: "" });
+  const [editData, setEditData] = useState({ description: "" });
   const [editCategorySlug, setEditCategorySlug] = useState<string>("");
   
   // Estados para certificaciones
   const [certifications, setCertifications] = useState<ProfessionalCertification[]>([]);
   const [showCertificationDialog, setShowCertificationDialog] = useState(false);
+  const [selectedServiceForCertification, setSelectedServiceForCertification] = useState<DashboardService | null>(null);
   const [newCertification, setNewCertification] = useState({
     categoryId: "",
     certificationType: "",
@@ -156,11 +157,8 @@ export default function DashboardPage() {
       id: 'certifications',
       title: 'Certificá tus servicios',
       description: 'Subí tu matrícula o certificaciones para mostrar un sello de confianza en tu perfil.',
-      actionLabel: 'Certificar mis servicios',
-      onClick: ({ }) => {
-        // Abrimos el modal de certificación
-        // Nota: usamos el setter directamente más abajo cuando renderizamos el tip
-      },
+      actionLabel: 'Ir a mis servicios',
+      onClick: ({ setActiveTab }) => setActiveTab('services'),
     },
     {
       id: 'services',
@@ -184,7 +182,7 @@ export default function DashboardPage() {
     [categoryTree.areas]
   );
   const oficioCategoriesByArea = useMemo(() => {
-    const byArea = new Map<string, Array<{ slug: string; name: string }>>();
+    const byArea = new Map<string, Array<{ id: string; slug: string; name: string }>>();
 
     for (const subcategory of categoryTree.subcategoriesOficios) {
       if (!subcategory.active || !subcategory.areaSlug) {
@@ -192,7 +190,7 @@ export default function DashboardPage() {
       }
 
       const current = byArea.get(subcategory.areaSlug) ?? [];
-      current.push({ slug: subcategory.slug, name: subcategory.name });
+      current.push({ id: subcategory.id, slug: subcategory.slug, name: subcategory.name });
       byArea.set(subcategory.areaSlug, current);
     }
 
@@ -202,44 +200,251 @@ export default function DashboardPage() {
     () =>
       categoryTree.subcategoriesProfesiones
         .filter((subcategory) => subcategory.active)
-        .map((subcategory) => ({ slug: subcategory.slug, name: subcategory.name })),
+        .map((subcategory) => ({ id: subcategory.id, slug: subcategory.slug, name: subcategory.name })),
     [categoryTree.subcategoriesProfesiones]
   );
+  const dashboardGroup = me?.professionalGroup ?? 'oficios';
+  const serviceCategoryOptions = useMemo(() => {
+    if (dashboardGroup === 'profesiones') {
+      return professionCategories.map((category) => ({
+        id: category.id,
+        slug: category.slug,
+        name: category.name,
+        areaSlug: null as string | null,
+      }));
+    }
+
+    return oficioAreas.flatMap((area) => {
+      const subcategories = oficioCategoriesByArea.get(area.slug) ?? [];
+
+      if (subcategories.length === 0) {
+        return [
+          {
+            id: area.id,
+            slug: area.slug,
+            name: area.name,
+            areaSlug: area.slug,
+          },
+        ];
+      }
+
+      return subcategories.map((subcategory) => ({
+        id: subcategory.id,
+        slug: subcategory.slug,
+        name: subcategory.name,
+        areaSlug: area.slug,
+      }));
+    });
+  }, [dashboardGroup, oficioAreas, oficioCategoriesByArea, professionCategories]);
   const categoryNameBySlug = useMemo(() => {
     const bySlug = new Map<string, string>();
 
-    for (const subcategory of categoryTree.subcategoriesOficios) {
-      if (subcategory.active) {
-        bySlug.set(subcategory.slug, subcategory.name);
-      }
-    }
-
-    for (const subcategory of categoryTree.subcategoriesProfesiones) {
-      if (subcategory.active) {
-        bySlug.set(subcategory.slug, subcategory.name);
-      }
+    for (const category of serviceCategoryOptions) {
+      bySlug.set(category.slug, category.name);
     }
 
     return bySlug;
-  }, [categoryTree.subcategoriesOficios, categoryTree.subcategoriesProfesiones]);
-  const categorySlugByName = useMemo(() => {
-    const byName = new Map<string, string>();
+  }, [serviceCategoryOptions]);
+  const categorySlugById = useMemo(() => {
+    const byId = new Map<string, string>();
 
-    for (const subcategory of categoryTree.subcategoriesOficios) {
-      if (subcategory.active) {
-        byName.set(subcategory.name, subcategory.slug);
+    for (const category of serviceCategoryOptions) {
+      byId.set(category.id, category.slug);
+    }
+
+    return byId;
+  }, [serviceCategoryOptions]);
+  const usedCategoryIds = useMemo(
+    () => new Set((me?.services ?? []).map((service) => service.categoryId)),
+    [me?.services]
+  );
+  const createSelectableCategoryIds = useMemo(() => {
+    const available = new Set<string>();
+
+    for (const category of serviceCategoryOptions) {
+      if (!usedCategoryIds.has(category.id)) {
+        available.add(category.id);
       }
     }
 
-    for (const subcategory of categoryTree.subcategoriesProfesiones) {
-      if (subcategory.active) {
-        byName.set(subcategory.name, subcategory.slug);
+    return available;
+  }, [serviceCategoryOptions, usedCategoryIds]);
+
+  const getEditableCategoryIds = (serviceId: string) => {
+    const usedByOtherServices = new Set(
+      (me?.services ?? [])
+        .filter((service) => service.id !== serviceId)
+        .map((service) => service.categoryId)
+    );
+
+    const available = new Set<string>();
+
+    for (const category of serviceCategoryOptions) {
+      if (!usedByOtherServices.has(category.id)) {
+        available.add(category.id);
       }
     }
 
-    return byName;
-  }, [categoryTree.subcategoriesOficios, categoryTree.subcategoriesProfesiones]);
-  const dashboardGroup = me?.professionalGroup ?? 'oficios';
+    return available;
+  };
+
+  const renderServiceCategoryOptions = (availableIds: Set<string>) => {
+    if (dashboardGroup === 'profesiones') {
+      return professionCategories
+        .filter((category) => availableIds.has(category.id))
+        .map((category) => (
+          <SelectItem key={category.slug} value={category.slug}>
+            {category.name}
+          </SelectItem>
+        ));
+    }
+
+    return oficioAreas.map((area) => {
+      const subcategories = oficioCategoriesByArea.get(area.slug) ?? [];
+
+      if (subcategories.length === 0) {
+        if (!availableIds.has(area.id)) {
+          return null;
+        }
+
+        return (
+          <SelectItem key={area.slug} value={area.slug}>
+            {area.name}
+          </SelectItem>
+        );
+      }
+
+      const availableSubcategories = subcategories.filter((subcategory) =>
+        availableIds.has(subcategory.id)
+      );
+
+      if (availableSubcategories.length === 0) {
+        return null;
+      }
+
+      return (
+        <div key={area.slug}>
+          <div className="px-2 py-1.5 text-xs font-semibold uppercase text-gray-500">
+            {area.name}
+          </div>
+          {availableSubcategories.map((category) => (
+            <SelectItem key={category.slug} value={category.slug} className="pl-6">
+              {category.name}
+            </SelectItem>
+          ))}
+        </div>
+      );
+    });
+  };
+
+  const resetCertificationForm = () => {
+    setNewCertification({
+      categoryId: "",
+      certificationType: "",
+      certificationNumber: "",
+      issuingOrganization: "",
+      issueDate: "",
+      expiryDate: "",
+      documentFile: null,
+      documentUrl: "",
+    });
+  };
+
+  const openCertificationDialog = (service: DashboardService) => {
+    setSelectedServiceForCertification(service);
+    setNewCertification({
+      categoryId: service.categoryId,
+      certificationType: "",
+      certificationNumber: "",
+      issuingOrganization: "",
+      issueDate: "",
+      expiryDate: "",
+      documentFile: null,
+      documentUrl: "",
+    });
+    setShowCertificationDialog(true);
+  };
+
+  const handleCertificationDialogChange = (open: boolean) => {
+    setShowCertificationDialog(open);
+    if (!open && !uploadingCert) {
+      setSelectedServiceForCertification(null);
+      resetCertificationForm();
+    }
+  };
+
+  const getCertificationForService = (service: DashboardService) =>
+    certifications.find(
+      (certification) =>
+        certification.categoryId === service.categoryId && certification.status === "approved"
+    ) ??
+    certifications.find(
+      (certification) =>
+        certification.categoryId === service.categoryId && certification.status === "pending"
+    ) ??
+    certifications.find(
+      (certification) => certification.categoryId === service.categoryId
+    ) ??
+    null;
+
+  const getCertificationUi = (service: DashboardService) => {
+    const certification = getCertificationForService(service);
+
+    if (!certification) {
+      return {
+        badgeVariant: "outline" as const,
+        badgeClassName: "border-dashed border-[#006F4B]/15 bg-white text-gray-600",
+        badgeLabel: "Sin certificar",
+        helperText: "Todavia no subiste una matricula o certificado para este servicio.",
+        buttonLabel: "Certificar servicio",
+        buttonDisabled: false,
+        buttonClassName:
+          "h-11 rounded-full bg-gradient-to-r from-[#006F4B] to-[#008F5B] px-5 text-white shadow-sm transition-all hover:from-[#008F5B] hover:to-[#006F4B]",
+      };
+    }
+
+    if (certification.status === "approved") {
+      return {
+        badgeVariant: "secondary" as const,
+        badgeClassName: "border-emerald-200 bg-emerald-50 text-emerald-700",
+        badgeLabel: "Certificado",
+        helperText: "Este servicio ya cuenta con una certificacion aprobada.",
+        buttonLabel: "Ya certificado",
+        buttonDisabled: true,
+        buttonClassName:
+          "h-11 rounded-full border border-emerald-200 bg-white px-5 text-emerald-700 opacity-100",
+      };
+    }
+
+    if (certification.status === "pending") {
+      return {
+        badgeVariant: "secondary" as const,
+        badgeClassName: "border-amber-200 bg-amber-50 text-amber-700",
+        badgeLabel: "En revision",
+        helperText: "Tu documentacion fue enviada y esta siendo revisada.",
+        buttonLabel: "En revision",
+        buttonDisabled: true,
+        buttonClassName:
+          "h-11 rounded-full border border-amber-200 bg-white px-5 text-amber-700 opacity-100",
+      };
+    }
+
+    return {
+      badgeVariant: "outline" as const,
+      badgeClassName: "border-red-200 bg-red-50 text-red-700",
+      badgeLabel: "Observado",
+      helperText: "La ultima certificacion fue observada. Podes volver a enviarla.",
+      buttonLabel: "Reenviar certificacion",
+      buttonDisabled: false,
+      buttonClassName:
+        "h-11 rounded-full border border-[#006F4B]/15 bg-white px-5 text-[#006F4B] shadow-sm transition-colors hover:bg-[#006F4B]/5",
+    };
+  };
+
+  const primaryDashboardActionClass =
+    "h-11 rounded-full bg-gradient-to-r from-[#006F4B] to-[#008F5B] px-5 text-white shadow-sm transition-all hover:from-[#008F5B] hover:to-[#006F4B]";
+  const secondaryDashboardActionClass =
+    "h-11 rounded-full border border-[#006F4B]/15 bg-white px-5 text-[#006F4B] shadow-sm transition-colors hover:bg-[#006F4B]/5";
 
   // Función para inicializar horarios por defecto
   const initializeDefaultSchedule = () => {
@@ -530,6 +735,8 @@ export default function DashboardPage() {
   }
 
   const isVerified = me.verified;
+  const needsCriminalRecordAlert =
+    me.documentationRequired === true && me.criminalRecordPresent !== true;
  
   return (
     <div className="min-h-screen bg-gray-50">
@@ -537,265 +744,30 @@ export default function DashboardPage() {
         <div className="max-w-7xl mx-auto">
           {/* Header */}
           <div className="mb-8">
-            <div className="flex items-center justify-between">
-              <div>
-                <h1 className="text-3xl font-bold text-gray-900 font-rutan">
-                  Panel Profesional
-                </h1>
-                <p className="text-gray-600 mt-1">
-                  Bienvenido, {me.user?.firstName} {me.user?.lastName}
-                </p>
-              </div>
-              <div className="flex items-center space-x-4">
-                {/* Botón/Badge de Certificaciones */}
-                {(() => {
-                  const hasApprovedCertifications = certifications.some(c => c.status === 'approved');
-                  const hasPendingCertifications = certifications.some(c => c.status === 'pending');
-                  if (hasApprovedCertifications) {
-                    return (
-                      <Badge className="rounded-xl bg-green-100 text-green-800 flex items-center">
-                        <Award className="h-3 w-3 mr-1" />
-                        Certificado
-                      </Badge>
-                    );
-                  }
-                  return (
-                    <Dialog open={showCertificationDialog} onOpenChange={setShowCertificationDialog}>
-                      <DialogTrigger asChild>
-                        <Button 
-                          variant="outline"
-                          disabled={hasPendingCertifications || uploadingCert}
-                          className="rounded-xl border-[#006F4B] text-[#006F4B] hover:bg-[#006F4B] hover:text-white disabled:opacity-60 disabled:cursor-not-allowed"
-                        >
-                          <Award className="h-4 w-4 mr-2" />
-                          {hasPendingCertifications ? 'Certificación en revisión' : 'Certificar mis servicios'}
-                        </Button>
-                      </DialogTrigger>
-                      <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
-                        <DialogHeader>
-                          <DialogTitle className="flex items-center gap-2">
-                            <Award className="h-5 w-5 text-[#006F4B]" />
-                            Certificar mis servicios
-                          </DialogTitle>
-                        </DialogHeader>
-                        <div className="space-y-4 py-4">
-                          <p className="text-sm text-gray-600">
-                            Subí tu matrícula o certificación profesional para que aparezca en tu perfil y te ayude a generar más confianza con los clientes.
-                          </p>
-
-                          {/* Categoría principal (solo informativa) */}
-                          <div>
-                            <Label>Categoría principal de tus servicios</Label>
-                            <p className="mt-1 text-sm text-gray-700">
-                              {me.services && me.services.length > 0 && me.services[0].category?.name
-                                ? me.services[0].category?.name
-                                : 'Usaremos la categoría principal que configuraste en tus servicios.'}
-                            </p>
-                          </div>
-
-                          {/* Tipo de certificación */}
-                          <div>
-                            <Label htmlFor="cert-type">Tipo de certificación *</Label>
-                            <Select 
-                              value={newCertification.certificationType} 
-                              onValueChange={(v) => setNewCertification(prev => ({ ...prev, certificationType: v }))}
-                            >
-                              <SelectTrigger className="rounded-xl mt-1">
-                                <SelectValue placeholder="Seleccionar tipo" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="matricula">Matrícula profesional</SelectItem>
-                                <SelectItem value="certificado">Certificado</SelectItem>
-                                <SelectItem value="licencia">Licencia</SelectItem>
-                                <SelectItem value="curso">Certificado de curso</SelectItem>
-                                <SelectItem value="otro">Otro</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-
-                          {/* Número de certificación */}
-                          <div>
-                            <Label htmlFor="cert-number">Número de matrícula/certificado *</Label>
-                            <Input
-                              id="cert-number"
-                              placeholder="Ej: 12345"
-                              value={newCertification.certificationNumber}
-                              onChange={(e) => setNewCertification(prev => ({ ...prev, certificationNumber: e.target.value }))}
-                              className="rounded-xl mt-1"
-                            />
-                          </div>
-
-                          {/* Organización emisora */}
-                          <div>
-                            <Label htmlFor="cert-org">Organización emisora *</Label>
-                            <Input
-                              id="cert-org"
-                              placeholder="Ej: Colegio de Abogados de Santa Fe"
-                              value={newCertification.issuingOrganization}
-                              onChange={(e) => setNewCertification(prev => ({ ...prev, issuingOrganization: e.target.value }))}
-                              className="rounded-xl mt-1"
-                            />
-                          </div>
-
-                          {/* Fechas */}
-                          <div className="grid grid-cols-2 gap-4">
-                            <div>
-                              <Label htmlFor="cert-issue-date">Fecha de emisión (opcional)</Label>
-                              <Input
-                                id="cert-issue-date"
-                                type="date"
-                                value={newCertification.issueDate}
-                                onChange={(e) => setNewCertification(prev => ({ ...prev, issueDate: e.target.value }))}
-                                className="rounded-xl mt-1"
-                              />
-                            </div>
-                            <div>
-                              <Label htmlFor="cert-expiry-date">Fecha de vencimiento (opcional)</Label>
-                              <Input
-                                id="cert-expiry-date"
-                                type="date"
-                                value={newCertification.expiryDate}
-                                onChange={(e) => setNewCertification(prev => ({ ...prev, expiryDate: e.target.value }))}
-                                className="rounded-xl mt-1"
-                              />
-                            </div>
-                          </div>
-
-                          {/* Subir documento (opcional) */}
-                          <div>
-                            <Label htmlFor="cert-document">Documento de certificación (opcional)</Label>
-                            <div className="mt-2">
-                              {newCertification.documentFile ? (
-                                <div className="flex items-center justify-between p-3 border border-gray-200 rounded-xl bg-gray-50">
-                                  <div className="flex items-center gap-2">
-                                    <FileText className="h-4 w-4 text-gray-600" />
-                                    <span className="text-sm text-gray-700">{newCertification.documentFile.name}</span>
-                                  </div>
-                                  <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => setNewCertification(prev => ({ ...prev, documentFile: null, documentUrl: "" }))}
-                                    className="h-8 w-8 p-0"
-                                  >
-                                    <X className="h-4 w-4" />
-                                  </Button>
-                                </div>
-                              ) : (
-                                <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-gray-300 border-dashed rounded-xl cursor-pointer bg-gray-50 hover:bg-gray-100 transition-colors">
-                                  <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                                    <Upload className="h-8 w-8 mb-2 text-gray-400" />
-                                    <p className="mb-2 text-sm text-gray-500">
-                                      <span className="font-semibold">Click para subir</span> o arrastra el archivo
-                                    </p>
-                                    <p className="text-xs text-gray-500">PDF, DOC, DOCX, JPG, PNG (máx. 15MB)</p>
-                                  </div>
-                                  <input
-                                    id="cert-document"
-                                    type="file"
-                                    className="hidden"
-                                    accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-                                    onChange={(e) => {
-                                      const file = e.target.files?.[0];
-                                      if (file) {
-                                        setNewCertification(prev => ({ ...prev, documentFile: file }));
-                                      }
-                                    }}
-                                  />
-                                </label>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                        <DialogFooter>
-                          <Button
-                            onClick={async () => {
-                              if (!newCertification.certificationType || !newCertification.certificationNumber || !newCertification.issuingOrganization) {
-                                toast.error('Completá todos los campos requeridos (tipo, número y organización)');
-                                return;
-                              }
-
-                              setUploadingCert(true);
-                              try {
-                                let documentUrl: string | null = null;
-
-                                // Si se subió un archivo, primero subirlo
-                                if (newCertification.documentFile) {
-                                  const uploadResult = await uploadFile(newCertification.documentFile, 'cv');
-                                  documentUrl = uploadResult.url || uploadResult.path || uploadResult.filename;
-                                }
-
-                                // Crear la certificación (con o sin documento)
-                                const certResult = {
-                                  success: true,
-                                  data: (
-                                    await createDashboardCertification({
-                                      categoryId: newCertification.categoryId || null,
-                                      certificationType: newCertification.certificationType,
-                                      certificationNumber: newCertification.certificationNumber,
-                                      issuingOrganization: newCertification.issuingOrganization,
-                                      issueDate: newCertification.issueDate || null,
-                                      expiryDate: newCertification.expiryDate || null,
-                                      documentUrl
-                                    })
-                                  ).certification,
-                                  message: undefined as string | undefined
-                                };
-                                if (certResult.success) {
-                                  toast.success('Certificación enviada para revisión. Será revisada por nuestro equipo.', {
-                                    duration: 5000
-                                  });
-                                  setCertifications(prev => [certResult.data, ...prev]);
-                                  setShowCertificationDialog(false);
-                                  setNewCertification({
-                                    categoryId: "",
-                                    certificationType: "",
-                                    certificationNumber: "",
-                                    issuingOrganization: "",
-                                    issueDate: "",
-                                    expiryDate: "",
-                                    documentFile: null,
-                                    documentUrl: ""
-                                  });
-                                } else {
-                                  toast.error(certResult.message || 'Error al crear la certificación');
-                                }
-                              } catch (error) {
-                                console.error('Error:', error);
-                                toast.error(getErrorMessage(error, 'Error al procesar la certificación'));
-                              } finally {
-                                setUploadingCert(false);
-                              }
-                            }}
-                            disabled={uploadingCert}
-                            className="bg-[#006F4B] text-white rounded-xl"
-                          >
-                            {uploadingCert ? (
-                              <>
-                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                                Enviando...
-                              </>
-                            ) : (
-                              'Enviar para revisión'
-                            )}
-                          </Button>
-                          <DialogClose asChild>
-                            <Button variant="outline" className="rounded-xl">Cancelar</Button>
-                          </DialogClose>
-                        </DialogFooter>
-                      </DialogContent>
-                    </Dialog>
-                  );
-                })()}
-                <Button 
-                  asChild
-                  className="bg-gradient-to-r from-[#006F4B] to-[#008F5B] text-white rounded-xl hover:from-[#008F5B] hover:to-[#006F4B]"
-                >
-                  <Link href="/dashboard/settings">
-                  <Settings className="h-4 w-4 mr-2" />
-                  Ajustes
-                  </Link>
-                </Button>
+            <div className="rounded-[28px] border border-emerald-100 bg-white/95 p-4 shadow-sm sm:p-6">
+              <div className="flex flex-col gap-4 sm:gap-5 md:flex-row md:items-center md:justify-between">
+                <div className="min-w-0">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#006F4B]">
+                    Espacio profesional
+                  </p>
+                  <h1 className="mt-2 text-2xl font-bold text-gray-900 font-rutan sm:text-3xl">
+                    Panel Profesional
+                  </h1>
+                  <p className="mt-2 max-w-2xl text-sm text-gray-600 sm:text-base">
+                    Bienvenido, {me.user?.firstName} {me.user?.lastName}
+                  </p>
+                </div>
+                <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+                  <Button
+                    asChild
+                    className={`w-full sm:w-auto ${primaryDashboardActionClass}`}
+                  >
+                    <Link href="/dashboard/settings">
+                      <Settings className="mr-2 h-4 w-4" />
+                      Ajustes
+                    </Link>
+                  </Button>
+                </div>
               </div>
             </div>
           </div>
@@ -849,6 +821,237 @@ export default function DashboardPage() {
           )}
 
 
+
+          {needsCriminalRecordAlert && (
+            <Card className="mb-6 rounded-2xl border-amber-200 bg-amber-50 shadow-sm">
+              <CardContent className="flex flex-col gap-4 p-5 md:flex-row md:items-center md:justify-between">
+                <div className="flex items-start gap-3">
+                  <div className="mt-0.5 rounded-full bg-amber-100 p-2 text-amber-700">
+                    <AlertCircle className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-amber-900">
+                      Te falta cargar el certificado de antecedentes penales
+                    </p>
+                    <p className="mt-1 text-sm text-amber-800">
+                      Tu perfil no podrá aparecer en la plataforma hasta que subas este documento.
+                      Puedes hacerlo ahora desde la configuración de tu perfil.
+                    </p>
+                  </div>
+                </div>
+                <Button asChild className="rounded-xl bg-amber-600 text-white hover:bg-amber-700">
+                  <Link href="/dashboard/settings">
+                    <FileText className="mr-2 h-4 w-4" />
+                    Cargar antecedentes
+                  </Link>
+                </Button>
+              </CardContent>
+            </Card>
+          )}
+
+          <Dialog open={showCertificationDialog} onOpenChange={handleCertificationDialogChange}>
+            <DialogContent className="w-[calc(100vw-1rem)] max-w-2xl overflow-hidden rounded-[28px] border border-gray-100 p-0 shadow-2xl">
+              <DialogHeader className="border-b border-gray-100 bg-white px-5 py-5 sm:px-6">
+                <DialogTitle className="flex items-center gap-2 text-lg">
+                  <Award className="h-5 w-5 text-[#006F4B]" />
+                  Certificar servicio
+                </DialogTitle>
+                <p className="pr-8 text-sm text-gray-600">
+                  Subi tu matricula o certificacion profesional para reforzar la confianza en este servicio.
+                </p>
+              </DialogHeader>
+              <div className="max-h-[calc(100vh-13rem)] space-y-5 overflow-y-auto px-5 py-5 sm:px-6">
+                <p className="hidden text-sm text-gray-600">
+                  Subí tu matrícula o certificación profesional para reforzar la confianza en este servicio.
+                </p>
+
+                <div className="rounded-[24px] border border-emerald-100 bg-gradient-to-br from-emerald-50 to-white p-4 sm:p-5">
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">
+                    Servicio seleccionado
+                  </p>
+                  <p className="mt-3 text-base font-semibold text-gray-900">
+                    {selectedServiceForCertification?.title || "Sin servicio seleccionado"}
+                  </p>
+                  <p className="mt-1 text-sm text-gray-600">
+                    {selectedServiceForCertification?.category?.name || "Sin categoría asociada"}
+                  </p>
+                </div>
+
+                <div>
+                  <Label htmlFor="cert-type">Tipo de certificación *</Label>
+                  <Select
+                    value={newCertification.certificationType}
+                    onValueChange={(v) => setNewCertification(prev => ({ ...prev, certificationType: v }))}
+                  >
+                    <SelectTrigger className="mt-1 h-11 rounded-2xl border-gray-200">
+                      <SelectValue placeholder="Seleccionar tipo" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="matricula">Matrícula profesional</SelectItem>
+                      <SelectItem value="certificado">Certificado</SelectItem>
+                      <SelectItem value="licencia">Licencia</SelectItem>
+                      <SelectItem value="curso">Certificado de curso</SelectItem>
+                      <SelectItem value="otro">Otro</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <Label htmlFor="cert-number">Número de matrícula/certificado *</Label>
+                  <Input
+                    id="cert-number"
+                    placeholder="Ej: 12345"
+                    value={newCertification.certificationNumber}
+                    onChange={(e) => setNewCertification(prev => ({ ...prev, certificationNumber: e.target.value }))}
+                    className="mt-1 h-11 rounded-2xl border-gray-200"
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="cert-org">Organización emisora *</Label>
+                  <Input
+                    id="cert-org"
+                    placeholder="Ej: Colegio de Abogados de Santa Fe"
+                    value={newCertification.issuingOrganization}
+                    onChange={(e) => setNewCertification(prev => ({ ...prev, issuingOrganization: e.target.value }))}
+                    className="mt-1 h-11 rounded-2xl border-gray-200"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div>
+                    <Label htmlFor="cert-issue-date">Fecha de emisión (opcional)</Label>
+                    <Input
+                      id="cert-issue-date"
+                      type="date"
+                      value={newCertification.issueDate}
+                      onChange={(e) => setNewCertification(prev => ({ ...prev, issueDate: e.target.value }))}
+                      className="mt-1 h-11 rounded-2xl border-gray-200"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="cert-expiry-date">Fecha de vencimiento (opcional)</Label>
+                    <Input
+                      id="cert-expiry-date"
+                      type="date"
+                      value={newCertification.expiryDate}
+                      onChange={(e) => setNewCertification(prev => ({ ...prev, expiryDate: e.target.value }))}
+                      className="mt-1 h-11 rounded-2xl border-gray-200"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <Label htmlFor="cert-document">Documento de certificación (opcional)</Label>
+                  <div className="mt-2">
+                    {newCertification.documentFile ? (
+                      <div className="flex items-center justify-between rounded-2xl border border-gray-200 bg-gray-50 p-3">
+                        <div className="flex items-center gap-2">
+                          <FileText className="h-4 w-4 text-gray-600" />
+                          <span className="line-clamp-2 text-sm text-gray-700">{newCertification.documentFile.name}</span>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setNewCertification(prev => ({ ...prev, documentFile: null, documentUrl: "" }))}
+                          className="h-8 w-8 p-0"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <label className="flex h-36 w-full cursor-pointer flex-col items-center justify-center rounded-[24px] border-2 border-dashed border-[#006F4B]/20 bg-[#F6FBF8] px-4 text-center transition-colors hover:bg-[#EEF8F2]">
+                        <div className="flex flex-col items-center justify-center">
+                          <Upload className="mb-2 h-8 w-8 text-[#006F4B]" />
+                          <p className="mb-2 text-sm text-gray-600">
+                            <span className="font-semibold">Click para subir</span> o arrastra el archivo
+                          </p>
+                          <p className="text-xs text-gray-500">PDF, DOC, DOCX, JPG, PNG (máx. 15MB)</p>
+                        </div>
+                        <input
+                          id="cert-document"
+                          type="file"
+                          className="hidden"
+                          accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              setNewCertification(prev => ({ ...prev, documentFile: file }));
+                            }
+                          }}
+                        />
+                      </label>
+                    )}
+                  </div>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button
+                  onClick={async () => {
+                    if (!selectedServiceForCertification) {
+                      toast.error('Seleccioná un servicio antes de cargar la certificación');
+                      return;
+                    }
+
+                    if (!newCertification.certificationType || !newCertification.certificationNumber || !newCertification.issuingOrganization) {
+                      toast.error('Completá todos los campos requeridos (tipo, número y organización)');
+                      return;
+                    }
+
+                    setUploadingCert(true);
+                    try {
+                      let documentUrl: string | null = null;
+
+                      if (newCertification.documentFile) {
+                        const uploadResult = await uploadFile(newCertification.documentFile, 'cv');
+                        documentUrl = uploadResult.url || uploadResult.path || uploadResult.filename;
+                      }
+
+                      const certResult = (
+                        await createDashboardCertification({
+                          categoryId: selectedServiceForCertification.categoryId,
+                          certificationType: newCertification.certificationType,
+                          certificationNumber: newCertification.certificationNumber,
+                          issuingOrganization: newCertification.issuingOrganization,
+                          issueDate: newCertification.issueDate || null,
+                          expiryDate: newCertification.expiryDate || null,
+                          documentUrl,
+                        })
+                      ).certification;
+
+                      toast.success('Certificación enviada para revisión. Será revisada por nuestro equipo.', {
+                        duration: 5000,
+                      });
+                      setCertifications(prev => [certResult, ...prev]);
+                      setShowCertificationDialog(false);
+                      setSelectedServiceForCertification(null);
+                      resetCertificationForm();
+                    } catch (error) {
+                      console.error('Error:', error);
+                      toast.error(getErrorMessage(error, 'Error al procesar la certificación'));
+                    } finally {
+                      setUploadingCert(false);
+                    }
+                  }}
+                  disabled={uploadingCert}
+                  className="bg-[#006F4B] text-white rounded-xl"
+                >
+                  {uploadingCert ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Enviando...
+                    </>
+                  ) : (
+                    'Enviar para revisión'
+                  )}
+                </Button>
+                <DialogClose asChild>
+                  <Button variant="outline" className="rounded-xl">Cancelar</Button>
+                </DialogClose>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
 
           <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
             <TabsList className="grid w-full grid-cols-3 rounded-2xl">
@@ -991,13 +1194,7 @@ export default function DashboardPage() {
                             variant="outline"
                             size="sm"
                             className="mt-4 rounded-xl border-[#006F4B] text-[#006F4B] hover:bg-[#006F4B] hover:text-white"
-                            onClick={() => {
-                              if (currentTip.id === 'certifications') {
-                                setShowCertificationDialog(true);
-                              } else {
-                                currentTip.onClick({ setActiveTab, router });
-                              }
-                            }}
+                            onClick={() => currentTip.onClick({ setActiveTab, router })}
                           >
                             {currentTip.actionLabel}
                           </Button>
@@ -1017,11 +1214,14 @@ export default function DashboardPage() {
 
             {/* Tab Servicios */}
             <TabsContent value="services" className="space-y-6">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <h2 className="text-2xl font-bold text-gray-900 font-rutan">Mis Servicios</h2>
                 <Dialog open={creating} onOpenChange={setCreating}>
                   <DialogTrigger asChild>
-                    <Button className="bg-gradient-to-r from-[#006F4B] to-[#008F5B] text-white rounded-xl hover:from-[#008F5B] hover:to-[#006F4B]">
+                    <Button
+                      className="w-full rounded-xl bg-gradient-to-r from-[#006F4B] to-[#008F5B] text-white hover:from-[#008F5B] hover:to-[#006F4B] sm:w-auto"
+                      disabled={categoriesLoading || createSelectableCategoryIds.size === 0}
+                    >
                       <Plus className="h-4 w-4 mr-2" />
                       Agregar Servicio
                     </Button>
@@ -1038,59 +1238,21 @@ export default function DashboardPage() {
                         </p>
                       )}
                       <div>
-                        <Label htmlFor="category">Categoría *</Label>
-                        <Select value={newService.categorySlug} onValueChange={(v) => {
-                          const selectedCategoryName = categoryNameBySlug.get(v) || '';
-                          setNewService(s => ({ 
-                            ...s, 
-                            categorySlug: v,
-                            // Auto-completar título con el nombre de la categoría si no hay título personalizado
-                            title: s.title || selectedCategoryName
-                          }));
-                        }} disabled={categoriesLoading}>
+                        <Label htmlFor="category">Categoria *</Label>
+                        <Select
+                          value={newService.categorySlug}
+                          onValueChange={(v) => setNewService((s) => ({ ...s, categorySlug: v }))}
+                          disabled={categoriesLoading}
+                        >
                           <SelectTrigger className="rounded-xl mt-1">
-                            <SelectValue placeholder={categoriesLoading ? "Cargando categorías..." : "Seleccionar categoría"} />
+                            <SelectValue placeholder={categoriesLoading ? "Cargando categorias..." : "Seleccionar categoria"} />
                           </SelectTrigger>
                           <SelectContent>
-                            {dashboardGroup === 'profesiones'
-                              ? professionCategories.map((category) => (
-                                  <SelectItem key={category.slug} value={category.slug}>
-                                    {category.name}
-                                  </SelectItem>
-                                ))
-                              : oficioAreas.map((area) => {
-                                  const subcategories = oficioCategoriesByArea.get(area.slug) ?? [];
-                                  if (subcategories.length === 0) return null;
-                                  return (
-                                    <div key={area.slug}>
-                                      <div className="px-2 py-1.5 text-xs font-semibold text-gray-500 uppercase">
-                                        {area.name}
-                                      </div>
-                                      {subcategories.map((category) => (
-                                        <SelectItem key={category.slug} value={category.slug} className="pl-6">
-                                          {category.name}
-                                        </SelectItem>
-                                      ))}
-                                    </div>
-                                  );
-                                })}
+                            {renderServiceCategoryOptions(createSelectableCategoryIds)}
                           </SelectContent>
                         </Select>
                       </div>
-                      <div>
-                        <Label htmlFor="title">Título personalizado (opcional)</Label>
-                        <Input 
-                          id="title"
-                          placeholder={newService.categorySlug ? categoryNameBySlug.get(newService.categorySlug) || 'Título del servicio' : 'Seleccioná una categoría primero'} 
-                          value={newService.title} 
-                          onChange={e => setNewService(s => ({ ...s, title: e.target.value }))}
-                          className="rounded-xl mt-1"
-                        />
-                        <p className="text-xs text-gray-500 mt-1">
-                          Si no especificás un título, se usará el nombre de la categoría
-                        </p>
-                      </div>
-                      <div>
+<div>
                         <Label htmlFor="description">Descripción *</Label>
                         <Textarea
                           id="description"
@@ -1100,17 +1262,7 @@ export default function DashboardPage() {
                           className="rounded-xl mt-1 min-h-[100px]"
                         />
                       </div>
-                      <div>
-                        <Label htmlFor="priceRange">Rango de precio (opcional)</Label>
-                        <Input 
-                          id="priceRange"
-                          placeholder="Ej: $5000 - $10000" 
-                          value={newService.priceRange} 
-                          onChange={e => setNewService(s => ({ ...s, priceRange: e.target.value }))}
-                          className="rounded-xl mt-1"
-                        />
-                      </div>
-                    </div>
+</div>
                     <DialogFooter>
                       <Button
                         onClick={async () => {
@@ -1120,16 +1272,31 @@ export default function DashboardPage() {
                           }
                           // Si no hay título personalizado, usar el nombre de la categoría
                           const categoryName = categoryNameBySlug.get(newService.categorySlug) || '';
+                          const selectedCategory = serviceCategoryOptions.find(
+                            (category) => category.slug === newService.categorySlug
+                          );
+
+                          if (!selectedCategory) {
+                            toast.error('Selecciona una categoria valida');
+                            return;
+                          }
+
+                          if (usedCategoryIds.has(selectedCategory.id)) {
+                            toast.error('Ese servicio ya esta cargado en tu perfil');
+                            return;
+                          }
+
                           const serviceToSave = {
-                            ...newService,
-                            title: newService.title.trim() || categoryName
+                            categorySlug: newService.categorySlug,
+                            description: newService.description,
+                            title: categoryName
                           };
                           try {
                             const createdService = await createService(serviceToSave);
                             toast.success('Servicio agregado correctamente');
                             setMe(prev => prev ? { ...prev, services: [ ...(prev.services || []), createdService as DashboardService ] } : prev);
                             setCreating(false);
-                            setNewService({ categorySlug: '', title: '', description: '', priceRange: '' });
+                            setNewService({ categorySlug: '', description: '' });
                           } catch (error) {
                             toast.error(getErrorMessage(error, 'Error al crear el servicio'));
                           }
@@ -1154,18 +1321,21 @@ export default function DashboardPage() {
                 </Card>
               )}
 
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {me.services?.map((service: DashboardService) => (
+              <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+                {me.services?.map((service: DashboardService) => {
+                  const certificationUi = getCertificationUi(service);
+
+                  return (
                   <Card key={service.id} className="rounded-2xl border border-gray-100">
                     <CardHeader className="pb-3">
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="min-w-0 flex-1">
                           <CardTitle className="text-lg font-rutan">{service.title}</CardTitle>
                           <Badge variant="outline" className="rounded-xl text-xs mt-2">
                             {service.category?.name || 'Sin categoría'}
                           </Badge>
                         </div>
-                        <div className="flex flex-col items-end gap-1">
+                        <div className="flex shrink-0 flex-col items-end gap-1 text-right">
                           <Switch
                             checked={service.available}
                             onCheckedChange={async (checked) => {
@@ -1205,19 +1375,53 @@ export default function DashboardPage() {
 
                       </div>
                     </CardHeader>
-                    <CardContent>
+                    <CardContent className="space-y-4">
                       <p className="text-gray-600 text-sm mb-4 leading-relaxed">{service.description || 'Sin descripción'}</p>
                      
                       
-                      <div className="text-sm text-gray-500 mb-4">{service.priceRange}</div>
 
-                      <div className="flex space-x-2">
+                      <div className="rounded-2xl border border-gray-100 bg-gray-50/80 p-4">
+                        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                          <div>
+                            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">
+                              Certificacion
+                            </p>
+                            <div className="mt-2">
+                              <Badge
+                                variant={certificationUi.badgeVariant}
+                                className={`rounded-xl ${certificationUi.badgeClassName}`}
+                              >
+                                {certificationUi.badgeLabel}
+                              </Badge>
+                            </div>
+                            <p className="mt-2 text-sm text-gray-600">
+                              {certificationUi.helperText}
+                            </p>
+                          </div>
+                          <Button
+                            type="button"
+                            variant={certificationUi.buttonDisabled ? "outline" : "default"}
+                            className={`w-full rounded-xl sm:w-auto ${
+                              certificationUi.buttonDisabled
+                                ? "cursor-not-allowed"
+                                : "bg-[#006F4B] text-white hover:bg-[#00563A]"
+                            }`}
+                            disabled={certificationUi.buttonDisabled}
+                            onClick={() => openCertificationDialog(service)}
+                          >
+                            <Award className="mr-2 h-4 w-4" />
+                            {certificationUi.buttonLabel}
+                          </Button>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-wrap gap-2">
                         <Dialog
                           open={editingId === service.id}
                           onOpenChange={(open) => {
                             setEditingId(open ? service.id : null);
                             if (!open) {
-                              setEditData({ title: '', description: '', priceRange: '' });
+                              setEditData({ description: '' });
                               setEditCategorySlug("");
                             }
                           }}
@@ -1226,17 +1430,14 @@ export default function DashboardPage() {
                             <Button
                               onClick={() => {
                                 setEditData({
-                                  title: service.title,
                                   description: service.description,
-                                  priceRange: service.priceRange || '',
                                 });
-                                // Inferir el slug de la categoría a partir del nombre, igual que en ajustes
-                                const matchedCategorySlug = categorySlugByName.get(service.category?.name || '') || '';
+                                const matchedCategorySlug = categorySlugById.get(service.categoryId) || '';
                                 setEditCategorySlug(matchedCategorySlug);
                               }}
                               variant="outline"
                               size="sm"
-                              className="flex-1 rounded-xl"
+                              className="flex-1 rounded-xl sm:flex-none"
                             >
                               <Edit className="h-3 w-3 mr-1" />
                               Editar
@@ -1253,76 +1454,24 @@ export default function DashboardPage() {
                                 </p>
                               )}
                               <div>
-                                <Label htmlFor={`edit-category-${service.id}`}>Categoría *</Label>
-                                <Select
+                        <Label htmlFor={`edit-category-${service.id}`}>Categoria *</Label>
+                        <Select
                                   value={editCategorySlug}
-                                  onValueChange={(v) => {
-                                    const selectedCategoryName = categoryNameBySlug.get(v) || '';
-                                    setEditCategorySlug(v);
-                                    setEditData((prev) => ({
-                                      ...prev,
-                                      // Autocompletar título solo si no hay uno personalizado
-                                      title: prev.title || selectedCategoryName,
-                                    }));
-                                  }}
+                                  onValueChange={(v) => setEditCategorySlug(v)}
                                   disabled={categoriesLoading}
                                 >
                                   <SelectTrigger
                                     id={`edit-category-${service.id}`}
                                     className="rounded-xl mt-1"
                                   >
-                                    <SelectValue placeholder={categoriesLoading ? "Cargando categorías..." : "Seleccionar categoría"} />
+                                    <SelectValue placeholder={categoriesLoading ? "Cargando categorias..." : "Seleccionar categoria"} />
                                   </SelectTrigger>
                                   <SelectContent>
-                                    {dashboardGroup === 'profesiones'
-                                      ? professionCategories.map((category) => (
-                                          <SelectItem key={category.slug} value={category.slug}>
-                                            {category.name}
-                                          </SelectItem>
-                                        ))
-                                      : oficioAreas.map((area) => {
-                                          const subcategories = oficioCategoriesByArea.get(area.slug) ?? [];
-                                          if (subcategories.length === 0) return null;
-                                          return (
-                                            <div key={area.slug}>
-                                              <div className="px-2 py-1.5 text-xs font-semibold text-gray-500 uppercase">
-                                                {area.name}
-                                              </div>
-                                              {subcategories.map((category) => (
-                                                <SelectItem
-                                                  key={category.slug}
-                                                  value={category.slug}
-                                                  className="pl-6"
-                                                >
-                                                  {category.name}
-                                                </SelectItem>
-                                              ))}
-                                            </div>
-                                          );
-                                        })}
+                                    {renderServiceCategoryOptions(getEditableCategoryIds(service.id))}
                                   </SelectContent>
                                 </Select>
                               </div>
-                              <div>
-                                <Label htmlFor="edit-title">Título personalizado (opcional)</Label>
-                                <Input
-                                  id="edit-title"
-                                  placeholder={
-                                    editCategorySlug
-                                      ? categoryNameBySlug.get(editCategorySlug) || 'Título del servicio'
-                                      : 'Seleccioná una categoría primero'
-                                  }
-                                  value={editData.title}
-                                  onChange={(e) =>
-                                    setEditData((d) => ({ ...d, title: e.target.value }))
-                                  }
-                                  className="rounded-xl mt-1"
-                                />
-                                <p className="text-xs text-gray-500 mt-1">
-                                  Si no especificás un título, se usará el nombre de la categoría
-                                </p>
-                              </div>
-                              <div>
+<div>
                                 <Label htmlFor="edit-description">Descripción *</Label>
                                 <Textarea
                                   id="edit-description"
@@ -1334,19 +1483,7 @@ export default function DashboardPage() {
                                   className="rounded-xl mt-1 min-h-[100px]"
                                 />
                               </div>
-                              <div>
-                                <Label htmlFor="edit-priceRange">Rango de precio (opcional)</Label>
-                                <Input
-                                  id="edit-priceRange"
-                                  placeholder="Ej: $5000 - $10000"
-                                  value={editData.priceRange}
-                                  onChange={(e) =>
-                                    setEditData((d) => ({ ...d, priceRange: e.target.value }))
-                                  }
-                                  className="rounded-xl mt-1"
-                                />
-                              </div>
-                            </div>
+</div>
                             <DialogFooter>
                               <Button
                                 onClick={async () => {
@@ -1354,19 +1491,32 @@ export default function DashboardPage() {
                                     toast.error('La descripción es requerida');
                                     return;
                                   }
+                                  const selectedCategory = serviceCategoryOptions.find(
+                                    (category) => category.slug === editCategorySlug
+                                  );
+
+                                  if (!selectedCategory) {
+                                    toast.error('Selecciona una categoria valida');
+                                    return;
+                                  }
+
+                                  if (!getEditableCategoryIds(service.id).has(selectedCategory.id)) {
+                                    toast.error('Ese servicio ya esta cargado en tu perfil');
+                                    return;
+                                  }
+
                                   const payload: Record<string, string> = {};
                                   // Si hay título personalizado, usarlo; sino usar el nombre de la categoría
                                   const categoryName =
                                     categoryNameBySlug.get(editCategorySlug) || service.category?.name || '';
-                                  payload.title = editData.title.trim() || categoryName;
+                                  payload.title = categoryName;
                                   payload.description = editData.description;
-                                  if (editData.priceRange) payload.priceRange = editData.priceRange;
                                   try {
                                     const updatedService = await updateService(service.id, payload);
                                     toast.success('Servicio actualizado correctamente');
                                     setMe(prev => prev ? { ...prev, services: prev.services?.map((s) => s.id === service.id ? { ...s, ...(updatedService as Partial<DashboardService>) } : s) } : prev);
                                     setEditingId(null);
-                                    setEditData({ title: '', description: '', priceRange: '' });
+                                    setEditData({ description: '' });
                                   } catch (error) {
                                     toast.error(getErrorMessage(error, 'Error al actualizar el servicio'));
                                   }
@@ -1417,7 +1567,7 @@ export default function DashboardPage() {
                       </div>
                     </CardContent>
                   </Card>
-                ))}
+                )})}
               </div>
 
             </TabsContent>
@@ -1719,3 +1869,8 @@ export default function DashboardPage() {
     </div>
   );
 }
+
+
+
+
+

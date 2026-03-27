@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
+import { ProfessionalDocumentationFields } from "@/components/features/ProfessionalDocumentationFields";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
@@ -24,8 +25,12 @@ import { ImageCropper } from "@/components/ui/image-cropper";
 import { getErrorMessage } from "@/lib/api/client";
 import { getDashboardProfile, updateDashboardProfile } from "@/lib/api/dashboard";
 import { createService, deleteService, updateService } from "@/lib/api/services";
-import { uploadFile } from "@/lib/api/uploads";
+import { uploadPrivateDocument } from "@/lib/api/private-documents";
+import { resolveStoredUploadValue, uploadFile } from "@/lib/api/uploads";
 import { usePublicCategoriesTree } from "@/hooks/usePublicCategoriesTree";
+import type { PrivateDocumentFile, ProfessionalDocumentation } from "@/types";
+import { validateProfessionalDocumentation } from "@/lib/validation/professional-documentation";
+import { resolvePublicUploadUrl } from "@/lib/public-upload-url";
 
 
 export default function SettingsPage() {
@@ -58,6 +63,10 @@ export default function SettingsPage() {
     serviceLocations: [] as string[],
     hasPhysicalStore: false,
     physicalStoreAddress: "",
+    documentation: {
+      criminalRecord: null,
+      laborReferences: [],
+    } as ProfessionalDocumentation,
     
     // Servicios
     services: [] as Array<{
@@ -295,6 +304,10 @@ export default function SettingsPage() {
           serviceLocations: formattedServiceLocations,
           hasPhysicalStore: data.hasPhysicalStore || false,
           physicalStoreAddress: data.physicalStoreAddress || "",
+          documentation: data.documentation || {
+            criminalRecord: null,
+            laborReferences: [],
+          },
           services: data.services || []
         });
     } catch (error) {
@@ -398,6 +411,14 @@ export default function SettingsPage() {
     setHasChanges(true);
   };
 
+  const uploadPrivateFile = async (file: File): Promise<PrivateDocumentFile> => {
+    const result = await uploadPrivateDocument(file);
+    return {
+      objectKey: result.objectKey,
+      fileName: result.fileName,
+    };
+  };
+
   // No necesitamos esta función para selección múltiple
 
   // Estados para gestión de servicios
@@ -498,7 +519,7 @@ export default function SettingsPage() {
 
     // Validar todos los campos
     Object.keys(formData).forEach(field => {
-      if (field !== 'services' && field !== 'specialties') {
+      if (field !== 'services' && field !== 'specialties' && field !== 'documentation') {
         const error = validateField(field, formData[field as keyof typeof formData]);
         if (error) {
           newErrors[field] = error;
@@ -506,9 +527,17 @@ export default function SettingsPage() {
       }
     });
 
+    const documentationValidation = validateProfessionalDocumentation(formData.documentation);
+    if (documentationValidation.errors.laborReferences) {
+      newErrors.documentationReferences = documentationValidation.errors.laborReferences;
+    }
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
+
+  const picturePreviewUrl = resolvePublicUploadUrl(formData.picture);
+  const cvPreviewUrl = resolvePublicUploadUrl(formData.cv);
 
   const handleSave = async () => {
     if (!validateForm()) {
@@ -516,12 +545,15 @@ export default function SettingsPage() {
       return;
     }
 
+    const documentationValidation = validateProfessionalDocumentation(formData.documentation);
+
     setSaving(true);
     try {
       // Normalizar WhatsApp antes de enviar
       const dataToSend = {
         ...formData,
         whatsapp: normalizeWhatsAppNumber(formData.whatsapp) || null,
+        documentation: documentationValidation.sanitized,
       };
 
       await updateDashboardProfile(dataToSend);
@@ -550,7 +582,7 @@ export default function SettingsPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      <div className="container mx-auto px-4 py-8 lg:py-12">
+      <div className="container mx-auto px-4 py-8 pb-32 lg:py-12 lg:pb-36">
         <div className="max-w-5xl mx-auto">
           {/* Header mejorado */}
           <div className="mb-8 bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
@@ -575,24 +607,6 @@ export default function SettingsPage() {
                   </Badge>
                 )}
                 <div className="flex items-center gap-2">
-                  <Button 
-                    onClick={handleSave} 
-                    disabled={saving || !hasChanges}
-                    size="lg"
-                    className="bg-gradient-to-r from-[#006F4B] to-[#008F5B] text-white rounded-xl hover:from-[#008F5B] hover:to-[#006F4B] flex items-center gap-2 shadow-lg hover:shadow-xl transition-all"
-                  >
-                    {saving ? (
-                      <>
-                        <Loader2 className="h-5 w-5 animate-spin" />
-                        Guardando...
-                      </>
-                    ) : (
-                      <>
-                        <Save className="h-5 w-5" />
-                        {hasChanges ? 'Guardar Cambios' : 'Sin cambios'}
-                      </>
-                    )}
-                  </Button>
                   <Button
                     type="button"
                     variant="outline"
@@ -1102,12 +1116,7 @@ export default function SettingsPage() {
                       {formData.picture ? (
                         <>
                           <Image
-                            src={
-                              formData.picture.startsWith('http') ||
-                              formData.picture.startsWith('/uploads/profiles/')
-                                ? formData.picture
-                                : `/uploads/profiles/${formData.picture}`
-                            }
+                            src={picturePreviewUrl}
                             alt="Foto de perfil"
                             fill
                             className="object-cover"
@@ -1180,9 +1189,7 @@ export default function SettingsPage() {
                       {formData.cv ? (
                         <a
                           href={
-                            formData.cv.startsWith('http')
-                              ? formData.cv
-                              : `/uploads/profiles/${formData.cv}`
+                            cvPreviewUrl
                           }
                           target="_blank"
                           rel="noopener noreferrer"
@@ -1214,7 +1221,7 @@ export default function SettingsPage() {
                                 const result = await uploadFile(file, 'cv');
                                 handleInputChange(
                                   'cv',
-                                  result.url || result.path || result.filename
+                                  resolveStoredUploadValue(result)
                                 );
                                 toast.success('CV subido correctamente');
                               } catch (error) {
@@ -1249,6 +1256,46 @@ export default function SettingsPage() {
                       )}
                     </div>
                   </div>
+                </div>
+
+                <div className="bg-gray-50 rounded-2xl p-6 border border-gray-200 space-y-4">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <h4 className="text-base font-semibold text-gray-900">Documentación para visibilidad</h4>
+                      <p className="text-sm text-gray-600 mt-1">
+                        El certificado de antecedentes penales es obligatorio para aparecer en la plataforma.
+                        Las referencias laborales son opcionales y se mostrarán como señal de confianza.
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <Badge variant={formData.documentation.criminalRecord ? "default" : "secondary"}>
+                        {formData.documentation.criminalRecord ? "Antecedentes cargados" : "Falta antecedentes"}
+                      </Badge>
+                      <Badge variant="outline">
+                        {formData.documentation.laborReferences?.length
+                          ? "Con referencias laborales"
+                          : "Sin referencias"}
+                      </Badge>
+                    </div>
+                  </div>
+
+                  <ProfessionalDocumentationFields
+                    value={formData.documentation}
+                    onChange={(documentation) => {
+                      setFormData((prev) => ({ ...prev, documentation }));
+                      setErrors((prev) => {
+                        const next = { ...prev };
+                        delete next.documentationReferences;
+                        return next;
+                      });
+                      setHasChanges(true);
+                    }}
+                    uploadDocument={uploadPrivateFile}
+                    errors={{
+                      laborReferences: errors.documentationReferences,
+                    }}
+                    helperText="Los archivos quedan guardados de forma privada y solo tú o un administrador podrán descargarlos."
+                  />
                 </div>
               </div>
             </div>
@@ -1470,7 +1517,7 @@ export default function SettingsPage() {
             const file = new File([croppedImageBlob], 'profile.jpg', { type: 'image/jpeg' });
             
             const result = await uploadFile(file, 'image');
-            const pictureValue = result.value || (result.storage === 'r2' ? result.url : result.filename);
+            const pictureValue = resolveStoredUploadValue(result);
             handleInputChange('picture', pictureValue);
             toast.success('Imagen recortada y subida correctamente');
             setImageToCrop("");
@@ -1482,7 +1529,7 @@ export default function SettingsPage() {
       />
 
       {/* Aviso flotante de cambios sin guardar (popup propio) */}
-      {hasChanges && (
+      {false && hasChanges && (
         <div className="fixed bottom-4 right-4 z-50">
           <Card className="shadow-xl border border-amber-200 bg-amber-50 max-w-md">
             <CardContent className="p-4 flex flex-col gap-3">
@@ -1534,6 +1581,59 @@ export default function SettingsPage() {
       )}
 
       {/* Diálogo para confirmar salir de la página con cambios sin guardar */}
+      <div className="fixed inset-x-0 bottom-0 z-50 border-t border-gray-200 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/85">
+        <div className="mx-auto flex max-w-5xl flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-start gap-3">
+            <div className={`mt-0.5 flex h-9 w-9 items-center justify-center rounded-full ${hasChanges ? "bg-amber-100 text-amber-700" : "bg-emerald-100 text-emerald-700"}`}>
+              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <AlertCircle className="h-4 w-4" />}
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-gray-900">
+                {hasChanges ? "Tenes cambios sin guardar" : "Todo guardado"}
+              </p>
+              <p className="text-xs text-gray-600">
+                {hasChanges
+                  ? "Revisa los cambios y guardalos cuando estes listo."
+                  : "Los cambios del perfil estan sincronizados."}
+              </p>
+            </div>
+          </div>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <Button
+              type="button"
+              variant="outline"
+              className="rounded-xl"
+              disabled={!hasChanges || saving}
+              onClick={async () => {
+                await loadProfessionalData();
+                setHasChanges(false);
+                toast.info("Se descartaron los cambios no guardados.");
+              }}
+            >
+              Descartar
+            </Button>
+            <Button
+              type="button"
+              className="rounded-xl bg-[#006F4B] text-white hover:bg-[#005a3d]"
+              onClick={handleSave}
+              disabled={!hasChanges || saving}
+            >
+              {saving ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Guardando...
+                </>
+              ) : (
+                <>
+                  <Save className="mr-2 h-4 w-4" />
+                  Guardar cambios
+                </>
+              )}
+            </Button>
+          </div>
+        </div>
+      </div>
+
       <Dialog open={showLeaveDialog} onOpenChange={setShowLeaveDialog}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>

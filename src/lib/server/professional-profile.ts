@@ -25,6 +25,7 @@ const professionalProfileArgs = Prisma.validator<Prisma.ProfessionalDefaultArgs>
     bio: true,
     experienceYears: true,
     verified: true,
+    requiresDocumentation: true,
     rating: true,
     reviewCount: true,
     specialties: true,
@@ -72,6 +73,16 @@ const professionalProfileArgs = Prisma.validator<Prisma.ProfessionalDefaultArgs>
       },
       orderBy: { createdAt: 'desc' },
     },
+    documentation: {
+      select: {
+        criminalRecordObjectKey: true,
+        laborReferences: {
+          select: {
+            id: true,
+          },
+        },
+      },
+    },
   },
 });
 
@@ -86,6 +97,7 @@ export type ProfessionalPageProfile = {
   verified: boolean;
   rating: number | null;
   reviewCount: number | null;
+  hasLaborReferences: boolean;
   specialties: string[];
   professionalGroup: 'oficios' | 'profesiones' | null;
   whatsapp: string | null;
@@ -167,6 +179,7 @@ function serializeProfessional(record: ProfessionalProfileRecord): ProfessionalP
     verified: record.verified,
     rating: record.rating,
     reviewCount: record.reviewCount,
+    hasLaborReferences: (record.documentation?.laborReferences?.length ?? 0) > 0,
     specialties: record.specialties,
     professionalGroup: record.professionalGroup,
     whatsapp: record.whatsapp,

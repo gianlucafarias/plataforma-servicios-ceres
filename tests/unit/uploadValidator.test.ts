@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { validateUploadServer, detectFileType } from '@/lib/uploadValidator';
+import {
+  detectFileType,
+  validateUploadFileName,
+  validateUploadServer,
+} from '@/lib/uploadValidator';
 
 describe('uploadValidator', () => {
   describe('validateUploadServer - images', () => {
@@ -125,6 +129,23 @@ describe('uploadValidator', () => {
       const file = { name: 'file.txt', type: 'text/plain' } as File;
       const type = detectFileType(file);
       expect(type).toBe(null);
+    });
+  });
+
+  describe('validateUploadFileName', () => {
+    it('debe rechazar nombres demasiado largos', () => {
+      const error = validateUploadFileName(`${'a'.repeat(181)}.pdf`);
+      expect(error).toContain('no puede superar');
+    });
+
+    it('debe rechazar nombres con caracteres de control o rutas', () => {
+      const error = validateUploadFileName('carpeta/archivo.pdf');
+      expect(error).toContain('no permitidos');
+    });
+
+    it('debe aceptar nombres normales con espacios', () => {
+      const error = validateUploadFileName('Antecedentes penales 2026.pdf');
+      expect(error).toBeUndefined();
     });
   });
 });

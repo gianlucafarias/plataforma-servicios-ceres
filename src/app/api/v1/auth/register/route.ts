@@ -9,6 +9,10 @@ import { enqueueSlackAlert } from '@/jobs/slack.producer';
 import { normalizeWhatsAppNumber } from '@/lib/whatsapp-normalize';
 import { ok, fail, requestMeta } from '@/lib/api-response';
 import { rateLimit, rateLimitHeaders } from '@/lib/rate-limit-memory';
+import {
+  normalizeProfessionalDocumentationInput,
+  upsertProfessionalDocumentation,
+} from '@/lib/server/professional-documentation';
 
 const RL_LIMIT = 40;
 const RL_WINDOW = 10 * 60 * 1000; // 10 min
@@ -50,6 +54,7 @@ interface RegisterRequestPayload {
   serviceLocations?: string[];
   hasPhysicalStore?: boolean;
   physicalStoreAddress?: string;
+  documentation?: unknown;
   services?: ServiceFormInput[];
 }
 
@@ -88,8 +93,10 @@ export async function POST(request: NextRequest) {
       serviceLocations,
       hasPhysicalStore,
       physicalStoreAddress,
+      documentation,
       services,
     } = payload;
+    const documentationInput = normalizeProfessionalDocumentationInput(documentation);
 
     if (!email || !password || !firstName || !lastName || !dni) {
       return NextResponse.json(
@@ -193,6 +200,7 @@ export async function POST(request: NextRequest) {
             userId: user.id,
             bio: bio || '',
             experienceYears: typeof experienceYears === 'number' ? experienceYears : 0,
+            requiresDocumentation: true,
             professionalGroup: professionalGroup || null,
             location: location || null,
             whatsapp: normalizeWhatsAppNumber(whatsapp) || null,
@@ -214,6 +222,10 @@ export async function POST(request: NextRequest) {
                 : undefined,
           },
         });
+
+        if (documentationInput.provided) {
+          await upsertProfessionalDocumentation(tx, professional.id, documentationInput.documentation);
+        }
       }
 
       let token: string | null = null;

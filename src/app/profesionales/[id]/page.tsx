@@ -31,6 +31,7 @@ import { authOptions } from "@/app/api/auth/options";
 import type { Metadata } from "next";
 import { getBaseUrl, generateProfessionalStructuredData, generateBreadcrumbsStructuredData } from "@/lib/seo";
 import { buildWhatsAppLink } from "@/lib/whatsapp";
+import { resolvePublicUploadUrl } from "@/lib/public-upload-url";
 import { ProfileViewTracker } from "@/components/features/ProfileViewTracker";
 import {
   getProfessionalProfileContext,
@@ -64,14 +65,15 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   const category = data.services[0]?.category?.name || "Profesional";
   const location = data.location || data.user.location || "Ceres, Santa Fe";
   const bio = data.bio || `Profesional ${category} en ${location}`;
-  const imageUrl = data.ProfilePicture || data.user.image 
-    ? (data.ProfilePicture?.startsWith('http') 
-        ? data.ProfilePicture 
-        : `${baseUrl}${data.ProfilePicture?.startsWith('/') ? '' : '/'}${data.ProfilePicture || data.user.image}`)
+  const resolvedImagePath = resolvePublicUploadUrl(data.ProfilePicture || data.user.image);
+  const imageUrl = resolvedImagePath
+    ? (resolvedImagePath.startsWith('http')
+        ? resolvedImagePath
+        : `${baseUrl}${resolvedImagePath.startsWith('/') ? '' : '/'}${resolvedImagePath}`)
     : `${baseUrl}/gob_iso.png`;
   
   const pageUrl = `${baseUrl}/profesionales/${id}`;
-  const title = `${professionalName} - ${category} en Ceres | Ceres en Red`;
+  const title = `${professionalName} - ${category} en Ceres`;
   const description = `${bio.substring(0, 155)}${bio.length > 155 ? '...' : ''} | ${location}`;
 
   return {
@@ -166,6 +168,7 @@ export default async function ProfessionalDetailPage({ params }: { params: Promi
     verified: data.verified,
     rating: data.rating ?? 0,
     reviews: data.reviewCount ?? 0,
+    hasLaborReferences: data.hasLaborReferences,
     category: data.services[0]?.category?.name,
     phone: data.user.phone?.trim() || "",
     whatsapp: data.whatsapp?.trim() || data.user.phone?.trim() || "",
@@ -235,9 +238,7 @@ export default async function ProfessionalDetailPage({ params }: { params: Promi
       : `https://linkedin.com/${normalizedLinkedin.replace(/^\/+/, "").replace(/^in\//, "in/")}`
     : null;
   const ownerCvHref = ownerCv
-    ? ownerCv.startsWith("http")
-      ? ownerCv
-      : `/uploads/profiles/${ownerCv}`
+    ? resolvePublicUploadUrl(ownerCv)
     : null;
 
   // Formatear horarios
@@ -386,10 +387,16 @@ export default async function ProfessionalDetailPage({ params }: { params: Promi
                     <MapPin className="h-3.5 w-3.5" />
                     {p.location || "Ceres, Santa Fe, Argentina"}
                   </span>
+                  {p.hasLaborReferences && (
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-400/20 px-3 py-1.5 text-sm text-emerald-50 ring-1 ring-emerald-200/30">
+                      <Briefcase className="h-3.5 w-3.5" />
+                      Cuenta con referencias laborales
+                    </span>
+                  )}
                   {p.years > 0 && (
                     <span className="inline-flex items-center gap-1.5 rounded-full bg-white/14 px-3 py-1.5 text-sm text-white">
                     <Award className="h-3.5 w-3.5" />
-                    {p.years} anos de experiencia
+                    {p.years} {p.years === 1 ? "año" : "años"} de experiencia
                     </span>
                   )}
                   {p.reviews > 0 && (

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireAdminApiKey } from '@/lib/auth-helpers';
+import { Prisma } from '@prisma/client';
 
 // GET: Listar todas las certificaciones (para panel admin)
 export async function GET(request: NextRequest) {
@@ -10,12 +11,16 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const status = searchParams.get('status') as 'pending' | 'approved' | 'rejected' | 'suspended' | null;
+    const professionalId = searchParams.get('professionalId');
     const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10));
     const limit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') || '20', 10)));
 
-    const where: { status?: 'pending' | 'approved' | 'rejected' | 'suspended' } = {};
+    const where: Prisma.ProfessionalCertificationWhereInput = {};
     if (status) {
       where.status = status;
+    }
+    if (professionalId) {
+      where.professionalId = professionalId;
     }
 
     const [total, certifications] = await Promise.all([

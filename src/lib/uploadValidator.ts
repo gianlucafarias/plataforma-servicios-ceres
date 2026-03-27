@@ -6,8 +6,8 @@
  * - CV (pdf, doc, docx, jpg, jpeg, png): máx 15 MB
  */
 
-const IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp'];
-const CV_TYPES = [
+export const IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp'];
+export const CV_TYPES = [
   'application/pdf',
   'application/msword', // .doc
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document', // .docx
@@ -16,16 +16,41 @@ const CV_TYPES = [
   'image/png',
 ];
 
-const IMAGE_EXTENSIONS = ['png', 'jpg', 'jpeg', 'webp'];
-const CV_EXTENSIONS = ['pdf', 'doc', 'docx', 'jpg', 'jpeg', 'png'];
+export const IMAGE_EXTENSIONS = ['png', 'jpg', 'jpeg', 'webp'];
+export const CV_EXTENSIONS = ['pdf', 'doc', 'docx', 'jpg', 'jpeg', 'png'];
 
-const MAX_IMAGE_SIZE = 10 * 1024 * 1024; // 10 MB
-const MAX_CV_SIZE = 15 * 1024 * 1024; // 15 MB
+export const MAX_IMAGE_SIZE = 10 * 1024 * 1024; // 10 MB
+export const MAX_CV_SIZE = 15 * 1024 * 1024; // 15 MB
+export const MAX_UPLOAD_FILENAME_LENGTH = 180;
+
+const INVALID_FILENAME_CHARS = /[\\/\u0000-\u001F\u007F-\u009F\u200B-\u200D\uFEFF]/;
 
 export interface ValidationResult {
   valid: boolean;
   error?: string;
   fileType?: 'image' | 'cv';
+}
+
+export function normalizeUploadFileName(fileName: string) {
+  return fileName.replace(/\s+/g, ' ').trim();
+}
+
+export function validateUploadFileName(fileName: string) {
+  const normalized = normalizeUploadFileName(fileName);
+
+  if (!normalized) {
+    return 'El archivo debe tener un nombre valido';
+  }
+
+  if (normalized.length > MAX_UPLOAD_FILENAME_LENGTH) {
+    return `El nombre del archivo no puede superar ${MAX_UPLOAD_FILENAME_LENGTH} caracteres`;
+  }
+
+  if (INVALID_FILENAME_CHARS.test(normalized)) {
+    return 'El nombre del archivo contiene caracteres no permitidos';
+  }
+
+  return undefined;
 }
 
 function startsWithBytes(buffer: Buffer, signature: number[]): boolean {
@@ -92,6 +117,11 @@ function matchesCvSignature(buffer: Buffer, extension: string): boolean {
 export function validateUpload(file: File, expectedType: 'image' | 'cv'): ValidationResult {
   if (!file) {
     return { valid: false, error: 'No se recibió ningún archivo' };
+  }
+
+  const fileNameError = validateUploadFileName(file.name);
+  if (fileNameError) {
+    return { valid: false, error: fileNameError };
   }
 
   const extension = file.name.split('.').pop()?.toLowerCase() || '';
@@ -176,6 +206,11 @@ export function detectFileType(file: File): 'image' | 'cv' | null {
 export function validateUploadServer(file: { name: string; type: string; size: number }, expectedType: 'image' | 'cv'): ValidationResult {
   if (!file) {
     return { valid: false, error: 'No se recibió ningún archivo' };
+  }
+
+  const fileNameError = validateUploadFileName(file.name);
+  if (fileNameError) {
+    return { valid: false, error: fileNameError };
   }
 
   const extension = file.name.split('.').pop()?.toLowerCase() || '';

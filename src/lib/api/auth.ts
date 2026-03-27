@@ -1,4 +1,4 @@
-import type { CategoryGroup, RegisterFormData, User } from '@/types';
+import type { CategoryGroup, ProfessionalDocumentation, RegisterFormData, User } from '@/types';
 import { apiRequest } from '@/lib/api/client';
 
 export type ServiceDraft = {
@@ -27,6 +27,7 @@ export type CompleteProfilePayload = {
   picture?: string;
   hasPhysicalStore?: boolean;
   physicalStoreAddress?: string;
+  documentation?: ProfessionalDocumentation;
   services: ServiceDraft[];
 };
 

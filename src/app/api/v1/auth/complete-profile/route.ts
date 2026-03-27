@@ -6,6 +6,10 @@ import { normalizeWhatsAppNumber } from '@/lib/whatsapp-normalize';
 import { ok, fail, requestMeta } from '@/lib/api-response';
 import { rateLimit, rateLimitHeaders } from '@/lib/rate-limit-memory';
 import { downloadAndSaveImage, isExternalOAuthImage } from '@/lib/download-image';
+import {
+  normalizeProfessionalDocumentationInput,
+  upsertProfessionalDocumentation,
+} from '@/lib/server/professional-documentation';
 
 const RL_LIMIT = 30;
 const RL_WINDOW = 10 * 60 * 1000; // 10 min
@@ -78,8 +82,10 @@ export async function POST(request: NextRequest) {
       picture,
       hasPhysicalStore,
       physicalStoreAddress,
+      documentation,
       services 
     } = body;
+    const documentationInput = normalizeProfessionalDocumentationInput(documentation);
 
     if (!dni || !gender || !birthDate || !phone || !location || !bio || !professionalGroup) {
       return NextResponse.json(fail('validation_error', 'Faltan campos requeridos (DNI, género, fecha de nacimiento, teléfono, localidad, bio y grupo profesional son obligatorios)', undefined, metaBase), {
@@ -162,6 +168,7 @@ export async function POST(request: NextRequest) {
           userId: user.id,
           bio,
           experienceYears: experienceYears || 0,
+          requiresDocumentation: true,
           professionalGroup,
           location,
           serviceLocations: serviceLocations || [location],
@@ -179,6 +186,10 @@ export async function POST(request: NextRequest) {
           verified: false,
         },
       });
+
+      if (documentationInput.provided) {
+        await upsertProfessionalDocumentation(tx, professional.id, documentationInput.documentation);
+      }
 
       for (const service of services) {
         const category = await tx.category.findUnique({
