@@ -149,6 +149,7 @@ export function ProfessionalDocumentationFields({
                 className="pl-10"
                 disabled={uploadingCriminalRecord}
                 onChange={async (event) => {
+                  const input = event.currentTarget;
                   const file = event.target.files?.[0];
                   if (!file) {
                     return;
@@ -170,7 +171,7 @@ export function ProfessionalDocumentationFields({
                     setUploadError(message);
                   } finally {
                     setUploadingCriminalRecord(false);
-                    event.currentTarget.value = '';
+                    input.value = '';
                   }
                 }}
               />
@@ -316,6 +317,7 @@ export function ProfessionalDocumentationFields({
                       className="pl-10"
                       disabled={uploadingReferenceIndex === index}
                       onChange={async (event) => {
+                        const input = event.currentTarget;
                         const file = event.target.files?.[0];
                         if (!file) {
                           return;
@@ -334,7 +336,7 @@ export function ProfessionalDocumentationFields({
                           setUploadError(message);
                         } finally {
                           setUploadingReferenceIndex(null);
-                          event.currentTarget.value = '';
+                          input.value = '';
                         }
                       }}
                     />

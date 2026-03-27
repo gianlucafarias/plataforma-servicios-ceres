@@ -5,6 +5,12 @@ import { prisma } from '@/lib/prisma';
 import { generateRandomToken } from '@/lib/utils';
 import { enqueueEmailVerify } from '@/jobs/email.producer';
 import { normalizeWhatsAppNumber } from '@/lib/whatsapp-normalize';
+import {
+  normalizeProfessionalDocumentationInput,
+  ProfessionalDocumentationError,
+  type ProfessionalDocumentationInput,
+  upsertProfessionalDocumentation,
+} from '@/lib/server/professional-documentation';
 import { rateLimit, rateLimitHeaders } from '@/lib/rate-limit-memory';
 import { clientIp } from '@/lib/request-helpers';
 import type { CategoryGroup } from '@/types';
@@ -41,6 +47,7 @@ type RegisterRequestPayload = {
   serviceLocations?: string[];
   hasPhysicalStore?: boolean;
   physicalStoreAddress?: string;
+  documentation?: ProfessionalDocumentationInput | null;
   services?: ServiceFormInput[];
 };
 
@@ -77,6 +84,7 @@ export async function POST(request: NextRequest) {
       serviceLocations,
       hasPhysicalStore,
       physicalStoreAddress,
+      documentation,
       services,
     }: RegisterRequestPayload = await request.json();
 
@@ -107,6 +115,7 @@ export async function POST(request: NextRequest) {
 
     const hashedPassword = await bcrypt.hash(password, 12);
     const skipEmailVerification = process.env.DISABLE_EMAIL_VERIFICATION === 'true';
+    const normalizedDocumentation = normalizeProfessionalDocumentationInput(documentation);
 
     const result = await prisma.$transaction(async (tx) => {
       const user = await tx.user.create({
@@ -203,6 +212,14 @@ export async function POST(request: NextRequest) {
                 : undefined,
           },
         });
+
+        if (normalizedDocumentation.provided) {
+          await upsertProfessionalDocumentation(
+            tx,
+            professional.id,
+            normalizedDocumentation.documentation
+          );
+        }
       }
 
       let token: string | null = null;
@@ -275,6 +292,7 @@ export async function POST(request: NextRequest) {
     }
 
     const isValidation =
+      error instanceof ProfessionalDocumentationError ||
       message.toLowerCase().includes('categoria no encontrada') ||
       message.toLowerCase().includes('faltan datos');
 

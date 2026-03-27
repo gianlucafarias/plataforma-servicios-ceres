@@ -519,35 +519,23 @@ export default function DashboardPage() {
     const fetchMyProfessional = async () => {
       try {
         const profile = await getDashboardProfile();
-        const response = { status: 200 } as Response;
-        const result = {
-          success: true,
-          data: profile,
-          error: undefined as string | undefined,
-        };
         setMe(profile);
-        
-        // Si la respuesta es 401 (no autorizado), el usuario no está logueado
-        if (response.status === 401 || result.error === 'unauthorized') {
+
+        // Cargar horarios
+        if (profile.schedule && typeof profile.schedule === 'object') {
+          setScheduleData(profile.schedule as Record<string, ScheduleData>);
+        } else {
+          initializeDefaultSchedule();
+        }
+      } catch (error) {
+        if (error instanceof ApiClientError && error.status === 401) {
           setIsUnauthorized(true);
-          // Redirigir al login después de un breve delay para mostrar el mensaje
           setTimeout(() => {
             router.push('/auth/login?callbackUrl=/dashboard');
           }, 2000);
           return;
         }
-        
-        if (result.success) {
-          setMe(result.data);
-          
-          // Cargar horarios
-          if (result.data.schedule && typeof result.data.schedule === 'object') {
-            setScheduleData(result.data.schedule as Record<string, ScheduleData>);
-          } else {
-            initializeDefaultSchedule();
-          }
-        }
-      } catch (error) {
+
         if (error instanceof ApiClientError && error.status === 404) {
           setMe(null);
           initializeDefaultSchedule();
@@ -567,25 +555,13 @@ export default function DashboardPage() {
 
     const fetchStats = async () => {
       try {
-        const response = { status: 200 } as Response;
-        const result = {
-          success: true,
-          data: await getDashboardStats(),
-          error: undefined as string | undefined,
-        };
-
-        // Si no está autorizado, no mostramos toast ni marcamos error visual
-        if (response.status === 401 || result.error === 'unauthorized') {
+        const stats = await getDashboardStats();
+        setStats(stats);
+      } catch (error) {
+        if (error instanceof ApiClientError && error.status === 401) {
           setStats(null);
           return;
         }
-
-        if (result.success && result.data) {
-          setStats(result.data);
-        } else {
-          console.error('Error en respuesta de stats:', result);
-        }
-      } catch (error) {
         console.error('Error cargando estadísticas:', error);
       } finally {
         setStatsLoading(false);
@@ -594,14 +570,13 @@ export default function DashboardPage() {
 
     const fetchCertifications = async () => {
       try {
-        const result = {
-          success: true,
-          data: await listDashboardCertifications(),
-        };
-        if (result.success) {
-          setCertifications(result.data || []);
-        }
+        const result = await listDashboardCertifications();
+        setCertifications(result || []);
       } catch (error) {
+        if (error instanceof ApiClientError && error.status === 401) {
+          setCertifications([]);
+          return;
+        }
         console.error('Error cargando certificaciones:', error);
       }
     };
