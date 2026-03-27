@@ -12,16 +12,20 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
+import { ProfessionalDocumentationFields } from "@/components/features/ProfessionalDocumentationFields";
+import { ServiceSelectionCard } from "@/components/features/ServiceSelectionCard";
 import { GROUPS, getLocations, getGenders } from "@/lib/taxonomy";
-import type { CategoryGroup } from "@/types";
+import type { CategoryGroup, PrivateDocumentFile, ProfessionalDocumentation } from "@/types";
 import { Eye, EyeOff, User, Mail, Lock, Building2, Award, Send, ArrowLeft, CheckCircle, MapPin, CircleUser, Upload, FileText, Globe, Linkedin, Instagram, Facebook, Store, IdCard } from "lucide-react";
 import WhatsAppIcon from "@/components/ui/whatsapp";
 import Link from "next/link";
 import { DateBirthPicker } from "./_components/date-birth-picker";
 import { normalizeWhatsAppNumber, validateWhatsAppNumber } from "@/lib/whatsapp-normalize";
 import { checkEmailExists } from "@/lib/api/auth";
-import { uploadRegistrationFile } from "@/lib/api/uploads";
+import { resolveStoredUploadValue, uploadRegistrationFile } from "@/lib/api/uploads";
+import { uploadPrivateRegistrationDocument } from "@/lib/api/private-documents";
 import { usePublicCategoriesTree } from "@/hooks/usePublicCategoriesTree";
+import { validateProfessionalDocumentation } from "@/lib/validation/professional-documentation";
 
 // Iconos de redes sociales
 const GoogleIcon = () => (
@@ -80,7 +84,13 @@ export default function RegistroPage() {
     // Paso 3: Servicios
     services: [
       { areaSlug: "", categoryId: "", title: "", description: "" }
-    ]
+    ],
+
+    // Paso 4: Documentacion
+    documentation: {
+      criminalRecord: null,
+      laborReferences: [],
+    } as ProfessionalDocumentation,
   });
   
   const [showPassword, setShowPassword] = useState(false);
@@ -118,8 +128,25 @@ export default function RegistroPage() {
         .map((subcategory) => ({ slug: subcategory.slug, name: subcategory.name })),
     [categoryTree.subcategoriesProfesiones]
   );
+  const areaNameBySlug = useMemo(() => {
+    const bySlug = new Map<string, string>();
+
+    for (const area of categoryTree.areas) {
+      if (area.active) {
+        bySlug.set(area.slug, area.name);
+      }
+    }
+
+    return bySlug;
+  }, [categoryTree.areas]);
   const categoryNameBySlug = useMemo(() => {
     const bySlug = new Map<string, string>();
+
+    for (const area of categoryTree.areas) {
+      if (area.active) {
+        bySlug.set(area.slug, area.name);
+      }
+    }
 
     for (const subcategory of categoryTree.subcategoriesOficios) {
       if (subcategory.active) {
@@ -134,7 +161,7 @@ export default function RegistroPage() {
     }
 
     return bySlug;
-  }, [categoryTree.subcategoriesOficios, categoryTree.subcategoriesProfesiones]);
+  }, [categoryTree.areas, categoryTree.subcategoriesOficios, categoryTree.subcategoriesProfesiones]);
   const locations = useMemo(() => getLocations(), []);
   const genders = useMemo(() => getGenders(), []);
 
@@ -148,6 +175,13 @@ export default function RegistroPage() {
     }
 
     return [];
+  };
+  const areaHasSelectableSubcategories = (areaSlug?: string) => {
+    if (!areaSlug) {
+      return false;
+    }
+
+    return (oficioSubcategoriesByArea.get(areaSlug)?.length ?? 0) > 0;
   };
 
   // Registrarse con redes sociales y luego completar perfil profesional
@@ -218,7 +252,8 @@ export default function RegistroPage() {
   const steps = [
     { id: 1, title: "Datos Personales", description: "Información básica" },
     { id: 2, title: "Perfil Profesional", description: "Experiencia y bio" },
-    { id: 3, title: "Servicios", description: "Servicios ofrecidos" }
+    { id: 3, title: "Servicios", description: "Servicios ofrecidos" },
+    { id: 4, title: "Documentacion", description: "Antecedentes y referencias" }
   ];
 
   const handleInputChange = (field: string, value: string | number | boolean | string[]) => {
@@ -248,14 +283,27 @@ export default function RegistroPage() {
     return uploadRegistrationFile(file, type);
   };
 
+  const uploadPrivateFile = async (file: File): Promise<PrivateDocumentFile> => {
+    const result = await uploadPrivateRegistrationDocument(file);
+    return {
+      objectKey: result.objectKey,
+      fileName: result.fileName,
+    };
+  };
+
   const handleServiceChange = (index: number, field: string, value: string) => {
     const newServices = [...formData.services];
     const updatedService = { ...newServices[index] };
 
     if (field === 'areaSlug') {
       updatedService.areaSlug = value;
-      updatedService.categoryId = '';
-      updatedService.title = '';
+      if (value && !areaHasSelectableSubcategories(value)) {
+        updatedService.categoryId = value;
+        updatedService.title = areaNameBySlug.get(value) || "";
+      } else {
+        updatedService.categoryId = '';
+        updatedService.title = '';
+      }
     } else if (field === 'categoryId') {
       updatedService.categoryId = value;
       updatedService.title = categoryNameBySlug.get(value) || '';
@@ -272,6 +320,7 @@ export default function RegistroPage() {
     setErrors((prev) => {
       const next = { ...prev } as { [key: string]: string };
       if (field === 'areaSlug') {
+        delete next[`service_${index}_area`];
         delete next[`service_${index}_category`];
         delete next[`service_${index}_title`];
       }
@@ -384,6 +433,7 @@ export default function RegistroPage() {
     return Object.keys(newErrors).length === 0;
   };
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const validateStep3 = () => {
     const newErrors: {[key: string]: string} = {};
 
@@ -391,6 +441,46 @@ export default function RegistroPage() {
       if (!service.categoryId) newErrors[`service_${index}_category`] = "La categoría es requerida";
       if (!service.description.trim()) newErrors[`service_${index}_description`] = "La descripción es requerida";
       // priceRange eliminado
+    });
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const validateStep4 = () => {
+    const newErrors: {[key: string]: string} = {};
+    const validation = validateProfessionalDocumentation(formData.documentation);
+
+    if (validation.errors.laborReferences) {
+      newErrors.documentationReferences = validation.errors.laborReferences;
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const validateServicesStep = () => {
+    const newErrors: {[key: string]: string} = {};
+
+    formData.services.forEach((service, index) => {
+      if (formData.professionalGroup === "oficios" && !service.areaSlug) {
+        newErrors[`service_${index}_area`] = "Elegi un area para este servicio";
+      }
+
+      const requiresSpecificCategory =
+        formData.professionalGroup === "profesiones" ||
+        areaHasSelectableSubcategories(service.areaSlug);
+
+      if (requiresSpecificCategory && !service.categoryId) {
+        newErrors[`service_${index}_category`] =
+          formData.professionalGroup === "profesiones"
+            ? "Elegi una profesion"
+            : "Elegi una subcategoria";
+      }
+
+      if (!service.description.trim()) {
+        newErrors[`service_${index}_description`] = "La descripcion es requerida";
+      }
     });
 
     setErrors(newErrors);
@@ -406,6 +496,9 @@ export default function RegistroPage() {
         break;
       case 2:
         isValid = validateStep2();
+        break;
+      case 3:
+        isValid = validateServicesStep();
         break;
       default:
         isValid = true;
@@ -426,13 +519,15 @@ export default function RegistroPage() {
       }
       }
 
-    if (isValid && currentStep < 3) {
+    if (isValid && currentStep < 4) {
       setCurrentStep(currentStep + 1);
     }
   };
 
   const handleSubmit = async () => {
-    if (!validateStep3()) return;
+    if (!validateStep4()) return;
+
+    const documentationValidation = validateProfessionalDocumentation(formData.documentation);
 
     setIsLoading(true);
     
@@ -464,6 +559,7 @@ export default function RegistroPage() {
         // Local físico
         hasPhysicalStore: formData.hasPhysicalStore,
         physicalStoreAddress: formData.physicalStoreAddress,
+        documentation: documentationValidation.sanitized,
         services: formData.services.map((s) => ({
           categoryId: s.categoryId,
           title: s.title,
@@ -483,11 +579,41 @@ export default function RegistroPage() {
 
   const renderStepIndicator = () => (
     <div className="mb-8">
-      <div className="flex items-center justify-center">
+      <div className="rounded-2xl border border-gray-100 bg-gray-50 p-4 sm:hidden">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#006F4B]">
+              Paso {currentStep} de {steps.length}
+            </p>
+            <p className="mt-1 text-sm font-semibold text-gray-900">
+              {steps[currentStep - 1]?.title}
+            </p>
+            <p className="text-xs text-gray-500">
+              {steps[currentStep - 1]?.description}
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            {steps.map((step) => (
+              <div
+                key={step.id}
+                className={`h-2.5 rounded-full transition-all duration-300 ${
+                  currentStep === step.id
+                    ? "w-8 bg-[#006F4B]"
+                    : currentStep > step.id
+                      ? "w-2.5 bg-[#006F4B]/70"
+                      : "w-2.5 bg-gray-300"
+                }`}
+              />
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div className="hidden items-center justify-center sm:flex">
         {steps.map((step, index) => (
           <div key={step.id} className="flex items-center">
             <div className="flex flex-col items-center">
-              <div className={`w-12 h-12 rounded-full flex items-center justify-center border-2 transition-all duration-300 ${
+              <div className={`h-12 w-12 rounded-full flex items-center justify-center border-2 transition-all duration-300 ${
                 currentStep >= step.id
                   ? 'bg-[#006F4B] border-[#006F4B] text-white'
                   : 'bg-white border-gray-300 text-gray-400'
@@ -498,7 +624,7 @@ export default function RegistroPage() {
                   <span className="font-semibold text-sm">{step.id}</span>
                 )}
               </div>
-              <div className="mt-2 text-center">
+              <div className="mt-2 text-center max-w-[112px]">
                 <p className={`text-xs font-medium ${
                   currentStep >= step.id ? 'text-[#006F4B]' : 'text-gray-500'
                 }`}>
@@ -512,7 +638,7 @@ export default function RegistroPage() {
               </div>
             </div>
             {index < steps.length - 1 && (
-              <div className="w-16 h-0.5 mx-4 self-center">
+              <div className="mx-4 h-0.5 w-10 self-center md:w-16">
                 <div className={`w-full h-full transition-all duration-300 ${
                   currentStep > step.id ? 'bg-[#006F4B]' : 'bg-gray-300'
                 }`} />
@@ -1183,7 +1309,7 @@ export default function RegistroPage() {
                       });
                       
                       */
-                      const pictureValue = result.value || (result.storage === 'r2' ? result.url : result.filename);
+                      const pictureValue = resolveStoredUploadValue(result);
                       handleInputChange('picture', pictureValue);
                       setErrors(prev => {
                         const newErrors = {...prev};
@@ -1229,7 +1355,7 @@ export default function RegistroPage() {
                       */
                       handleInputChange(
                         'cv',
-                        result.url || result.path || result.filename
+                        resolveStoredUploadValue(result)
                       );
                       setErrors(prev => {
                         const newErrors = {...prev};
@@ -1302,6 +1428,28 @@ export default function RegistroPage() {
       )}
 
       {formData.services.map((service, index) => (
+        <ServiceSelectionCard
+          key={`service-selector-${index}`}
+          group={formData.professionalGroup as CategoryGroup}
+          index={index}
+          service={service}
+          areas={areas.map((area) => ({ slug: area.slug, name: area.name }))}
+          categoryOptions={getAvailableCategories(formData.professionalGroup, service.areaSlug)}
+          selectedAreaName={service.areaSlug ? areaNameBySlug.get(service.areaSlug) : ""}
+          selectedServiceName={service.title}
+          categoriesLoading={categoriesLoading}
+          areaError={errors[`service_${index}_area`]}
+          categoryError={errors[`service_${index}_category`]}
+          descriptionError={errors[`service_${index}_description`]}
+          canRemove={formData.professionalGroup !== 'profesiones' && formData.services.length > 1}
+          onAreaChange={(value) => handleServiceChange(index, 'areaSlug', value)}
+          onCategoryChange={(value) => handleServiceChange(index, 'categoryId', value)}
+          onDescriptionChange={(value) => handleServiceChange(index, 'description', value)}
+          onRemove={() => removeService(index)}
+        />
+      ))}
+
+      {false && formData.services.map((service, index) => (
         <Card key={index} className="rounded-2xl border border-gray-100 shadow-sm">
           <CardContent className="p-6">
             <div className="flex items-center justify-between mb-4">
@@ -1422,6 +1570,44 @@ export default function RegistroPage() {
     </div>
   );
 
+  const renderStep4 = () => (
+    <div className="space-y-6">
+      <div className="text-center">
+        <div className="w-16 h-16 bg-[#006F4B]/10 rounded-full flex items-center justify-center mx-auto mb-4">
+          <IdCard className="w-8 h-8 text-[#006F4B]" />
+        </div>
+        <h2 className="text-2xl md:text-3xl font-bold text-gray-900 mb-2">
+          Documentación
+        </h2>
+        <p className="text-gray-600 max-w-2xl mx-auto">
+          El certificado de antecedentes penales es obligatorio para que tu perfil pueda aparecer en la plataforma.
+          Las referencias laborales son opcionales y se mostrarán como señal de confianza en tu perfil.
+        </p>
+      </div>
+
+      <ProfessionalDocumentationFields
+        value={formData.documentation}
+        onChange={(documentation) => {
+          setFormData((prev) => ({ ...prev, documentation }));
+          setErrors((prev) => {
+            const next = { ...prev };
+            delete next.documentationReferences;
+            return next;
+          });
+        }}
+        uploadDocument={uploadPrivateFile}
+        errors={{
+          laborReferences: errors.documentationReferences,
+        }}
+        helperText="Si todavía no lo tienes, puedes terminar el registro ahora y cargarlo más tarde desde tu perfil."
+      />
+
+      <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-4 text-sm text-amber-800">
+        Podrás completar o reemplazar estos documentos más adelante desde la configuración de tu perfil.
+      </div>
+    </div>
+  );
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Hero Header */}
@@ -1469,6 +1655,7 @@ export default function RegistroPage() {
             {currentStep === 1 && renderStep1()}
             {currentStep === 2 && renderStep2()}
             {currentStep === 3 && renderStep3()}
+            {currentStep === 4 && renderStep4()}
 
             <div className="flex gap-4 mt-8">
               {currentStep > 1 && (
@@ -1481,7 +1668,7 @@ export default function RegistroPage() {
                 </button>
               )}
               
-              {currentStep < 3 ? (
+              {currentStep < 4 ? (
                 <button
                   onClick={handleNext}
                   className="flex-1 bg-[#006F4B] hover:bg-[#005a3d] text-white py-4 px-6 rounded-xl font-semibold transition-all duration-200 shadow-lg shadow-[#006F4B]/20 cursor-pointer"

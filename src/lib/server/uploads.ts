@@ -1,11 +1,18 @@
-import { existsSync, mkdirSync } from 'fs';
+import { createReadStream, existsSync, mkdirSync } from 'fs';
 import { writeFile } from 'fs/promises';
-import { join } from 'path';
+import { basename, join } from 'path';
+import { Readable } from 'stream';
 import { enqueueOptimizeProfileImage, enqueueValidateCV } from '@/jobs/files.producer';
 import { downloadAndSaveImage, isExternalOAuthImage } from '@/lib/download-image';
-import { isR2Configured, uploadToR2 } from '@/lib/r2';
+import { getR2Object, isR2Configured, isR2StorageConfigured, uploadToR2 } from '@/lib/r2';
 import { createUploadGrant, verifyUploadGrant, type UploadGrantType } from '@/lib/upload-grant';
-import { detectFileType, validateUploadBuffer } from '@/lib/uploadValidator';
+import {
+  detectFileType,
+  normalizeUploadFileName,
+  validateUploadBuffer,
+} from '@/lib/uploadValidator';
+
+type PublicUploadGrantType = Extract<UploadGrantType, 'image' | 'cv'>;
 
 export const UPLOAD_RATE_LIMIT = {
   limit: 30,
@@ -31,7 +38,7 @@ export type StoredUpload = {
   url: string;
   value: string;
   storage: UploadStorage;
-  fileType: UploadGrantType;
+  fileType: PublicUploadGrantType;
 };
 
 export class UploadFlowError extends Error {
@@ -45,7 +52,7 @@ export class UploadFlowError extends Error {
   }
 }
 
-function ensureUploadGrantType(value: unknown): UploadGrantType | null {
+function ensureUploadGrantType(value: unknown): PublicUploadGrantType | null {
   if (value === 'image' || value === 'cv') {
     return value;
   }
@@ -55,6 +62,32 @@ function ensureUploadGrantType(value: unknown): UploadGrantType | null {
 
 function uploadsDirectory() {
   return join(process.cwd(), 'public', 'uploads', 'profiles');
+}
+
+function localUploadPathForObjectKey(objectKey: string) {
+  return join(uploadsDirectory(), basename(objectKey));
+}
+
+function inferContentTypeFromKey(objectKey: string) {
+  const extension = objectKey.split('.').pop()?.toLowerCase() || '';
+
+  switch (extension) {
+    case 'png':
+      return 'image/png';
+    case 'jpg':
+    case 'jpeg':
+      return 'image/jpeg';
+    case 'webp':
+      return 'image/webp';
+    case 'pdf':
+      return 'application/pdf';
+    case 'doc':
+      return 'application/msword';
+    case 'docx':
+      return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+    default:
+      return 'application/octet-stream';
+  }
 }
 
 function ensureUploadsDirectory() {
@@ -156,7 +189,8 @@ export async function processProfileUpload(input: {
   }
 
   const hintedType = ensureUploadGrantType(input.typeHint);
-  const detectedType = hintedType || detectFileType(file);
+  const detectedFileType = detectFileType(file);
+  const detectedType = hintedType || (detectedFileType === 'image' || detectedFileType === 'cv' ? detectedFileType : null);
 
   if (!detectedType) {
     throw new UploadFlowError(
@@ -190,7 +224,7 @@ export async function processProfileUpload(input: {
     throw new UploadFlowError('validation_error', validation.error || 'Archivo invalido', 400);
   }
 
-  const originalName = file.name;
+  const originalName = normalizeUploadFileName(file.name);
   const extension = originalName.split('.').pop()?.toLowerCase() || '';
   const persisted = await persistUpload(buffer, file, extension);
 
@@ -203,10 +237,53 @@ export async function processProfileUpload(input: {
     originalName,
     path: persisted.url,
     url: persisted.url,
-    value: persisted.storage === 'r2' ? persisted.url : persisted.filename,
+    value: persisted.filename,
     storage: persisted.storage,
     fileType: detectedType,
   };
+}
+
+export async function createPublicUploadResponse(input: { objectKey: string }) {
+  const objectKey = input.objectKey.replace(/^\/+/, '');
+
+  if (!objectKey.startsWith('profiles/') || objectKey.includes('..')) {
+    throw new UploadFlowError('invalid_key', 'Archivo invalido.', 400);
+  }
+
+  if (isR2StorageConfigured()) {
+    try {
+      const object = await getR2Object(objectKey);
+      const body = object.Body?.transformToWebStream?.();
+
+      if (!body) {
+        throw new UploadFlowError('not_found', 'Archivo no encontrado.', 404);
+      }
+
+      return new Response(body, {
+        headers: {
+          'Content-Type': object.ContentType || inferContentTypeFromKey(objectKey),
+          'Cache-Control': 'public, max-age=3600',
+        },
+      });
+    } catch (error) {
+      if (error instanceof UploadFlowError) {
+        throw error;
+      }
+    }
+  }
+
+  const localPath = localUploadPathForObjectKey(objectKey);
+  if (!existsSync(localPath)) {
+    throw new UploadFlowError('not_found', 'Archivo no encontrado.', 404);
+  }
+
+  const stream = Readable.toWeb(createReadStream(localPath)) as ReadableStream;
+  return new Response(stream, {
+    headers: {
+      'Content-Type': inferContentTypeFromKey(objectKey),
+      'Cache-Control': 'public, max-age=3600',
+    },
+  });
 }
 
 export async function processExternalOAuthUpload(input: {

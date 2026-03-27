@@ -1,4 +1,5 @@
 import { apiRequest } from '@/lib/api/client';
+import type { ProfessionalDocumentation } from '@/types';
 
 export type DashboardScheduleSlot = {
   enabled: boolean;
@@ -39,6 +40,9 @@ export type DashboardProfile = {
   verified: boolean;
   rating: number | null;
   reviewCount: number | null;
+  documentationRequired?: boolean;
+  criminalRecordPresent?: boolean;
+  hasLaborReferences?: boolean;
   specialties: string[];
   professionalGroup: 'oficios' | 'profesiones' | null;
   whatsapp: string | null;
@@ -64,6 +68,7 @@ export type DashboardProfile = {
     location: string | null;
   };
   services: DashboardServiceRecord[];
+  documentation?: ProfessionalDocumentation;
   registrationType: 'email' | 'google' | 'facebook';
 };
 

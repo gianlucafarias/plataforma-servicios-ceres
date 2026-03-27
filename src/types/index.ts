@@ -41,6 +41,28 @@ export interface Category {
   parentCategoryId?: string;
 }
 
+export interface PrivateDocumentFile {
+  objectKey?: string;
+  fileName: string;
+  downloadPath?: string;
+}
+
+export interface LaborReference {
+  id?: string;
+  name: string;
+  company: string;
+  contact: string;
+  attachment?: PrivateDocumentFile | null;
+}
+
+export interface ProfessionalDocumentation {
+  required?: boolean;
+  criminalRecordPresent?: boolean;
+  hasLaborReferences?: boolean;
+  criminalRecord?: PrivateDocumentFile | null;
+  laborReferences?: LaborReference[];
+}
+
 export interface Professional {
   id: string;
   userId: string;
@@ -50,10 +72,14 @@ export interface Professional {
   experienceYears: number;
   verified: boolean;
   status: 'pending' | 'active' | 'suspended';
+  documentationRequired?: boolean;
+  criminalRecordPresent?: boolean;
+  hasLaborReferences?: boolean;
   rating: number;
   reviewCount: number;
   createdAt: Date;
   updatedAt: Date;
+  documentation?: ProfessionalDocumentation;
   services?: Service[]; // para vistas que incluyen servicios
 }
 
@@ -130,6 +156,7 @@ export interface RegisterFormData {
   serviceLocations?: string[];
   hasPhysicalStore?: boolean;
   physicalStoreAddress?: string;
+  documentation?: ProfessionalDocumentation;
   services?: ServiceFormData[];
 }
 

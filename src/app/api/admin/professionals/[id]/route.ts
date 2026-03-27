@@ -2,8 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireAdminApiKey } from '@/lib/auth-helpers';
 import { normalizeWhatsAppNumber } from '@/lib/whatsapp-normalize';
+import {
+  professionalDocumentationArgs,
+  serializeAdminDocumentation,
+} from '@/lib/server/professional-documentation';
 
-// GET: Obtener detalles completos de un profesional
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -13,7 +16,7 @@ export async function GET(
 
   try {
     const { id } = await params;
-    
+
     const professional = await prisma.professional.findUnique({
       where: { id },
       include: {
@@ -29,37 +32,38 @@ export async function GET(
             verified: true,
             createdAt: true,
             updatedAt: true,
-            password: true, // Para determinar tipo de registro
+            password: true,
             accounts: {
               select: {
-                provider: true
-              }
-            }
-          }
+                provider: true,
+              },
+            },
+          },
         },
         services: {
           include: {
-            category: { 
-              select: { 
+            category: {
+              select: {
                 id: true,
-                name: true, 
+                name: true,
                 slug: true,
-                groupId: true
-              } 
-            }
+                groupId: true,
+              },
+            },
           },
-          orderBy: { createdAt: 'desc' }
+          orderBy: { createdAt: 'desc' },
         },
         reviews: {
           take: 10,
           orderBy: { createdAt: 'desc' },
           include: {
-            user: { select: { firstName: true, lastName: true } }
-          }
+            user: { select: { firstName: true, lastName: true } },
+          },
         },
         _count: {
-          select: { services: true, reviews: true, contactRequests: true }
-        }
+          select: { services: true, reviews: true, contactRequests: true },
+        },
+        documentation: professionalDocumentationArgs,
       },
     });
 
@@ -70,7 +74,6 @@ export async function GET(
       );
     }
 
-    // Determinar tipo de registro
     let registrationType: 'email' | 'google' | 'facebook' = 'email';
     if (professional.user.accounts && professional.user.accounts.length > 0) {
       const provider = professional.user.accounts[0]?.provider;
@@ -81,11 +84,17 @@ export async function GET(
       }
     }
 
-    // Remover password y accounts de la respuesta por seguridad
     const { password, accounts, ...userData } = professional.user;
+    void password;
+    void accounts;
 
-    // Formatear servicios según requerimientos
-    const formattedServices = professional.services.map(service => ({
+    const documentation = serializeAdminDocumentation(
+      professional.id,
+      professional.requiresDocumentation,
+      professional.documentation
+    );
+
+    const formattedServices = professional.services.map((service) => ({
       id: service.id,
       professionalId: service.professionalId,
       categoryId: service.categoryId,
@@ -98,25 +107,25 @@ export async function GET(
       updatedAt: service.updatedAt,
     }));
 
-    return NextResponse.json({ 
-      success: true, 
+    return NextResponse.json({
+      success: true,
       data: {
         ...professional,
         user: userData,
         services: formattedServices,
-        registrationType
-      }
+        registrationType,
+        documentationRequired: professional.requiresDocumentation,
+        criminalRecordPresent: documentation.criminalRecordPresent,
+        hasLaborReferences: documentation.hasLaborReferences,
+        documentation,
+      },
     });
   } catch (error) {
     console.error('Error obteniendo profesional:', error);
-    return NextResponse.json(
-      { success: false, error: 'server_error' },
-      { status: 500 }
-    );
+    return NextResponse.json({ success: false, error: 'server_error' }, { status: 500 });
   }
 }
 
-// PUT: Actualizar información del profesional
 export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -128,10 +137,9 @@ export async function PUT(
     const { id } = await params;
     const body = await request.json();
 
-    // Verificar que el profesional existe
     const existing = await prisma.professional.findUnique({
       where: { id },
-      include: { user: true }
+      include: { user: true },
     });
 
     if (!existing) {
@@ -141,7 +149,6 @@ export async function PUT(
       );
     }
 
-    // Actualizar usuario si se proporcionan datos
     if (body.user) {
       await prisma.user.update({
         where: { id: existing.userId },
@@ -152,11 +159,10 @@ export async function PUT(
           phone: body.user.phone,
           birthDate: body.user.birthDate ? new Date(body.user.birthDate) : undefined,
           location: body.user.location,
-        }
+        },
       });
     }
 
-    // Actualizar profesional
     const updated = await prisma.professional.update({
       where: { id },
       data: {
@@ -179,16 +185,16 @@ export async function PUT(
         user: true,
         services: {
           include: {
-            category: { select: { name: true, slug: true } }
-          }
-        }
-      }
+            category: { select: { name: true, slug: true } },
+          },
+        },
+      },
     });
 
     return NextResponse.json({
       success: true,
       data: updated,
-      message: 'Profesional actualizado correctamente'
+      message: 'Profesional actualizado correctamente',
     });
   } catch (error) {
     console.error('Error actualizando profesional:', error);

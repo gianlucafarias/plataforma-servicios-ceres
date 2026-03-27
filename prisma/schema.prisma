@@ -94,6 +94,7 @@ model Professional {
   experienceYears      Int?                        @default(0)
   verified             Boolean                     @default(false)
   status               ProfessionalStatus          @default(pending)
+  requiresDocumentation Boolean                    @default(true)
   rating               Float?                      @default(0)
   reviewCount          Int?                        @default(0)
   profileViews         Int                         @default(0)
@@ -119,8 +120,37 @@ model Professional {
   reviews              Review[]
   services             Service[]
   certifications       ProfessionalCertification[]
+  documentation        ProfessionalDocumentation?
 
   @@map("professionals")
+}
+
+model ProfessionalDocumentation {
+  id                      String                       @id @default(uuid())
+  professionalId          String                       @unique
+  criminalRecordObjectKey String?
+  criminalRecordFileName  String?
+  createdAt               DateTime                     @default(now())
+  updatedAt               DateTime                     @updatedAt
+  professional            Professional                 @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+  laborReferences         ProfessionalLaborReference[]
+
+  @@map("professional_documentation")
+}
+
+model ProfessionalLaborReference {
+  id                  String                    @id @default(uuid())
+  documentationId     String
+  name                String
+  company             String
+  contact             String
+  attachmentObjectKey String?
+  attachmentFileName  String?
+  createdAt           DateTime                  @default(now())
+  updatedAt           DateTime                  @updatedAt
+  documentation       ProfessionalDocumentation @relation(fields: [documentationId], references: [id], onDelete: Cascade)
+
+  @@map("professional_labor_references")
 }
 
 model Service {

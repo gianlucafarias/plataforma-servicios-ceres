@@ -1,7 +1,7 @@
 import crypto from 'node:crypto';
 
-export type UploadGrantContext = 'register';
-export type UploadGrantType = 'image' | 'cv';
+export type UploadGrantContext = 'register' | 'documentation';
+export type UploadGrantType = 'image' | 'cv' | 'document';
 
 type UploadGrantPayload = {
   context: UploadGrantContext;
@@ -96,7 +96,7 @@ export function verifyUploadGrant(
       return null;
     }
 
-    if (!['register'].includes(payload.context) || !['image', 'cv'].includes(payload.type)) {
+    if (!['register', 'documentation'].includes(payload.context) || !['image', 'cv', 'document'].includes(payload.type)) {
       return null;
     }
 

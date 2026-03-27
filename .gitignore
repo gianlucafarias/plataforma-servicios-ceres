@@ -45,3 +45,7 @@ next-env.d.ts
 # uploads (archivos subidos por usuarios)
 /public/uploads/**
 !/public/uploads/.gitkeep
+
+# storage local fallback (documentos privados / pruebas)
+/storage/**
+/storage/**

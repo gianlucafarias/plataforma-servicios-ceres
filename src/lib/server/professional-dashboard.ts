@@ -1,6 +1,12 @@
 import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { normalizeWhatsAppNumber } from '@/lib/whatsapp-normalize';
+import {
+  normalizeProfessionalDocumentationInput,
+  professionalDocumentationArgs,
+  serializeSelfDocumentation,
+  upsertProfessionalDocumentation,
+} from '@/lib/server/professional-documentation';
 
 export type ProfessionalScheduleSlot = {
   enabled: boolean;
@@ -26,6 +32,7 @@ const professionalDashboardArgs = Prisma.validator<Prisma.ProfessionalDefaultArg
     bio: true,
     experienceYears: true,
     verified: true,
+    requiresDocumentation: true,
     rating: true,
     reviewCount: true,
     specialties: true,
@@ -60,6 +67,7 @@ const professionalDashboardArgs = Prisma.validator<Prisma.ProfessionalDefaultArg
         category: { select: { name: true } },
       },
     },
+    documentation: professionalDocumentationArgs,
   },
 });
 
@@ -73,6 +81,9 @@ export type ProfessionalDashboardProfile = {
   verified: boolean;
   rating: number | null;
   reviewCount: number | null;
+  documentationRequired: boolean;
+  criminalRecordPresent: boolean;
+  hasLaborReferences: boolean;
   specialties: string[];
   professionalGroup: 'oficios' | 'profesiones' | null;
   whatsapp: string | null;
@@ -112,6 +123,7 @@ export type ProfessionalDashboardProfile = {
       name: string;
     };
   }>;
+  documentation: ReturnType<typeof serializeSelfDocumentation>;
   registrationType: RegistrationType;
 };
 
@@ -163,6 +175,9 @@ function serializeProfessionalDashboard(
     verified: record.verified,
     rating: record.rating,
     reviewCount: record.reviewCount,
+    documentationRequired: record.requiresDocumentation,
+    criminalRecordPresent: !!record.documentation?.criminalRecordObjectKey,
+    hasLaborReferences: (record.documentation?.laborReferences.length ?? 0) > 0,
     specialties: record.specialties,
     professionalGroup: record.professionalGroup,
     whatsapp: record.whatsapp,
@@ -202,6 +217,11 @@ function serializeProfessionalDashboard(
         name: service.category.name,
       },
     })),
+    documentation: serializeSelfDocumentation(
+      record.id,
+      record.requiresDocumentation,
+      record.documentation
+    ),
     registrationType,
   };
 }
@@ -281,6 +301,7 @@ export async function updateProfessionalDashboardProfile(
 ): Promise<ProfessionalDashboardProfile | null> {
   const body = (payload ?? {}) as Record<string, unknown>;
   const professionalId = await getProfessionalIdByUserId(userId);
+  const documentationInput = normalizeProfessionalDocumentationInput(body.documentation);
 
   if (!professionalId) {
     return null;
@@ -402,7 +423,11 @@ export async function updateProfessionalDashboardProfile(
       body.schedule == null ? Prisma.DbNull : (body.schedule as Prisma.InputJsonValue);
   }
 
-  if (Object.keys(userData).length === 0 && Object.keys(professionalData).length === 0) {
+  if (
+    Object.keys(userData).length === 0 &&
+    Object.keys(professionalData).length === 0 &&
+    !documentationInput.provided
+  ) {
     return getProfessionalDashboardProfile(userId);
   }
 
@@ -425,6 +450,10 @@ export async function updateProfessionalDashboardProfile(
           updatedAt: now,
         },
       });
+    }
+
+    if (documentationInput.provided) {
+      await upsertProfessionalDocumentation(tx, professionalId, documentationInput.documentation);
     }
   });
 

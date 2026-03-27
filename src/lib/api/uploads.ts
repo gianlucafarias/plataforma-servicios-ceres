@@ -1,4 +1,5 @@
 import { apiRequest } from '@/lib/api/client';
+import { validateUpload } from '@/lib/uploadValidator';
 
 export type UploadFileType = 'image' | 'cv';
 export type UploadStorage = 'r2' | 'local';
@@ -42,6 +43,11 @@ export async function uploadFile(
     uploadToken?: string | null;
   } = {}
 ) {
+  const validation = validateUpload(file, type);
+  if (!validation.valid) {
+    throw new Error(validation.error || 'Archivo inválido');
+  }
+
   const formData = new FormData();
   formData.append('file', file);
   formData.append('type', type);

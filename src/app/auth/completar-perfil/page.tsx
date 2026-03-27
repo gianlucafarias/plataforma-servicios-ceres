@@ -9,8 +9,10 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
+import { ProfessionalDocumentationFields } from "@/components/features/ProfessionalDocumentationFields";
+import { ServiceSelectionCard } from "@/components/features/ServiceSelectionCard";
 import { GROUPS, getLocations, getGenders } from "@/lib/taxonomy";
-import type { CategoryGroup } from "@/types";
+import type { CategoryGroup, PrivateDocumentFile, ProfessionalDocumentation } from "@/types";
 import { 
   Phone, 
   MapPin, 
@@ -41,8 +43,11 @@ import { Switch } from "@/components/ui/switch";
 import { normalizeWhatsAppNumber, validateWhatsAppNumber } from "@/lib/whatsapp-normalize";
 import { completeProfessionalProfile } from "@/lib/api/auth";
 import { getErrorMessage } from "@/lib/api/client";
-import { uploadExternalOAuthImage, uploadFile } from "@/lib/api/uploads";
+import { resolveStoredUploadValue, uploadExternalOAuthImage, uploadFile } from "@/lib/api/uploads";
+import { uploadPrivateDocument } from "@/lib/api/private-documents";
+import { resolvePublicUploadUrl } from "@/lib/public-upload-url";
 import { usePublicCategoriesTree } from "@/hooks/usePublicCategoriesTree";
+import { validateProfessionalDocumentation } from "@/lib/validation/professional-documentation";
 
 export default function CompletarPerfilPage() {
   const router = useRouter();
@@ -76,7 +81,11 @@ export default function CompletarPerfilPage() {
     physicalStoreAddress: "",
     services: [
       { areaSlug: "", categoryId: "", title: "", description: "" }
-    ]
+    ],
+    documentation: {
+      criminalRecord: null,
+      laborReferences: [],
+    } as ProfessionalDocumentation,
   });
   
   const [errors, setErrors] = useState<{[key: string]: string}>({});
@@ -111,8 +120,25 @@ export default function CompletarPerfilPage() {
         .map((subcategory) => ({ slug: subcategory.slug, name: subcategory.name })),
     [categoryTree.subcategoriesProfesiones]
   );
+  const areaNameBySlug = useMemo(() => {
+    const bySlug = new Map<string, string>();
+
+    for (const area of categoryTree.areas) {
+      if (area.active) {
+        bySlug.set(area.slug, area.name);
+      }
+    }
+
+    return bySlug;
+  }, [categoryTree.areas]);
   const categoryNameBySlug = useMemo(() => {
     const bySlug = new Map<string, string>();
+
+    for (const area of categoryTree.areas) {
+      if (area.active) {
+        bySlug.set(area.slug, area.name);
+      }
+    }
 
     for (const subcategory of categoryTree.subcategoriesOficios) {
       if (subcategory.active) {
@@ -127,7 +153,7 @@ export default function CompletarPerfilPage() {
     }
 
     return bySlug;
-  }, [categoryTree.subcategoriesOficios, categoryTree.subcategoriesProfesiones]);
+  }, [categoryTree.areas, categoryTree.subcategoriesOficios, categoryTree.subcategoriesProfesiones]);
   const locations = useMemo(() => getLocations(), []);
   const genders = useMemo(() => getGenders(), []);
 
@@ -141,6 +167,13 @@ export default function CompletarPerfilPage() {
     }
 
     return [];
+  };
+  const areaHasSelectableSubcategories = (areaSlug?: string) => {
+    if (!areaSlug) {
+      return false;
+    }
+
+    return (oficioSubcategoriesByArea.get(areaSlug)?.length ?? 0) > 0;
   };
 
   // Redirigir si no está logueado
@@ -198,7 +231,8 @@ export default function CompletarPerfilPage() {
 
   const steps = [
     { id: 1, title: "Datos Personales", description: "Información básica requerida" },
-    { id: 2, title: "Perfil Profesional", description: "Experiencia y servicios" }
+    { id: 2, title: "Perfil Profesional", description: "Experiencia y servicios" },
+    { id: 3, title: "Documentación", description: "Antecedentes y referencias" }
   ];
 
   const handleInputChange = (field: string, value: string | number | boolean | string[]) => {
@@ -222,14 +256,27 @@ export default function CompletarPerfilPage() {
     }
   };
 
+  const uploadPrivateFile = async (file: File): Promise<PrivateDocumentFile> => {
+    const result = await uploadPrivateDocument(file);
+    return {
+      objectKey: result.objectKey,
+      fileName: result.fileName,
+    };
+  };
+
   const handleServiceChange = (index: number, field: string, value: string) => {
     const newServices = [...formData.services];
     const updatedService = { ...newServices[index] };
 
     if (field === 'areaSlug') {
       updatedService.areaSlug = value;
-      updatedService.categoryId = '';
-      updatedService.title = '';
+      if (value && !areaHasSelectableSubcategories(value)) {
+        updatedService.categoryId = value;
+        updatedService.title = areaNameBySlug.get(value) || "";
+      } else {
+        updatedService.categoryId = '';
+        updatedService.title = '';
+      }
     } else if (field === 'categoryId') {
       updatedService.categoryId = value;
       updatedService.title = categoryNameBySlug.get(value) || '';
@@ -241,6 +288,21 @@ export default function CompletarPerfilPage() {
 
     newServices[index] = updatedService;
     setFormData(prev => ({ ...prev, services: newServices }));
+
+    setErrors((prev) => {
+      const next = { ...prev } as { [key: string]: string };
+      if (field === 'areaSlug') {
+        delete next[`service_${index}_area`];
+        delete next[`service_${index}_category`];
+      }
+      if (field === 'categoryId') {
+        delete next[`service_${index}_category`];
+      }
+      if (field === 'description') {
+        delete next[`service_${index}_description`];
+      }
+      return next;
+    });
   };
 
   const addService = () => {
@@ -305,6 +367,7 @@ export default function CompletarPerfilPage() {
     return Object.keys(newErrors).length === 0;
   };
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const validateStep2 = () => {
     const newErrors: {[key: string]: string} = {};
     if (!formData.bio.trim()) newErrors.bio = "La descripción profesional es requerida";
@@ -344,14 +407,91 @@ export default function CompletarPerfilPage() {
     return Object.keys(newErrors).length === 0;
   };
 
+  const validateStep3 = () => {
+    const newErrors: {[key: string]: string} = {};
+    const validation = validateProfessionalDocumentation(formData.documentation);
+
+    if (validation.errors.laborReferences) {
+      newErrors.documentationReferences = validation.errors.laborReferences;
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const validateProfessionalStep = () => {
+    const newErrors: {[key: string]: string} = {};
+
+    if (!formData.bio.trim()) newErrors.bio = "La descripcion profesional es requerida";
+    if (!formData.experienceYears || parseInt(formData.experienceYears) < 0) {
+      newErrors.experienceYears = "Los anios de experiencia son requeridos";
+    }
+    if (!formData.professionalGroup) {
+      newErrors.professionalGroup = "Debes elegir si ofreces Oficios o Profesiones";
+    }
+    if (!formData.serviceLocations || formData.serviceLocations.length === 0) {
+      newErrors.serviceLocations = "Debes agregar al menos una localidad donde ofreces tus servicios";
+    }
+    if (!formData.whatsapp || !formData.whatsapp.trim()) {
+      newErrors.whatsapp = "El WhatsApp es requerido";
+    } else {
+      const error = validateWhatsAppNumber(formData.whatsapp);
+      if (error) {
+        newErrors.whatsapp = error;
+      }
+    }
+    if (formData.hasPhysicalStore && !formData.physicalStoreAddress?.trim()) {
+      newErrors.physicalStoreAddress = "La direccion del local es requerida si tienes un local fisico";
+    }
+
+    formData.services.forEach((service, index) => {
+      if (formData.professionalGroup === "oficios" && !service.areaSlug) {
+        newErrors[`service_${index}_area`] = "Elegi un area para este servicio";
+      }
+
+      const requiresSpecificCategory =
+        formData.professionalGroup === "profesiones" ||
+        areaHasSelectableSubcategories(service.areaSlug);
+
+      if (requiresSpecificCategory && !service.categoryId) {
+        newErrors[`service_${index}_category`] =
+          formData.professionalGroup === "profesiones"
+            ? "Elegi una profesion"
+            : "Elegi una subcategoria";
+      }
+
+      if (!service.description.trim()) {
+        newErrors[`service_${index}_description`] = "La descripcion es requerida";
+      }
+    });
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
   const handleNext = () => {
-    if (validateStep1()) {
-      setCurrentStep(2);
+    let isValid = false;
+
+    switch (currentStep) {
+      case 1:
+        isValid = validateStep1();
+        break;
+      case 2:
+        isValid = validateProfessionalStep();
+        break;
+      default:
+        isValid = true;
+    }
+
+    if (isValid && currentStep < 3) {
+      setCurrentStep(currentStep + 1);
     }
   };
 
   const handleSubmit = async () => {
-    if (!validateStep2()) return;
+    if (!validateStep3()) return;
+
+    const documentationValidation = validateProfessionalDocumentation(formData.documentation);
 
     setIsLoading(true);
     
@@ -378,6 +518,7 @@ export default function CompletarPerfilPage() {
           // Local físico
           hasPhysicalStore: formData.hasPhysicalStore,
           physicalStoreAddress: formData.physicalStoreAddress,
+          documentation: documentationValidation.sanitized,
           services: formData.services.map((s) => ({
             categoryId: s.categoryId,
             title: s.title,
@@ -932,34 +1073,13 @@ export default function CompletarPerfilPage() {
                     {formData.picture && formData.picture.trim() !== "" && (
                       <div className="mt-2 mb-3 relative inline-block">
                         <div className="relative w-24 h-24 rounded-full overflow-hidden border-2 border-gray-200 bg-gray-100">
-                          {formData.picture.startsWith('http') || formData.picture.startsWith('https') ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img
-                              src={formData.picture}
-                              alt="Foto de perfil"
-                              className="w-full h-full object-cover"
-                              onError={(e) => {
-                                console.error("Error cargando imagen:", formData.picture);
-                                e.currentTarget.style.display = 'none';
-                              }}
-                            />
-                          ) : formData.picture.startsWith('/') ? (
-                            <Image
-                              src={formData.picture}
-                              alt="Foto de perfil"
-                              fill
-                              className="object-cover"
-                              onError={() => console.error("Error cargando imagen local:", formData.picture)}
-                            />
-                          ) : (
-                            <Image
-                              src={`/uploads/profiles/${formData.picture}`}
-                              alt="Foto de perfil"
-                              fill
-                              className="object-cover"
-                              onError={() => console.error("Error cargando imagen desde uploads:", formData.picture)}
-                            />
-                          )}
+                          <Image
+                            src={resolvePublicUploadUrl(formData.picture)}
+                            alt="Foto de perfil"
+                            fill
+                            className="object-cover"
+                            onError={() => console.error("Error cargando imagen:", formData.picture)}
+                          />
                         </div>
                         <button
                           type="button"
@@ -988,7 +1108,7 @@ export default function CompletarPerfilPage() {
                           if (file) {
                             try {
                               const result = await uploadFile(file, 'image');
-                              const pictureValue = result.value || (result.storage === 'r2' ? result.url : result.filename);
+                              const pictureValue = resolveStoredUploadValue(result);
                               handleInputChange('picture', pictureValue);
                               setErrors(prev => {
                                 const newErrors = {...prev};
@@ -1027,7 +1147,7 @@ export default function CompletarPerfilPage() {
                               const result = await uploadFile(file, 'cv');
                               handleInputChange(
                                 'cv',
-                                result.url || result.path || result.filename
+                                resolveStoredUploadValue(result)
                               );
                               setErrors(prev => {
                                 const newErrors = {...prev};
@@ -1105,6 +1225,28 @@ export default function CompletarPerfilPage() {
                     )}
 
                     {formData.services.map((service, index) => (
+                      <ServiceSelectionCard
+                        key={`service-selector-${index}`}
+                        group={formData.professionalGroup as CategoryGroup}
+                        index={index}
+                        service={service}
+                        areas={areas.map((area) => ({ slug: area.slug, name: area.name }))}
+                        categoryOptions={getAvailableCategories(formData.professionalGroup, service.areaSlug)}
+                        selectedAreaName={service.areaSlug ? areaNameBySlug.get(service.areaSlug) : ""}
+                        selectedServiceName={service.title}
+                        categoriesLoading={categoriesLoading}
+                        areaError={errors[`service_${index}_area`]}
+                        categoryError={errors[`service_${index}_category`]}
+                        descriptionError={errors[`service_${index}_description`]}
+                        canRemove={formData.professionalGroup !== 'profesiones' && formData.services.length > 1}
+                        onAreaChange={(value) => handleServiceChange(index, 'areaSlug', value)}
+                        onCategoryChange={(value) => handleServiceChange(index, 'categoryId', value)}
+                        onDescriptionChange={(value) => handleServiceChange(index, 'description', value)}
+                        onRemove={() => removeService(index)}
+                      />
+                    ))}
+
+                    {false && formData.services.map((service, index) => (
                       <Card key={index} className="p-4 rounded-xl border-2 border-gray-100">
                         <div className="space-y-3">
                           {formData.professionalGroup === 'oficios' && (
@@ -1187,6 +1329,35 @@ export default function CompletarPerfilPage() {
               </div>
             )}
 
+            {currentStep === 3 && (
+              <div className="space-y-6">
+                <div className="text-center mb-6">
+                  <h2 className="text-2xl font-bold text-gray-900 mb-2">Documentación</h2>
+                  <p className="text-gray-600">
+                    El certificado de antecedentes penales es obligatorio para que tu perfil pueda aparecer en la plataforma.
+                    Las referencias laborales son opcionales.
+                  </p>
+                </div>
+
+                <ProfessionalDocumentationFields
+                  value={formData.documentation}
+                  onChange={(documentation) => {
+                    setFormData((prev) => ({ ...prev, documentation }));
+                    setErrors((prev) => {
+                      const next = { ...prev };
+                      delete next.documentationReferences;
+                      return next;
+                    });
+                  }}
+                  uploadDocument={uploadPrivateFile}
+                  errors={{
+                    laborReferences: errors.documentationReferences,
+                  }}
+                  helperText="Si no lo tienes ahora, podrás cargarlo más tarde desde la configuración de tu perfil."
+                />
+              </div>
+            )}
+
             {/* Navigation Buttons */}
             <div className="flex gap-4 mt-8">
               {currentStep > 1 && (
@@ -1201,7 +1372,7 @@ export default function CompletarPerfilPage() {
                 </Button>
               )}
               
-              {currentStep < 2 ? (
+              {currentStep < 3 ? (
                 <Button
                   type="button"
                   onClick={handleNext}
