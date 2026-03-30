@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { getRequestId, resolveAdminActor } from '@/lib/observability/context';
 
 /**
  * Valida que la petición venga del dashboard de admin verificando el API Key
@@ -36,7 +37,14 @@ export function requireAdminApiKey(request: NextRequest) {
       };
     }
   
-    return { error: null, authorized: true };
+    const requestId = getRequestId(request);
+
+    return {
+      error: null,
+      authorized: true,
+      requestId,
+      actor: resolveAdminActor(request, requestId),
+    };
   }
   
   /**

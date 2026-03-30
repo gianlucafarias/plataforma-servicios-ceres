@@ -1,8 +1,10 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { revalidateTag } from 'next/cache';
 import { prisma } from '@/lib/prisma';
 import { requireAdminApiKey } from '@/lib/auth-helpers';
 import { isCategoryIconKey } from '@/lib/category-icon-keys';
+import { buildChanges, finalizeObservedResponse, observedJson, safeRecordAuditEvent } from '@/lib/observability/audit';
+import { createRequestObservationContext } from '@/lib/observability/context';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,12 +23,54 @@ function canShowOnHome(type: 'area' | 'subcategory', group: string) {
   return type === 'area' || group === 'profesiones';
 }
 
+function resolveCategoryType(category: {
+  groupId: string;
+  parentCategoryId: string | null;
+}): 'area' | 'subcategory' {
+  return category.groupId === 'oficios' && !category.parentCategoryId ? 'area' : 'subcategory';
+}
+
+function categoryAuditSnapshot(category: {
+  id: string;
+  name: string;
+  slug: string;
+  groupId: string;
+  parentCategoryId: string | null;
+  icon: string | null;
+  backgroundUrl: string | null;
+  description: string;
+  active: boolean;
+  showOnHome: boolean;
+}) {
+  return {
+    id: category.id,
+    type: resolveCategoryType(category),
+    name: category.name,
+    slug: category.slug,
+    groupId: category.groupId,
+    parentCategoryId: category.parentCategoryId,
+    icon: category.icon,
+    backgroundUrl: category.backgroundUrl,
+    description: category.description,
+    active: category.active,
+    showOnHome: category.showOnHome,
+  };
+}
+
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
-  const { error } = requireAdminApiKey(request);
-  if (error) return error;
+  const auth = requireAdminApiKey(request);
+  const context = createRequestObservationContext(request, {
+    route: '/api/admin/categories/[id]',
+    actor: auth.authorized ? auth.actor : undefined,
+    requestId: auth.authorized ? auth.requestId : undefined,
+  });
+
+  if (auth.error) {
+    return finalizeObservedResponse(context, auth.error);
+  }
 
   try {
     const { id } = await params;
@@ -59,18 +103,18 @@ export async function GET(
     });
 
     if (!category) {
-      return NextResponse.json(
+      return observedJson(
+        context,
         { success: false, error: 'not_found', message: 'Categoria no encontrada' },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
-    return NextResponse.json({
+    return observedJson(context, {
       success: true,
       data: {
         id: category.id,
-        type:
-          category.groupId === 'oficios' && !category.parentCategoryId ? 'area' : 'subcategory',
+        type: resolveCategoryType(category),
         name: category.name,
         slug: category.slug,
         group: category.groupId,
@@ -88,16 +132,24 @@ export async function GET(
     });
   } catch (error) {
     console.error('Error obteniendo categoria:', error);
-    return NextResponse.json({ success: false, error: 'server_error' }, { status: 500 });
+    return observedJson(context, { success: false, error: 'server_error' }, { status: 500 });
   }
 }
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
-  const { error } = requireAdminApiKey(request);
-  if (error) return error;
+  const auth = requireAdminApiKey(request);
+  const context = createRequestObservationContext(request, {
+    route: '/api/admin/categories/[id]',
+    actor: auth.authorized ? auth.actor : undefined,
+    requestId: auth.authorized ? auth.requestId : undefined,
+  });
+
+  if (auth.error) {
+    return finalizeObservedResponse(context, auth.error);
+  }
 
   try {
     const { id } = await params;
@@ -105,9 +157,10 @@ export async function PUT(
 
     const existing = await prisma.category.findUnique({ where: { id } });
     if (!existing) {
-      return NextResponse.json(
+      return observedJson(
+        context,
         { success: false, error: 'not_found', message: 'Categoria no encontrada' },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
@@ -127,29 +180,31 @@ export async function PUT(
       try {
         updateData.icon = normalizeIcon(body.icon);
       } catch {
-        return NextResponse.json(
+        return observedJson(
+          context,
           {
             success: false,
             error: 'validation_error',
             message: 'Icono invalido. Debe pertenecer al catalogo permitido',
           },
-          { status: 400 }
+          { status: 400 },
         );
       }
     }
     if (body.image !== undefined) updateData.backgroundUrl = body.image;
     if (body.active !== undefined) updateData.active = body.active;
     if (body.showOnHome !== undefined) {
-      const categoryType =
-        existing.groupId === 'oficios' && !existing.parentCategoryId ? 'area' : 'subcategory';
+      const categoryType = resolveCategoryType(existing);
       if (body.showOnHome && !canShowOnHome(categoryType, existing.groupId)) {
-        return NextResponse.json(
+        return observedJson(
+          context,
           {
             success: false,
             error: 'validation_error',
-            message: 'Solo las areas de oficios y las categorias de profesiones pueden mostrarse en el inicio',
+            message:
+              'Solo las areas de oficios y las categorias de profesiones pueden mostrarse en el inicio',
           },
-          { status: 400 }
+          { status: 400 },
         );
       }
 
@@ -159,9 +214,10 @@ export async function PUT(
       if (body.parentId) {
         const parent = await prisma.category.findUnique({ where: { id: body.parentId } });
         if (!parent) {
-          return NextResponse.json(
+          return observedJson(
+            context,
             { success: false, error: 'not_found', message: 'Area padre no encontrada' },
-            { status: 404 }
+            { status: 404 },
           );
         }
       }
@@ -174,28 +230,55 @@ export async function PUT(
       data: updateData,
     });
 
+    await safeRecordAuditEvent({
+      kind: 'audit',
+      domain: 'admin.categories',
+      eventName: 'category.update',
+      status: 'success',
+      summary: `Categoria ${updated.slug} actualizada`,
+      actor: context.actor,
+      requestId: context.requestId,
+      route: context.route,
+      method: context.method,
+      entityType: 'category',
+      entityId: updated.id,
+      changes: buildChanges(
+        categoryAuditSnapshot(existing),
+        categoryAuditSnapshot(updated),
+      ),
+    });
+
     revalidateTag('categories');
 
-    return NextResponse.json({
+    return observedJson(context, {
       success: true,
       data: updated,
       message: 'Categoria actualizada correctamente',
     });
   } catch (error) {
     console.error('Error actualizando categoria:', error);
-    return NextResponse.json(
+    return observedJson(
+      context,
       { success: false, error: 'server_error', message: 'Error al actualizar categoria' },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
-  const { error } = requireAdminApiKey(request);
-  if (error) return error;
+  const auth = requireAdminApiKey(request);
+  const context = createRequestObservationContext(request, {
+    route: '/api/admin/categories/[id]',
+    actor: auth.authorized ? auth.actor : undefined,
+    requestId: auth.authorized ? auth.requestId : undefined,
+  });
+
+  if (auth.error) {
+    return finalizeObservedResponse(context, auth.error);
+  }
 
   try {
     const { id } = await params;
@@ -211,14 +294,36 @@ export async function DELETE(
     });
 
     if (!category) {
-      return NextResponse.json(
+      return observedJson(
+        context,
         { success: false, error: 'not_found', message: 'Categoria no encontrada' },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
     if (!force && (category._count.children > 0 || category._count.services > 0)) {
-      return NextResponse.json(
+      await safeRecordAuditEvent({
+        kind: 'audit',
+        domain: 'admin.categories',
+        eventName: 'category.delete',
+        status: 'warning',
+        summary: `Intento de eliminar categoria ${category.slug} bloqueado por dependencias`,
+        actor: context.actor,
+        requestId: context.requestId,
+        route: context.route,
+        method: context.method,
+        entityType: 'category',
+        entityId: category.id,
+        metadata: {
+          force,
+          deactivate,
+          subcategoryCount: category._count.children,
+          serviceCount: category._count.services,
+        },
+      });
+
+      return observedJson(
+        context,
         {
           success: false,
           error: 'conflict',
@@ -228,7 +333,7 @@ export async function DELETE(
             professionalCount: category._count.services,
           },
         },
-        { status: 409 }
+        { status: 409 },
       );
     }
 
@@ -238,9 +343,30 @@ export async function DELETE(
         data: { active: false },
       });
 
+      await safeRecordAuditEvent({
+        kind: 'audit',
+        domain: 'admin.categories',
+        eventName: 'category.deactivate',
+        status: 'success',
+        summary: `Categoria ${updated.slug} desactivada`,
+        actor: context.actor,
+        requestId: context.requestId,
+        route: context.route,
+        method: context.method,
+        entityType: 'category',
+        entityId: updated.id,
+        changes: buildChanges(
+          categoryAuditSnapshot(category),
+          categoryAuditSnapshot(updated),
+        ),
+        metadata: {
+          force,
+        },
+      });
+
       revalidateTag('categories');
 
-      return NextResponse.json({
+      return observedJson(context, {
         success: true,
         message: 'Categoria desactivada exitosamente',
         data: { id: updated.id, active: false },
@@ -248,9 +374,30 @@ export async function DELETE(
     }
 
     await prisma.category.delete({ where: { id } });
+
+    await safeRecordAuditEvent({
+      kind: 'audit',
+      domain: 'admin.categories',
+      eventName: 'category.delete',
+      status: 'success',
+      summary: `Categoria ${category.slug} eliminada`,
+      actor: context.actor,
+      requestId: context.requestId,
+      route: context.route,
+      method: context.method,
+      entityType: 'category',
+      entityId: category.id,
+      changes: buildChanges(categoryAuditSnapshot(category), null),
+      metadata: {
+        force,
+        subcategoryCount: category._count.children,
+        serviceCount: category._count.services,
+      },
+    });
+
     revalidateTag('categories');
 
-    return NextResponse.json({
+    return observedJson(context, {
       success: true,
       message: 'Categoria eliminada exitosamente',
       affected: {
@@ -260,9 +407,10 @@ export async function DELETE(
     });
   } catch (error) {
     console.error('Error eliminando categoria:', error);
-    return NextResponse.json(
+    return observedJson(
+      context,
       { success: false, error: 'server_error', message: 'Error al eliminar categoria' },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

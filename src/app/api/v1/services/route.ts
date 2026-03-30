@@ -1,9 +1,11 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/app/api/auth/options';
 import { fail, ok, requestMeta } from '@/lib/api-response';
 import { rateLimit, rateLimitHeaders } from '@/lib/rate-limit-memory';
 import { clientIp } from '@/lib/request-helpers';
+import { observedJson, safeRecordAuditEvent } from '@/lib/observability/audit';
+import { createEndUserActor, createRequestObservationContext } from '@/lib/observability/context';
 import {
   SERVICES_LIST_RATE_LIMIT,
   SERVICES_WRITE_RATE_LIMIT,
@@ -14,16 +16,21 @@ import {
 
 export async function GET(request: NextRequest) {
   const metaBase = requestMeta(request);
+  const context = createRequestObservationContext(request, {
+    route: '/api/v1/services',
+    requestId: metaBase.requestId,
+  });
   const rl = rateLimit(
     `services:list:${clientIp(request)}`,
     SERVICES_LIST_RATE_LIMIT.limit,
-    SERVICES_LIST_RATE_LIMIT.windowMs
+    SERVICES_LIST_RATE_LIMIT.windowMs,
   );
 
   if (!rl.allowed) {
-    return NextResponse.json(
+    return observedJson(
+      context,
       fail('rate_limited', 'Demasiadas solicitudes. Intenta mas tarde.', undefined, metaBase),
-      { status: 429, headers: rateLimitHeaders(rl) }
+      { status: 429, headers: rateLimitHeaders(rl) },
     );
   }
 
@@ -39,7 +46,9 @@ export async function GET(request: NextRequest) {
       },
     };
 
-    return NextResponse.json(ok(result.data, meta), { headers: rateLimitHeaders(rl) });
+    return observedJson(context, ok(result.data, meta), {
+      headers: rateLimitHeaders(rl),
+    });
   } catch (error) {
     console.error('List services v1 error:', error);
 
@@ -48,7 +57,7 @@ export async function GET(request: NextRequest) {
         ? `Error al obtener servicios. Detalle: ${error.message}`
         : 'Error al obtener servicios';
 
-    return NextResponse.json(fail('fetch_failed', message, undefined, metaBase), {
+    return observedJson(context, fail('fetch_failed', message, undefined, metaBase), {
       status: 500,
       headers: rateLimitHeaders(rl),
     });
@@ -57,47 +66,81 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   const metaBase = requestMeta(request);
+  const context = createRequestObservationContext(request, {
+    route: '/api/v1/services',
+    requestId: metaBase.requestId,
+  });
   const rl = rateLimit(
     `services:create:${clientIp(request)}`,
     SERVICES_WRITE_RATE_LIMIT.limit,
-    SERVICES_WRITE_RATE_LIMIT.windowMs
+    SERVICES_WRITE_RATE_LIMIT.windowMs,
   );
 
   if (!rl.allowed) {
-    return NextResponse.json(
+    return observedJson(
+      context,
       fail('rate_limited', 'Demasiadas solicitudes. Intenta mas tarde.', undefined, metaBase),
-      { status: 429, headers: rateLimitHeaders(rl) }
+      { status: 429, headers: rateLimitHeaders(rl) },
     );
   }
 
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
-      return NextResponse.json(
+      return observedJson(
+        context,
         fail('unauthorized', 'No autorizado', undefined, metaBase),
-        { status: 401, headers: rateLimitHeaders(rl) }
+        { status: 401, headers: rateLimitHeaders(rl) },
       );
     }
 
-    const body = await request.json();
-    const created = await createServiceForUser(session.user.id, body);
+    context.actor = createEndUserActor({
+      userId: session.user.id,
+      email: session.user.email ?? null,
+      label: session.user.name ?? session.user.email ?? session.user.id,
+    });
 
-    return NextResponse.json(ok(created, metaBase), {
+    const body = await request.json();
+    const created = await createServiceForUser(session.user.id, body, {
+      requestId: context.requestId,
+      actor: context.actor,
+      route: context.route,
+      method: context.method,
+    });
+
+    return observedJson(context, ok(created, metaBase), {
       status: 201,
       headers: rateLimitHeaders(rl),
     });
   } catch (error) {
     if (error instanceof ServiceFlowError) {
-      return NextResponse.json(
+      await safeRecordAuditEvent({
+        kind: 'audit',
+        domain: 'services',
+        eventName: 'service.create',
+        status: 'warning',
+        summary: `Fallo al crear servicio: ${error.message}`,
+        actor: context.actor,
+        requestId: context.requestId,
+        route: context.route,
+        method: context.method,
+        metadata: {
+          code: error.code,
+        },
+      });
+
+      return observedJson(
+        context,
         fail(error.code, error.message, undefined, metaBase),
-        { status: error.status, headers: rateLimitHeaders(rl) }
+        { status: error.status, headers: rateLimitHeaders(rl) },
       );
     }
 
     console.error('POST /api/v1/services error:', error);
-    return NextResponse.json(
+    return observedJson(
+      context,
       fail('server_error', 'Error al crear servicio', undefined, metaBase),
-      { status: 500, headers: rateLimitHeaders(rl) }
+      { status: 500, headers: rateLimitHeaders(rl) },
     );
   }
 }

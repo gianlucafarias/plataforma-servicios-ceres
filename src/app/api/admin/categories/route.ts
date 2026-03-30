@@ -1,9 +1,11 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { Prisma } from '@prisma/client';
 import { revalidateTag } from 'next/cache';
 import { prisma } from '@/lib/prisma';
 import { requireAdminApiKey } from '@/lib/auth-helpers';
 import { isCategoryIconKey } from '@/lib/category-icon-keys';
+import { buildChanges, finalizeObservedResponse, observedJson, safeRecordAuditEvent } from '@/lib/observability/audit';
+import { createRequestObservationContext } from '@/lib/observability/context';
 
 export const dynamic = 'force-dynamic';
 
@@ -22,9 +24,44 @@ function canShowOnHome(type: 'area' | 'subcategory', group: string) {
   return type === 'area' || group === 'profesiones';
 }
 
+function categoryAuditSnapshot(category: {
+  id: string;
+  name: string;
+  slug: string;
+  groupId: string;
+  parentCategoryId: string | null;
+  icon: string | null;
+  backgroundUrl: string | null;
+  description: string;
+  active: boolean;
+  showOnHome: boolean;
+}, type: 'area' | 'subcategory') {
+  return {
+    id: category.id,
+    type,
+    name: category.name,
+    slug: category.slug,
+    groupId: category.groupId,
+    parentCategoryId: category.parentCategoryId,
+    icon: category.icon,
+    backgroundUrl: category.backgroundUrl,
+    description: category.description,
+    active: category.active,
+    showOnHome: category.showOnHome,
+  };
+}
+
 export async function GET(request: NextRequest) {
-  const { error } = requireAdminApiKey(request);
-  if (error) return error;
+  const auth = requireAdminApiKey(request);
+  const context = createRequestObservationContext(request, {
+    route: '/api/admin/categories',
+    actor: auth.authorized ? auth.actor : undefined,
+    requestId: auth.authorized ? auth.requestId : undefined,
+  });
+
+  if (auth.error) {
+    return finalizeObservedResponse(context, auth.error);
+  }
 
   try {
     const { searchParams } = new URL(request.url);
@@ -91,7 +128,7 @@ export async function GET(request: NextRequest) {
     ]);
 
     if (type || group || search) {
-      return NextResponse.json({
+      return observedJson(context, {
         success: true,
         data: categories.map((category) => ({
           id: category.id,
@@ -113,7 +150,7 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    return NextResponse.json({
+    return observedJson(context, {
       success: true,
       data: {
         areas: areas.map((area) => ({
@@ -167,85 +204,110 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     console.error('Error obteniendo categorias:', error);
-    return NextResponse.json(
+    return observedJson(
+      context,
       { success: false, error: 'server_error', message: 'Error al obtener categorias' },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
 
 export async function POST(request: NextRequest) {
-  const { error } = requireAdminApiKey(request);
-  if (error) return error;
+  const auth = requireAdminApiKey(request);
+  const context = createRequestObservationContext(request, {
+    route: '/api/admin/categories',
+    actor: auth.authorized ? auth.actor : undefined,
+    requestId: auth.authorized ? auth.requestId : undefined,
+  });
+
+  if (auth.error) {
+    return finalizeObservedResponse(context, auth.error);
+  }
 
   try {
     const body = await request.json();
-    const { type, name, slug, group, parentId, description, image, active = true, showOnHome = false } =
-      body;
+    const {
+      type,
+      name,
+      slug,
+      group,
+      parentId,
+      description,
+      image,
+      active = true,
+      showOnHome = false,
+    } = body;
 
     if (!name || !slug || !group || !type) {
-      return NextResponse.json(
+      return observedJson(
+        context,
         {
           success: false,
           error: 'validation_error',
           message: 'Campos requeridos: name, slug, group, type',
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     if (!['oficios', 'profesiones'].includes(group)) {
-      return NextResponse.json(
+      return observedJson(
+        context,
         {
           success: false,
           error: 'validation_error',
           message: 'Grupo debe ser "oficios" o "profesiones"',
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     if (!['area', 'subcategory'].includes(type)) {
-      return NextResponse.json(
+      return observedJson(
+        context,
         {
           success: false,
           error: 'validation_error',
           message: 'Type debe ser "area" o "subcategory"',
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     if (type === 'area' && group !== 'oficios') {
-      return NextResponse.json(
+      return observedJson(
+        context,
         {
           success: false,
           error: 'validation_error',
           message: 'Solo el grupo "oficios" puede tener areas',
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     if (type === 'subcategory' && group === 'oficios' && !parentId) {
-      return NextResponse.json(
+      return observedJson(
+        context,
         {
           success: false,
           error: 'validation_error',
           message: 'Las subcategorias de oficios requieren un area padre (parentId)',
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     if (showOnHome && !canShowOnHome(type, group)) {
-      return NextResponse.json(
+      return observedJson(
+        context,
         {
           success: false,
           error: 'validation_error',
-          message: 'Solo las areas de oficios y las categorias de profesiones pueden mostrarse en el inicio',
+          message:
+            'Solo las areas de oficios y las categorias de profesiones pueden mostrarse en el inicio',
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -253,30 +315,50 @@ export async function POST(request: NextRequest) {
     try {
       icon = normalizeIcon(body.icon);
     } catch {
-      return NextResponse.json(
+      return observedJson(
+        context,
         {
           success: false,
           error: 'validation_error',
           message: 'Icono invalido. Debe pertenecer al catalogo permitido',
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     const existing = await prisma.category.findUnique({ where: { slug } });
     if (existing) {
-      return NextResponse.json(
+      await safeRecordAuditEvent({
+        kind: 'audit',
+        domain: 'admin.categories',
+        eventName: 'category.create',
+        status: 'warning',
+        summary: `Intento de crear categoria con slug duplicado: ${slug}`,
+        actor: context.actor,
+        requestId: context.requestId,
+        route: context.route,
+        method: context.method,
+        entityType: 'category',
+        entityId: existing.id,
+        metadata: {
+          slug,
+        },
+      });
+
+      return observedJson(
+        context,
         { success: false, error: 'validation_error', message: 'El slug ya existe' },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     if (parentId) {
       const parent = await prisma.category.findUnique({ where: { id: parentId } });
       if (!parent) {
-        return NextResponse.json(
+        return observedJson(
+          context,
           { success: false, error: 'not_found', message: 'Area padre no encontrada' },
-          { status: 404 }
+          { status: 404 },
         );
       }
     }
@@ -295,9 +377,25 @@ export async function POST(request: NextRequest) {
       },
     });
 
+    await safeRecordAuditEvent({
+      kind: 'audit',
+      domain: 'admin.categories',
+      eventName: 'category.create',
+      status: 'success',
+      summary: `Categoria ${category.slug} creada`,
+      actor: context.actor,
+      requestId: context.requestId,
+      route: context.route,
+      method: context.method,
+      entityType: 'category',
+      entityId: category.id,
+      changes: buildChanges(null, categoryAuditSnapshot(category, type)),
+    });
+
     revalidateTag('categories');
 
-    return NextResponse.json(
+    return observedJson(
+      context,
       {
         success: true,
         data: {
@@ -306,13 +404,14 @@ export async function POST(request: NextRequest) {
         },
         message: 'Categoria creada exitosamente',
       },
-      { status: 201 }
+      { status: 201 },
     );
   } catch (error) {
     console.error('Error creando categoria:', error);
-    return NextResponse.json(
+    return observedJson(
+      context,
       { success: false, error: 'server_error', message: 'Error al crear categoria' },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

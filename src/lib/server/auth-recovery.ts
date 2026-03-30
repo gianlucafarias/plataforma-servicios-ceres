@@ -3,6 +3,13 @@ import { Resend } from 'resend';
 import { prisma } from '@/lib/prisma';
 import { getAbsoluteUrl } from '@/lib/seo';
 import { sendMail } from '@/lib/mail';
+import type { ObservabilityActor } from '@/lib/observability/context';
+import {
+  recordEmailFailed,
+  recordEmailRequested,
+  recordEmailSent,
+  recordEmailSkipped,
+} from '@/lib/observability/email';
 import { generateRandomToken } from '@/lib/utils';
 
 const resend = new Resend(process.env.RESEND_API_KEY || '');
@@ -26,7 +33,15 @@ export function normalizeEmailInput(value: unknown): string | null {
   return email.length > 0 ? email : null;
 }
 
-export async function createPasswordResetRequest(email: string): Promise<{ userFound: boolean }> {
+type AuthRecoveryObservability = {
+  requestId?: string | null;
+  actor?: ObservabilityActor;
+};
+
+export async function createPasswordResetRequest(
+  email: string,
+  observability?: AuthRecoveryObservability,
+): Promise<{ userFound: boolean }> {
   const user = await prisma.user.findUnique({
     where: { email },
     select: { id: true, email: true, firstName: true, password: true },
@@ -52,9 +67,21 @@ export async function createPasswordResetRequest(email: string): Promise<{ userF
   });
 
   const resetUrl = getAbsoluteUrl(`/auth/reset-password?token=${token}`);
+  const emailEvent = {
+    requestId: observability?.requestId,
+    actor: observability?.actor,
+    entityType: 'user',
+    entityId: user.id,
+    channel: 'resend' as const,
+    template: 'email.password_reset',
+    domain: 'auth.email',
+    summary: `Correo de recuperacion solicitado para usuario ${user.id}`,
+    recipient: user.email,
+  };
 
   if (process.env.RESEND_API_KEY) {
     try {
+      await recordEmailRequested(emailEvent);
       await resend.emails.send({
         from: 'Ceres en Red <no-reply@ceresenred.ceres.gob.ar>',
         to: user.email,
@@ -72,10 +99,13 @@ export async function createPasswordResetRequest(email: string): Promise<{ userF
           <p>Este enlace sera valido por 1 hora.</p>
         `,
       });
+      await recordEmailSent(emailEvent);
     } catch (emailError) {
+      await recordEmailFailed(emailEvent, emailError);
       console.error('[forgot-password] Error enviando email con Resend:', emailError);
     }
   } else {
+    await recordEmailSkipped(emailEvent, 'resend_not_configured');
     console.warn('[forgot-password] RESEND_API_KEY no esta configurada. No se envio el email.');
   }
 
@@ -87,7 +117,10 @@ export type ResendVerificationResult =
   | { status: 'already_verified' }
   | { status: 'resent' };
 
-export async function resendVerificationEmail(email: string): Promise<ResendVerificationResult> {
+export async function resendVerificationEmail(
+  email: string,
+  observability?: AuthRecoveryObservability,
+): Promise<ResendVerificationResult> {
   const user = await prisma.user.findUnique({
     where: { email },
     select: { id: true, email: true, verified: true },
@@ -124,6 +157,15 @@ export async function resendVerificationEmail(email: string): Promise<ResendVeri
         <p>Este enlace vence en 24 horas.</p>
       `,
       text: `Confirma tu cuenta ingresando a: ${verifyUrl}`,
+      observability: {
+        requestId: observability?.requestId,
+        actor: observability?.actor,
+        entityType: 'user',
+        entityId: user.id,
+        template: 'email.verification_resend',
+        domain: 'auth.email',
+        summary: `Reenvio de verificacion solicitado para usuario ${user.id}`,
+      },
     });
   } catch (error) {
     console.error('Error reenviando correo:', error);

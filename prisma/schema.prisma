@@ -320,9 +320,57 @@ model ProfessionalCertification {
   @@map("professional_certifications")
 }
 
+model AuditEvent {
+  id         String           @id @default(uuid())
+  kind       AuditEventKind
+  domain     String
+  eventName  String
+  entityType String?
+  entityId   String?
+  actorType  AuditActorType
+  actorId    String?
+  actorLabel String?
+  requestId  String?
+  route      String?
+  method     String?
+  status     AuditEventStatus
+  durationMs Int?
+  summary    String           @db.Text
+  changes    Json?
+  metadata   Json?
+  createdAt  DateTime         @default(now())
+
+  @@index([createdAt])
+  @@index([domain])
+  @@index([requestId])
+  @@index([actorId])
+  @@index([entityType, entityId])
+  @@index([kind, status])
+  @@map("audit_events")
+}
+
 enum CertificationStatus {
   pending
   approved
   rejected
   suspended
+}
+
+enum AuditEventKind {
+  audit
+  workflow
+  request
+}
+
+enum AuditActorType {
+  admin_user
+  end_user
+  system
+}
+
+enum AuditEventStatus {
+  success
+  failure
+  warning
+  skipped
 }
