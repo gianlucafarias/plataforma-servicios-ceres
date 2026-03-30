@@ -49,6 +49,31 @@ import { resolvePublicUploadUrl } from "@/lib/public-upload-url";
 import { usePublicCategoriesTree } from "@/hooks/usePublicCategoriesTree";
 import { validateProfessionalDocumentation } from "@/lib/validation/professional-documentation";
 
+const ALLOWED_OAUTH_IMAGE_HOSTS = new Set([
+  "graph.facebook.com",
+  "lookaside.facebook.com",
+  "platform-lookaside.fbsbx.com",
+]);
+
+const ALLOWED_OAUTH_IMAGE_SUFFIXES = [".googleusercontent.com", ".fbcdn.net"];
+
+function shouldUploadOAuthImage(imageUrl: string) {
+  try {
+    const parsedUrl = new URL(imageUrl);
+    if (parsedUrl.protocol !== "https:") {
+      return false;
+    }
+
+    const hostname = parsedUrl.hostname.toLowerCase();
+    return (
+      ALLOWED_OAUTH_IMAGE_HOSTS.has(hostname) ||
+      ALLOWED_OAUTH_IMAGE_SUFFIXES.some((suffix) => hostname.endsWith(suffix))
+    );
+  } catch {
+    return false;
+  }
+}
+
 export default function CompletarPerfilPage() {
   const router = useRouter();
   const { data: session, status } = useSession();
@@ -195,7 +220,7 @@ export default function CompletarPerfilPage() {
         const imageUrl = session.user.image;
         
         // Si es una URL externa (OAuth), descargarla y guardarla en R2
-        if (imageUrl && (imageUrl.startsWith('http://') || imageUrl.startsWith('https://'))) {
+        if (imageUrl && shouldUploadOAuthImage(imageUrl)) {
           // Descargar y guardar la imagen en R2 de forma asíncrona
           uploadExternalOAuthImage(imageUrl)
             .then((result) => {

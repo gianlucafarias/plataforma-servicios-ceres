@@ -3,6 +3,7 @@ import { useState, memo, useCallback } from "react";
 import Image from "next/image";
 import type { PublicCategoriesTree } from "@/lib/api/professionals";
 import { resolveCategoryIcon } from "@/lib/category-icons";
+import { resolvePublicUploadUrl } from "@/lib/public-upload-url";
 
 type CarouselCategory = PublicCategoriesTree["areas"][number];
 
@@ -13,11 +14,17 @@ interface CategoryCardProps {
 
 function CategoryCardComponent({ category, priority = false }: CategoryCardProps) {
   const [loaded, setLoaded] = useState(false);
-  const hasImage = Boolean(category.image);
+  const [imageFailed, setImageFailed] = useState(false);
+  const resolvedImageUrl = resolvePublicUploadUrl(category.image);
+  const hasImage = Boolean(resolvedImageUrl) && !imageFailed;
   const Icon = resolveCategoryIcon(category.icon, category.slug);
 
   const handleLoad = useCallback(() => {
     setLoaded(true);
+  }, []);
+
+  const handleError = useCallback(() => {
+    setImageFailed(true);
   }, []);
 
   return (
@@ -27,15 +34,16 @@ function CategoryCardComponent({ category, priority = false }: CategoryCardProps
           <div className="absolute inset-0 bg-gray-200 dark:bg-gray-700 animate-pulse" />
         ) : null}
 
-        {hasImage && category.image && (
+        {hasImage && resolvedImageUrl && (
           <Image
-            src={category.image}
+            src={resolvedImageUrl}
             alt={category.name}
             fill
             priority={priority}
             sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 20vw"
             className={`object-cover transition-transform duration-500 group-hover:scale-105 ${loaded ? "opacity-100" : "opacity-0"}`}
             onLoad={handleLoad}
+            onError={handleError}
           />
         )}
 
