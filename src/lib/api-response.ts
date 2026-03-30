@@ -1,3 +1,5 @@
+import { getRequestId } from '@/lib/observability/context';
+
 export type ApiError = {
   code: string;
   message: string;
@@ -35,11 +37,7 @@ export function fail(code: string, message: string, details?: unknown, meta?: Ap
 }
 
 export function requestMeta(req: Request, extras?: Partial<ApiMeta>): ApiMeta {
-  const requestId =
-    req.headers.get('x-request-id') ||
-    req.headers.get('x-cf-ray') ||
-    req.headers.get('x-vercel-id') ||
-    crypto.randomUUID();
+  const requestId = getRequestId(req);
 
   return { requestId, ...(extras ?? {}) };
 }

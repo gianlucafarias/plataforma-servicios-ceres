@@ -1,5 +1,7 @@
 import { CategoryGroupId, Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
+import type { ObservabilityActor } from '@/lib/observability/context';
+import { buildChanges, safeRecordAuditEvent } from '@/lib/observability/audit';
 import { getServiceCountsByCategorySlug } from '@/lib/service-stats';
 import { getPublicProfessionalWhere } from '@/lib/server/public-professional-visibility';
 import {
@@ -39,6 +41,13 @@ type UpdateServicePayload = {
   available?: unknown;
 };
 
+type ServiceMutationObservability = {
+  requestId?: string | null;
+  actor?: ObservabilityActor;
+  route?: string | null;
+  method?: string | null;
+};
+
 type ListedService = {
   id: string;
   title: string;
@@ -62,6 +71,52 @@ type ListedService = {
     name: string;
   };
 };
+
+function categoryAuditSnapshot(category: {
+  id: string;
+  name: string;
+  slug: string;
+  groupId: string;
+  parentCategoryId: string | null;
+  active: boolean;
+}) {
+  return {
+    id: category.id,
+    name: category.name,
+    slug: category.slug,
+    groupId: category.groupId,
+    parentCategoryId: category.parentCategoryId,
+    active: category.active,
+  };
+}
+
+function serviceAuditSnapshot(service: {
+  id: string;
+  professionalId: string;
+  categoryId: string;
+  categoryGroup: CategoryGroupId | null;
+  title: string;
+  description: string;
+  priceRange: string | null;
+  available: boolean;
+  category?: {
+    name: string;
+    slug?: string;
+  } | null;
+}) {
+  return {
+    id: service.id,
+    professionalId: service.professionalId,
+    categoryId: service.categoryId,
+    categoryGroup: service.categoryGroup,
+    categoryName: service.category?.name ?? null,
+    categorySlug: service.category?.slug ?? null,
+    title: service.title,
+    description: service.description,
+    priceRange: service.priceRange,
+    available: service.available,
+  };
+}
 
 export type ListedServicesPage = {
   data: ListedService[];
@@ -126,7 +181,10 @@ function applyCategoryFilter(where: Prisma.ServiceWhereInput, categorySlug: stri
   where.category = subSlugs.length > 0 ? { slug: { in: subSlugs } } : { slug: categorySlug };
 }
 
-async function resolveServiceCategory(categorySlug: string) {
+async function resolveServiceCategory(
+  categorySlug: string,
+  observability?: ServiceMutationObservability,
+) {
   let category = await prisma.category.findUnique({ where: { slug: categorySlug } });
   if (category) {
     return category;
@@ -148,6 +206,24 @@ async function resolveServiceCategory(categorySlug: string) {
     },
   });
 
+  await safeRecordAuditEvent({
+    kind: 'audit',
+    domain: 'services.catalog',
+    eventName: 'category.auto_created',
+    status: 'success',
+    summary: `Categoria ${category.slug} creada automaticamente durante flujo de servicios`,
+    actor: observability?.actor,
+    requestId: observability?.requestId,
+    route: observability?.route,
+    method: observability?.method,
+    entityType: 'category',
+    entityId: category.id,
+    changes: buildChanges(null, categoryAuditSnapshot(category)),
+    metadata: {
+      source: 'service_flow',
+    },
+  });
+
   return category;
 }
 
@@ -155,6 +231,12 @@ async function ensureOwnedService(serviceId: string, userId: string) {
   const service = await prisma.service.findUnique({
     where: { id: serviceId },
     include: {
+      category: {
+        select: {
+          name: true,
+          slug: true,
+        },
+      },
       professional: {
         select: {
           userId: true,
@@ -170,6 +252,8 @@ async function ensureOwnedService(serviceId: string, userId: string) {
   if (service.professional.userId !== userId) {
     throw new ServiceFlowError('forbidden', 'No autorizado para modificar este servicio', 403);
   }
+
+  return service;
 }
 
 export async function listPublicServices(url: string): Promise<ListedServicesPage> {
@@ -311,7 +395,11 @@ export async function listPublicServices(url: string): Promise<ListedServicesPag
   };
 }
 
-export async function createServiceForUser(userId: string, payload: CreateServicePayload) {
+export async function createServiceForUser(
+  userId: string,
+  payload: CreateServicePayload,
+  observability?: ServiceMutationObservability,
+) {
   const title = typeof payload.title === 'string' ? payload.title.trim() : '';
   const description = typeof payload.description === 'string' ? payload.description.trim() : '';
   const categorySlug =
@@ -330,9 +418,9 @@ export async function createServiceForUser(userId: string, payload: CreateServic
     throw new ServiceFlowError('no_professional', 'Perfil profesional no encontrado', 404);
   }
 
-  const category = await resolveServiceCategory(categorySlug);
+  const category = await resolveServiceCategory(categorySlug, observability);
 
-  return prisma.service.create({
+  const created = await prisma.service.create({
     data: {
       professionalId: professional.id,
       categoryId: category.id,
@@ -343,17 +431,38 @@ export async function createServiceForUser(userId: string, payload: CreateServic
       available: true,
     },
     include: {
-      category: { select: { name: true } },
+      category: { select: { name: true, slug: true } },
     },
   });
+
+  await safeRecordAuditEvent({
+    kind: 'audit',
+    domain: 'services',
+    eventName: 'service.create',
+    status: 'success',
+    summary: `Servicio ${created.id} creado por usuario ${userId}`,
+    actor: observability?.actor,
+    requestId: observability?.requestId,
+    route: observability?.route,
+    method: observability?.method,
+    entityType: 'service',
+    entityId: created.id,
+    changes: buildChanges(null, serviceAuditSnapshot(created)),
+    metadata: {
+      ownerUserId: userId,
+    },
+  });
+
+  return created;
 }
 
 export async function updateOwnedService(
   serviceId: string,
   userId: string,
-  payload: UpdateServicePayload
+  payload: UpdateServicePayload,
+  observability?: ServiceMutationObservability,
 ) {
-  await ensureOwnedService(serviceId, userId);
+  const existing = await ensureOwnedService(serviceId, userId);
 
   const data: Record<string, unknown> = {};
   if (typeof payload.title === 'string') {
@@ -373,11 +482,11 @@ export async function updateOwnedService(
     throw new ServiceFlowError('no_fields', 'No hay campos validos para actualizar', 400);
   }
 
-  return prisma.service.update({
+  const updated = await prisma.service.update({
     where: { id: serviceId },
     data,
     include: {
-      category: { select: { name: true } },
+      category: { select: { name: true, slug: true } },
       professional: {
         select: {
           id: true,
@@ -389,11 +498,56 @@ export async function updateOwnedService(
       },
     },
   });
+
+  await safeRecordAuditEvent({
+    kind: 'audit',
+    domain: 'services',
+    eventName: 'service.update',
+    status: 'success',
+    summary: `Servicio ${serviceId} actualizado por usuario ${userId}`,
+    actor: observability?.actor,
+    requestId: observability?.requestId,
+    route: observability?.route,
+    method: observability?.method,
+    entityType: 'service',
+    entityId: updated.id,
+    changes: buildChanges(
+      serviceAuditSnapshot(existing),
+      serviceAuditSnapshot(updated),
+    ),
+    metadata: {
+      ownerUserId: userId,
+    },
+  });
+
+  return updated;
 }
 
-export async function deleteOwnedService(serviceId: string, userId: string) {
-  await ensureOwnedService(serviceId, userId);
+export async function deleteOwnedService(
+  serviceId: string,
+  userId: string,
+  observability?: ServiceMutationObservability,
+) {
+  const existing = await ensureOwnedService(serviceId, userId);
   await prisma.service.delete({ where: { id: serviceId } });
+
+  await safeRecordAuditEvent({
+    kind: 'audit',
+    domain: 'services',
+    eventName: 'service.delete',
+    status: 'success',
+    summary: `Servicio ${serviceId} eliminado por usuario ${userId}`,
+    actor: observability?.actor,
+    requestId: observability?.requestId,
+    route: observability?.route,
+    method: observability?.method,
+    entityType: 'service',
+    entityId: serviceId,
+    changes: buildChanges(serviceAuditSnapshot(existing), null),
+    metadata: {
+      ownerUserId: userId,
+    },
+  });
 }
 
 export async function getServiceCounts() {

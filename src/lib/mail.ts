@@ -1,4 +1,11 @@
 import nodemailer from 'nodemailer'
+import type { ObservabilityActor } from '@/lib/observability/context';
+import {
+  recordEmailFailed,
+  recordEmailRequested,
+  recordEmailSent,
+  recordEmailSkipped,
+} from '@/lib/observability/email';
 
 const smtpHost = process.env.SMTP_HOST
 const smtpPort = process.env.SMTP_PORT ? parseInt(process.env.SMTP_PORT, 10) : 465
@@ -33,19 +40,104 @@ export async function sendMail(options: {
   html: string
   text?: string
   from?: string
-}) {
-  const { to, subject, html, text, from } = options
-  const info = await mailTransporter.sendMail({
-    from: from || smtpFrom,
-    to,
-    subject,
-    html,
-    text,
-  })
-  if (process.env.NODE_ENV !== 'production') {
-    console.log('[SMTP] Sent mail to', to, 'messageId=', info.messageId)
+  observability?: {
+    requestId?: string | null
+    actor?: ObservabilityActor
+    entityType?: string | null
+    entityId?: string | null
+    template: string
+    domain: string
+    summary: string
   }
-  return info
+}) {
+  const { to, subject, html, text, from, observability } = options
+
+  if (!smtpHost || !smtpUser || !smtpPass) {
+    if (observability) {
+      await recordEmailSkipped(
+        {
+          requestId: observability.requestId,
+          actor: observability.actor,
+          entityType: observability.entityType,
+          entityId: observability.entityId,
+          channel: 'smtp',
+          template: observability.template,
+          domain: observability.domain,
+          summary: observability.summary,
+          recipient: to,
+        },
+        'smtp_not_configured',
+      )
+    }
+
+    throw new Error('SMTP no configurado: faltan SMTP_HOST/SMTP_USER/SMTP_PASS')
+  }
+
+  if (observability) {
+    await recordEmailRequested({
+      requestId: observability.requestId,
+      actor: observability.actor,
+      entityType: observability.entityType,
+      entityId: observability.entityId,
+      channel: 'smtp',
+      template: observability.template,
+      domain: observability.domain,
+      summary: observability.summary,
+      recipient: to,
+    })
+  }
+
+  try {
+    const info = await mailTransporter.sendMail({
+      from: from || smtpFrom,
+      to,
+      subject,
+      html,
+      text,
+    })
+
+    if (observability) {
+      await recordEmailSent({
+        requestId: observability.requestId,
+        actor: observability.actor,
+        entityType: observability.entityType,
+        entityId: observability.entityId,
+        channel: 'smtp',
+        template: observability.template,
+        domain: observability.domain,
+        summary: observability.summary,
+        recipient: to,
+        metadata: {
+          messageId: info.messageId,
+        },
+      })
+    }
+
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('[SMTP] Sent mail to', to, 'messageId=', info.messageId)
+    }
+
+    return info
+  } catch (error) {
+    if (observability) {
+      await recordEmailFailed(
+        {
+          requestId: observability.requestId,
+          actor: observability.actor,
+          entityType: observability.entityType,
+          entityId: observability.entityId,
+          channel: 'smtp',
+          template: observability.template,
+          domain: observability.domain,
+          summary: observability.summary,
+          recipient: to,
+        },
+        error,
+      )
+    }
+
+    throw error
+  }
 }
 
 export async function verifySmtp() {

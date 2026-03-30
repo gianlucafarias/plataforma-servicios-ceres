@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { type User as PrismaUser, type Professional as PrismaProfessional } from '@prisma/client';
 import type { CategoryGroup } from '@/types';
 import bcrypt from 'bcryptjs';
@@ -9,6 +9,11 @@ import { enqueueSlackAlert } from '@/jobs/slack.producer';
 import { normalizeWhatsAppNumber } from '@/lib/whatsapp-normalize';
 import { ok, fail, requestMeta } from '@/lib/api-response';
 import { rateLimit, rateLimitHeaders } from '@/lib/rate-limit-memory';
+import { buildChanges, observedJson, safeRecordAuditEvent } from '@/lib/observability/audit';
+import {
+  createEndUserActor,
+  createRequestObservationContext,
+} from '@/lib/observability/context';
 import {
   normalizeProfessionalDocumentationInput,
   upsertProfessionalDocumentation,
@@ -36,7 +41,7 @@ interface RegisterRequestPayload {
   password: string;
   firstName: string;
   lastName: string;
-  dni?: string; // Documento Nacional de Identidad (obligatorio)
+  dni?: string;
   phone?: string;
   birthDate?: string;
   location?: string;
@@ -58,13 +63,40 @@ interface RegisterRequestPayload {
   services?: ServiceFormInput[];
 }
 
+function registrationAuditSnapshot(input: {
+  user: Omit<PrismaUser, 'password'>;
+  professional: PrismaProfessional | null;
+  servicesCount: number;
+  skipEmailVerification: boolean;
+}) {
+  return {
+    userId: input.user.id,
+    email: input.user.email,
+    firstName: input.user.firstName,
+    lastName: input.user.lastName,
+    dni: input.user.dni,
+    verified: input.user.verified,
+    professionalId: input.professional?.id ?? null,
+    professionalStatus: input.professional?.status ?? null,
+    professionalGroup: input.professional?.professionalGroup ?? null,
+    servicesCount: input.servicesCount,
+    skipEmailVerification: input.skipEmailVerification,
+  };
+}
+
 export async function POST(request: NextRequest) {
   const metaBase = requestMeta(request);
+  const context = createRequestObservationContext(request, {
+    route: '/api/v1/auth/register',
+    requestId: metaBase.requestId,
+  });
   const rl = rateLimit(`auth-register:${clientIp(request)}`, RL_LIMIT, RL_WINDOW);
+
   if (!rl.allowed) {
-    return NextResponse.json(
-      fail('rate_limited', 'Demasiadas solicitudes. Intenta más tarde.', undefined, metaBase),
-      { status: 429, headers: rateLimitHeaders(rl) }
+    return observedJson(
+      context,
+      fail('rate_limited', 'Demasiadas solicitudes. Intenta mas tarde.', undefined, metaBase),
+      { status: 429, headers: rateLimitHeaders(rl) },
     );
   }
 
@@ -96,20 +128,50 @@ export async function POST(request: NextRequest) {
       documentation,
       services,
     } = payload;
+
+    context.actor = createEndUserActor({
+      email,
+      label: [firstName, lastName].filter(Boolean).join(' ').trim() || email,
+    });
+
     const documentationInput = normalizeProfessionalDocumentationInput(documentation);
 
     if (!email || !password || !firstName || !lastName || !dni) {
-      return NextResponse.json(
-        fail('validation_error', 'Faltan datos requeridos (email, contraseña, nombre, apellido y DNI son obligatorios)', undefined, metaBase),
-        { status: 400, headers: rateLimitHeaders(rl) }
+      await safeRecordAuditEvent({
+        kind: 'audit',
+        domain: 'auth',
+        eventName: 'auth.register',
+        status: 'warning',
+        summary: 'Intento de registro con datos incompletos',
+        actor: context.actor,
+        requestId: context.requestId,
+        route: context.route,
+        method: context.method,
+        metadata: {
+          hasEmail: Boolean(email),
+          hasFirstName: Boolean(firstName),
+          hasLastName: Boolean(lastName),
+          hasDni: Boolean(dni),
+        },
+      });
+
+      return observedJson(
+        context,
+        fail(
+          'validation_error',
+          'Faltan datos requeridos (email, contrasena, nombre, apellido y DNI son obligatorios)',
+          undefined,
+          metaBase,
+        ),
+        { status: 400, headers: rateLimitHeaders(rl) },
       );
     }
 
-    // Validar formato de DNI (7-8 dígitos)
     if (!/^\d{7,8}$/.test(dni.trim())) {
-      return NextResponse.json(
-        fail('validation_error', 'El DNI debe tener entre 7 y 8 dígitos', undefined, metaBase),
-        { status: 400, headers: rateLimitHeaders(rl) }
+      return observedJson(
+        context,
+        fail('validation_error', 'El DNI debe tener entre 7 y 8 digitos', undefined, metaBase),
+        { status: 400, headers: rateLimitHeaders(rl) },
       );
     }
 
@@ -119,14 +181,37 @@ export async function POST(request: NextRequest) {
     });
 
     if (existingUser) {
-      return NextResponse.json(
+      await safeRecordAuditEvent({
+        kind: 'audit',
+        domain: 'auth',
+        eventName: 'auth.register',
+        status: 'warning',
+        summary: `Intento de registro con email ya existente: ${email}`,
+        actor: context.actor,
+        requestId: context.requestId,
+        route: context.route,
+        method: context.method,
+        entityType: 'user',
+        entityId: existingUser.id,
+      });
+
+      return observedJson(
+        context,
         fail('conflict', 'El usuario ya existe', undefined, metaBase),
-        { status: 400, headers: rateLimitHeaders(rl) }
+        { status: 400, headers: rateLimitHeaders(rl) },
       );
     }
 
     const hashedPassword = await bcrypt.hash(password, 12);
     const skipEmailVerification = process.env.DISABLE_EMAIL_VERIFICATION === 'true';
+    const autoCreatedCategories: Array<{
+      id: string;
+      name: string;
+      slug: string;
+      groupId: string;
+      parentCategoryId: string | null;
+      active: boolean;
+    }> = [];
 
     const result = await prisma.$transaction(async (tx) => {
       const user = await tx.user.create({
@@ -181,8 +266,16 @@ export async function POST(request: NextRequest) {
                     active: true,
                     groupId: categoryGroupRecord.id,
                   },
-                  select: { id: true },
+                  select: {
+                    id: true,
+                    name: true,
+                    slug: true,
+                    groupId: true,
+                    parentCategoryId: true,
+                    active: true,
+                  },
                 });
+                autoCreatedCategories.push(created);
                 category = created;
               }
               return {
@@ -191,7 +284,7 @@ export async function POST(request: NextRequest) {
                 description: s.description,
                 categoryGroup: professionalGroup || undefined,
               };
-            })
+            }),
           );
         }
 
@@ -232,7 +325,7 @@ export async function POST(request: NextRequest) {
 
       if (!skipEmailVerification) {
         token = generateRandomToken(48);
-        const expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24); // 24h
+        const expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24);
         await tx.verificationToken.create({
           data: {
             userId: user.id,
@@ -248,6 +341,68 @@ export async function POST(request: NextRequest) {
     const { password: _dbPassword, ...userWithoutPassword } = result.user as PrismaUser;
     void _dbPassword;
 
+    await safeRecordAuditEvent({
+      kind: 'audit',
+      domain: 'auth',
+      eventName: 'auth.register',
+      status: 'success',
+      summary: `Usuario ${userWithoutPassword.id} registrado`,
+      actor: {
+        ...context.actor,
+        id: userWithoutPassword.id,
+      },
+      requestId: context.requestId,
+      route: context.route,
+      method: context.method,
+      entityType: 'user',
+      entityId: userWithoutPassword.id,
+      changes: buildChanges(
+        null,
+        registrationAuditSnapshot({
+          user: userWithoutPassword,
+          professional: result.professional,
+          servicesCount: payload.services?.length || 0,
+          skipEmailVerification,
+        }),
+      ),
+      metadata: {
+        hasProfessional: Boolean(result.professional),
+      },
+    });
+
+    for (const category of autoCreatedCategories.reduce<Array<typeof autoCreatedCategories[number]>>(
+      (acc, current) => {
+        if (acc.some((item) => item.slug === current.slug)) {
+          return acc;
+        }
+        acc.push(current);
+        return acc;
+      },
+      [],
+    )) {
+      await safeRecordAuditEvent({
+        kind: 'audit',
+        domain: 'services.catalog',
+        eventName: 'category.auto_created',
+        status: 'success',
+        summary: `Categoria ${category.slug} creada automaticamente durante registro`,
+        actor: {
+          ...context.actor,
+          id: userWithoutPassword.id,
+        },
+        requestId: context.requestId,
+        route: context.route,
+        method: context.method,
+        entityType: 'category',
+        entityId: category.id,
+        changes: buildChanges(null, category),
+        metadata: {
+          source: 'auth_register',
+          userId: userWithoutPassword.id,
+        },
+      });
+    }
+
     if (!skipEmailVerification && result.token) {
       try {
         await enqueueEmailVerify({
@@ -255,27 +410,68 @@ export async function POST(request: NextRequest) {
           token: result.token,
           email: userWithoutPassword.email,
           firstName: userWithoutPassword.firstName || undefined,
+          observability: {
+            requestId: context.requestId,
+            actor: {
+              ...context.actor,
+              id: userWithoutPassword.id,
+            },
+          },
         });
       } catch (e) {
-        console.error('Error encolando correo de verificación (v1):', e);
-        if (process.env.NODE_ENV !== 'production') {
-          const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || process.env.VERCEL_URL || '';
-          const origin = baseUrl.startsWith('http') ? baseUrl : `https://${baseUrl}`;
-          const verifyUrl = `${origin}/auth/verify?token=${encodeURIComponent(result.token)}&email=${encodeURIComponent(
-            userWithoutPassword.email
-          )}`;
-          console.log('Verification URL (dev):', verifyUrl);
-        }
+        console.error('Error encolando correo de verificacion (v1):', e);
       }
     } else if (skipEmailVerification) {
-      console.log(`[register-v1] Email verification disabled – user ${userWithoutPassword.email} auto-verified`);
+      console.log(
+        `[register-v1] Email verification disabled - user ${userWithoutPassword.email} auto-verified`,
+      );
     }
 
     if (result.professional) {
       enqueueSlackAlert(
         `prof:new:${result.professional.id}`,
-        `🔔 Nuevo profesional registrado (pendiente):\n*${userWithoutPassword.firstName} ${userWithoutPassword.lastName}*\nEmail: ${userWithoutPassword.email}\nGrupo: ${result.professional.professionalGroup || 'N/A'}\nServicios: ${payload.services?.length || 0}`
-      ).catch((slackError) => console.error('Error enviando alerta a Slack:', slackError));
+        `Nuevo profesional registrado (pendiente):\n*${userWithoutPassword.firstName} ${userWithoutPassword.lastName}*\nEmail: ${userWithoutPassword.email}\nGrupo: ${result.professional.professionalGroup || 'N/A'}\nServicios: ${payload.services?.length || 0}`,
+      )
+        .then(() =>
+          safeRecordAuditEvent({
+            kind: 'workflow',
+            domain: 'auth',
+            eventName: 'auth.register.slack_sent',
+            status: 'success',
+            summary: `Slack enviado por nuevo profesional ${result.professional?.id}`,
+            actor: {
+              ...context.actor,
+              id: userWithoutPassword.id,
+            },
+            requestId: context.requestId,
+            entityType: 'professional',
+            entityId: result.professional?.id,
+            metadata: {
+              target: 'slack',
+            },
+          }),
+        )
+        .catch(async (slackError) => {
+          console.error('Error enviando alerta a Slack:', slackError);
+          await safeRecordAuditEvent({
+            kind: 'workflow',
+            domain: 'auth',
+            eventName: 'auth.register.slack_failed',
+            status: 'failure',
+            summary: `Fallo la alerta Slack para profesional ${result.professional?.id}`,
+            actor: {
+              ...context.actor,
+              id: userWithoutPassword.id,
+            },
+            requestId: context.requestId,
+            entityType: 'professional',
+            entityId: result.professional?.id,
+            metadata: {
+              target: 'slack',
+              error: slackError instanceof Error ? slackError.message : 'Unknown error',
+            },
+          });
+        });
     }
 
     const devVerifyUrl =
@@ -284,12 +480,13 @@ export async function POST(request: NextRequest) {
             const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || process.env.VERCEL_URL || '';
             const origin = baseUrl.startsWith('http') ? baseUrl : `https://${baseUrl}`;
             return `${origin}/auth/verify?token=${encodeURIComponent(result.token)}&email=${encodeURIComponent(
-              userWithoutPassword.email
+              userWithoutPassword.email,
             )}`;
           })()
         : undefined;
 
-    return NextResponse.json(
+    return observedJson(
+      context,
       ok(
         {
           message: skipEmailVerification
@@ -299,17 +496,39 @@ export async function POST(request: NextRequest) {
           professional: result.professional,
           ...(devVerifyUrl ? { devVerifyUrl } : {}),
         },
-        metaBase
+        metaBase,
       ),
-      { status: 201, headers: rateLimitHeaders(rl) }
+      { status: 201, headers: rateLimitHeaders(rl) },
     );
   } catch (error) {
     console.error('Error al registrar usuario (v1):', error);
     const message = error instanceof Error ? error.message : 'Error interno del servidor';
-    const isValidation = message.toLowerCase().includes('categoría no encontrada') || message.toLowerCase().includes('faltan datos');
-    return NextResponse.json(fail(isValidation ? 'validation_error' : 'server_error', message, undefined, metaBase), {
-      status: isValidation ? 400 : 500,
-      headers: rateLimitHeaders(rl),
+    const isValidation =
+      message.toLowerCase().includes('categoria no encontrada') ||
+      message.toLowerCase().includes('faltan datos');
+
+    await safeRecordAuditEvent({
+      kind: 'audit',
+      domain: 'auth',
+      eventName: 'auth.register',
+      status: isValidation ? 'warning' : 'failure',
+      summary: 'Error durante el registro de usuario',
+      actor: context.actor,
+      requestId: context.requestId,
+      route: context.route,
+      method: context.method,
+      metadata: {
+        error: message,
+      },
     });
+
+    return observedJson(
+      context,
+      fail(isValidation ? 'validation_error' : 'server_error', message, undefined, metaBase),
+      {
+        status: isValidation ? 400 : 500,
+        headers: rateLimitHeaders(rl),
+      },
+    );
   }
 }
