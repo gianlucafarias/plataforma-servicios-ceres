@@ -44,10 +44,7 @@ export function resolvePublicUploadUrl(value?: string | null) {
     return "";
   }
 
-  if (
-    value.startsWith("/api/v1/uploads/public/") ||
-    value.startsWith("/uploads/profiles/")
-  ) {
+  if (value.startsWith("/")) {
     return value;
   }
 
