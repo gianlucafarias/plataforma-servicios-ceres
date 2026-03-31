@@ -403,28 +403,22 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    if (!skipEmailVerification && result.token) {
-      try {
-        await enqueueEmailVerify({
-          userId: userWithoutPassword.id,
-          token: result.token,
-          email: userWithoutPassword.email,
-          firstName: userWithoutPassword.firstName || undefined,
-          observability: {
-            requestId: context.requestId,
-            actor: {
-              ...context.actor,
-              id: userWithoutPassword.id,
-            },
+    try {
+      await enqueueEmailVerify({
+        userId: userWithoutPassword.id,
+        token: result.token,
+        email: userWithoutPassword.email,
+        firstName: userWithoutPassword.firstName || undefined,
+        observability: {
+          requestId: context.requestId,
+          actor: {
+            ...context.actor,
+            id: userWithoutPassword.id,
           },
-        });
-      } catch (e) {
-        console.error('Error encolando correo de verificacion (v1):', e);
-      }
-    } else if (skipEmailVerification) {
-      console.log(
-        `[register-v1] Email verification disabled - user ${userWithoutPassword.email} auto-verified`,
-      );
+        },
+      });
+    } catch (e) {
+      console.error('Error encolando correo de verificacion (v1):', e);
     }
 
     if (result.professional) {
