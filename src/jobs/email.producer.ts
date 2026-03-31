@@ -22,7 +22,7 @@ function getResendClient() {
 
 interface EnqueueEmailVerifyParams {
   userId: string;
-  token: string;
+  token?: string | null;
   email: string;
   firstName?: string;
   observability?: {
@@ -50,6 +50,12 @@ export async function enqueueEmailVerify(params: EnqueueEmailVerifyParams) {
     console.log(
       '[email-verify] Email de verificacion deshabilitado (DISABLE_EMAIL_VERIFICATION=true)',
     );
+    return null;
+  }
+
+  if (!token) {
+    await recordEmailSkipped(eventBase, 'missing_verification_token');
+    console.warn('[email-verify] Token de verificacion ausente. No se envio el email.');
     return null;
   }
 
@@ -135,6 +141,57 @@ export async function enqueueProfessionalApprovedEmail(
   const loginUrl = getAbsoluteUrl('/auth/login?callbackUrl=/dashboard');
   const recipientName = [firstName, lastName].filter(Boolean).join(' ').trim();
   const greeting = recipientName ? `Hola ${recipientName}` : 'Hola';
+  const eventBase = {
+    requestId: observability?.requestId,
+    actor: observability?.actor,
+    entityType: 'professional',
+    entityId: professionalId,
+    channel: 'resend' as const,
+    template: 'email.professional_approved',
+    domain: 'admin.professionals.email',
+    summary: `Correo de aprobacion solicitado para profesional ${professionalId}`,
+    recipient: email,
+  };
+
+  const resend = getResendClient();
+  if (resend) {
+    try {
+      await recordEmailRequested(eventBase);
+
+      const result = await resend.emails.send({
+        from: 'Ceres en Red <no-reply@ceresenred.ceres.gob.ar>',
+        to: email,
+        subject: 'Tu perfil fue aprobado - Ceres en Red',
+        html: `
+          <p>${greeting},</p>
+          <p>Tu perfil profesional en <strong>Ceres en Red</strong> fue aprobado por el equipo de administracion.</p>
+          <p>Desde ahora ya podes ingresar a tu panel para revisar y actualizar tu informacion.</p>
+          <p>
+            <a
+              href="${loginUrl}"
+              style="display:inline-block;padding:10px 18px;background:#006F4B;color:#ffffff;text-decoration:none;border-radius:6px;font-weight:bold;"
+            >
+              Ingresar a mi panel
+            </a>
+          </p>
+          <p>Si no solicitaste este perfil o tenes alguna duda, podes responder a este correo.</p>
+        `,
+        text: `${greeting}, tu perfil profesional en Ceres en Red fue aprobado. Podes ingresar desde ${loginUrl}`,
+      });
+
+      await recordEmailSent({
+        ...eventBase,
+        metadata: {
+          resendId: result?.data?.id ?? null,
+        },
+      });
+
+      return result;
+    } catch (emailError) {
+      await recordEmailFailed(eventBase, emailError);
+      throw emailError;
+    }
+  }
 
   await sendMail({
     to: email,
@@ -159,9 +216,9 @@ export async function enqueueProfessionalApprovedEmail(
       actor: observability?.actor,
       entityType: 'professional',
       entityId: professionalId,
-      template: 'email.professional_approved',
-      domain: 'admin.professionals.email',
-      summary: `Correo de aprobacion solicitado para profesional ${professionalId}`,
+      template: eventBase.template,
+      domain: eventBase.domain,
+      summary: eventBase.summary,
     },
   });
 }

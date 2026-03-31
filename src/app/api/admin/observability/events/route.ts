@@ -10,13 +10,14 @@ function parseDate(value: string | null, endOfDay = false) {
     return null;
   }
 
-  const date = new Date(value);
+  const trimmed = value.trim();
+  const date = new Date(trimmed);
   if (Number.isNaN(date.getTime())) {
     return null;
   }
 
-  if (endOfDay) {
-    date.setHours(23, 59, 59, 999);
+  if (endOfDay && /^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+    date.setUTCHours(23, 59, 59, 999);
   }
 
   return date;
