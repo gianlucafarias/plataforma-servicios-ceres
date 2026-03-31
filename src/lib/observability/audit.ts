@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
+import { emitCentralOpsEvent } from '@/lib/central-ops';
 import type {
   ObservabilityActor,
   ObservabilityEventKind,
@@ -173,6 +174,38 @@ export async function safeRecordAuditEvent(payload: AuditPayload) {
       payload.eventName,
       payload.status,
     );
+
+    await emitCentralOpsEvent({
+      kind: payload.kind,
+      domain: payload.domain,
+      eventName: payload.eventName,
+      status: payload.status,
+      summary: payload.summary,
+      actor: payload.actor,
+      requestId: payload.requestId ?? null,
+      route: payload.route ?? null,
+      path:
+        sanitizedMetadata &&
+        typeof sanitizedMetadata === 'object' &&
+        typeof (sanitizedMetadata as Record<string, unknown>).path === 'string'
+          ? ((sanitizedMetadata as Record<string, unknown>).path as string)
+          : payload.route ?? null,
+      method: payload.method ?? null,
+      entityType: payload.entityType ?? null,
+      entityId: payload.entityId ?? null,
+      durationMs:
+        payload.durationMs !== undefined && payload.durationMs !== null
+          ? Math.round(payload.durationMs)
+          : null,
+      changes:
+        sanitizedChanges && typeof sanitizedChanges === 'object'
+          ? (sanitizedChanges as Record<string, unknown>)
+          : null,
+      metadata:
+        sanitizedMetadata && typeof sanitizedMetadata === 'object'
+          ? (sanitizedMetadata as Record<string, unknown>)
+          : null,
+    });
   } catch (error) {
     logStructured('error', {
       msg: 'audit_event_write_failed',

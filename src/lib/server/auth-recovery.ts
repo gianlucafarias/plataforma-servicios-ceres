@@ -1,18 +1,12 @@
 import crypto from 'crypto';
-import { Resend } from 'resend';
 import { prisma } from '@/lib/prisma';
 import { getAbsoluteUrl } from '@/lib/seo';
-import { sendMail } from '@/lib/mail';
-import type { ObservabilityActor } from '@/lib/observability/context';
 import {
-  recordEmailFailed,
-  recordEmailRequested,
-  recordEmailSent,
-  recordEmailSkipped,
-} from '@/lib/observability/email';
+  enqueuePasswordResetEmail,
+  enqueueVerificationResendEmail,
+} from '@/jobs/email.producer';
+import type { ObservabilityActor } from '@/lib/observability/context';
 import { generateRandomToken } from '@/lib/utils';
-
-const resend = new Resend(process.env.RESEND_API_KEY || '');
 
 export const PASSWORD_FORGOT_RATE_LIMIT = {
   limit: 10,
@@ -67,46 +61,16 @@ export async function createPasswordResetRequest(
   });
 
   const resetUrl = getAbsoluteUrl(`/auth/reset-password?token=${token}`);
-  const emailEvent = {
-    requestId: observability?.requestId,
-    actor: observability?.actor,
-    entityType: 'user',
-    entityId: user.id,
-    channel: 'resend' as const,
-    template: 'email.password_reset',
-    domain: 'auth.email',
-    summary: `Correo de recuperacion solicitado para usuario ${user.id}`,
-    recipient: user.email,
-  };
-
-  if (process.env.RESEND_API_KEY) {
-    try {
-      await recordEmailRequested(emailEvent);
-      await resend.emails.send({
-        from: 'Ceres en Red <no-reply@ceresenred.ceres.gob.ar>',
-        to: user.email,
-        subject: 'Restablecer tu contrasena - Ceres en Red',
-        html: `
-          <p>Hola ${user.firstName || ''},</p>
-          <p>Recibimos un pedido para restablecer tu contrasena en <strong>Ceres en Red</strong>.</p>
-          <p>Hace clic en el siguiente boton para crear una nueva contrasena:</p>
-          <p>
-            <a href="${resetUrl}" style="display:inline-block;padding:10px 18px;background:#006F4B;color:#ffffff;text-decoration:none;border-radius:6px;font-weight:bold;">
-              Restablecer contrasena
-            </a>
-          </p>
-          <p>Si no fuiste vos, podes ignorar este correo.</p>
-          <p>Este enlace sera valido por 1 hora.</p>
-        `,
-      });
-      await recordEmailSent(emailEvent);
-    } catch (emailError) {
-      await recordEmailFailed(emailEvent, emailError);
-      console.error('[forgot-password] Error enviando email con Resend:', emailError);
-    }
-  } else {
-    await recordEmailSkipped(emailEvent, 'resend_not_configured');
-    console.warn('[forgot-password] RESEND_API_KEY no esta configurada. No se envio el email.');
+  try {
+    await enqueuePasswordResetEmail({
+      userId: user.id,
+      email: user.email,
+      firstName: user.firstName,
+      resetUrl,
+      observability,
+    });
+  } catch (emailError) {
+    console.error('[forgot-password] Error encolando email central:', emailError);
   }
 
   return { userFound: true };
@@ -148,27 +112,14 @@ export async function resendVerificationEmail(
   );
 
   try {
-    await sendMail({
-      to: email,
-      subject: 'Reenvio: Confirma tu cuenta - Ceres en Red',
-      html: `
-        <p>Para activar tu cuenta, hace clic en el siguiente enlace:</p>
-        <p><a href="${verifyUrl}">Confirmar mi cuenta</a></p>
-        <p>Este enlace vence en 24 horas.</p>
-      `,
-      text: `Confirma tu cuenta ingresando a: ${verifyUrl}`,
-      observability: {
-        requestId: observability?.requestId,
-        actor: observability?.actor,
-        entityType: 'user',
-        entityId: user.id,
-        template: 'email.verification_resend',
-        domain: 'auth.email',
-        summary: `Reenvio de verificacion solicitado para usuario ${user.id}`,
-      },
+    await enqueueVerificationResendEmail({
+      userId: user.id,
+      email,
+      verificationUrl: verifyUrl,
+      observability,
     });
   } catch (error) {
-    console.error('Error reenviando correo:', error);
+    console.error('Error reenviando correo central:', error);
   }
 
   return { status: 'resent' };
