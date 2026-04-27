@@ -61,3 +61,4 @@ tests
 *.test.tsx
 *.spec.ts
 *.spec.tsx
+/output
