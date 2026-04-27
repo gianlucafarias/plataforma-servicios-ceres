@@ -6,7 +6,7 @@ import { prisma } from '@/lib/prisma';
 import { generateRandomToken } from '@/lib/utils';
 import { enqueueEmailVerify } from '@/jobs/email.producer';
 import { enqueueSlackAlert } from '@/jobs/slack.producer';
-import { normalizeWhatsAppNumber } from '@/lib/whatsapp-normalize';
+import { normalizeWhatsAppNumber, validateWhatsAppNumber } from '@/lib/whatsapp-normalize';
 import { ok, fail, requestMeta } from '@/lib/api-response';
 import { rateLimit, rateLimitHeaders } from '@/lib/rate-limit-memory';
 import { buildChanges, observedJson, safeRecordAuditEvent } from '@/lib/observability/audit';
@@ -41,6 +41,7 @@ interface RegisterRequestPayload {
   password: string;
   firstName: string;
   lastName: string;
+  gender?: string;
   dni?: string;
   phone?: string;
   birthDate?: string;
@@ -54,7 +55,7 @@ interface RegisterRequestPayload {
   cv?: string;
   picture?: string;
   bio?: string;
-  experienceYears?: number;
+  experienceYears?: number | string | null;
   professionalGroup?: CategoryGroup;
   serviceLocations?: string[];
   hasPhysicalStore?: boolean;
@@ -63,11 +64,131 @@ interface RegisterRequestPayload {
   services?: ServiceFormInput[];
 }
 
+function isValidProfessionalGroup(value: unknown): value is CategoryGroup {
+  return value === 'oficios' || value === 'profesiones';
+}
+
+function calculateAge(birthDate: Date, today = new Date()) {
+  const age = today.getFullYear() - birthDate.getFullYear();
+  const monthDiff = today.getMonth() - birthDate.getMonth();
+
+  return monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())
+    ? age - 1
+    : age;
+}
+
+function normalizeExperienceYears(value: RegisterRequestPayload['experienceYears']) {
+  if (value === undefined || value === null || value === '') {
+    return 0;
+  }
+
+  const years = Number(value);
+  if (!Number.isFinite(years) || years < 0) {
+    return null;
+  }
+
+  return years;
+}
+
+function validateRegistrationPayload(payload: RegisterRequestPayload) {
+  const {
+    email,
+    password,
+    firstName,
+    lastName,
+    dni,
+    birthDate,
+    location,
+    whatsapp,
+    bio,
+    professionalGroup,
+    serviceLocations,
+    services,
+    experienceYears,
+  } = payload;
+
+  if (!email || !password || !firstName || !lastName || !dni) {
+    return 'Faltan datos requeridos (email, contrasena, nombre, apellido y DNI son obligatorios)';
+  }
+
+  if (!/^\S+@\S+\.\S+$/.test(email.trim())) {
+    return 'Ingresa un email valido';
+  }
+
+  if (password.length < 6) {
+    return 'La contrasena debe tener al menos 6 caracteres';
+  }
+
+  if (!/^\d{7,8}$/.test(dni.trim())) {
+    return 'El DNI debe tener entre 7 y 8 digitos';
+  }
+
+  if (!birthDate) {
+    return 'La fecha de nacimiento es requerida';
+  }
+
+  const parsedBirthDate = new Date(birthDate);
+  if (Number.isNaN(parsedBirthDate.getTime())) {
+    return 'La fecha de nacimiento es invalida';
+  }
+
+  if (calculateAge(parsedBirthDate) < 18) {
+    return 'Debes ser mayor de 18 anos para registrarte';
+  }
+
+  if (!location?.trim()) {
+    return 'La localidad es requerida';
+  }
+
+  if (!bio?.trim()) {
+    return 'La descripcion profesional es requerida';
+  }
+
+  const normalizedExperienceYears = normalizeExperienceYears(experienceYears);
+  if (normalizedExperienceYears === null) {
+    return 'Los anos de experiencia deben ser un numero mayor o igual a 0';
+  }
+
+  if (!isValidProfessionalGroup(professionalGroup)) {
+    return 'Debes elegir un grupo profesional valido';
+  }
+
+  if (!serviceLocations || serviceLocations.length === 0) {
+    return 'Debes agregar al menos una localidad donde ofreces tus servicios';
+  }
+
+  if (!whatsapp?.trim()) {
+    return 'El WhatsApp es requerido';
+  }
+
+  const whatsappError = validateWhatsAppNumber(whatsapp);
+  if (whatsappError) {
+    return `WhatsApp invalido: ${whatsappError}`;
+  }
+
+  if (!services || services.length === 0) {
+    return 'Debes agregar al menos un servicio';
+  }
+
+  for (const [index, service] of services.entries()) {
+    if (!service.categoryId?.trim()) {
+      return `La categoria del servicio ${index + 1} es requerida`;
+    }
+
+    if (!service.description?.trim()) {
+      return `La descripcion del servicio ${index + 1} es requerida`;
+    }
+  }
+
+  return null;
+}
+
 function registrationAuditSnapshot(input: {
   user: Omit<PrismaUser, 'password'>;
   professional: PrismaProfessional | null;
   servicesCount: number;
   skipEmailVerification: boolean;
+  emailVerificationQueued: boolean;
 }) {
   return {
     userId: input.user.id,
@@ -75,12 +196,14 @@ function registrationAuditSnapshot(input: {
     firstName: input.user.firstName,
     lastName: input.user.lastName,
     dni: input.user.dni,
+    gender: input.user.gender,
     verified: input.user.verified,
     professionalId: input.professional?.id ?? null,
     professionalStatus: input.professional?.status ?? null,
     professionalGroup: input.professional?.professionalGroup ?? null,
     servicesCount: input.servicesCount,
     skipEmailVerification: input.skipEmailVerification,
+    emailVerificationQueued: input.emailVerificationQueued,
   };
 }
 
@@ -107,6 +230,7 @@ export async function POST(request: NextRequest) {
       password,
       firstName,
       lastName,
+      gender,
       dni,
       phone,
       birthDate,
@@ -135,14 +259,15 @@ export async function POST(request: NextRequest) {
     });
 
     const documentationInput = normalizeProfessionalDocumentationInput(documentation);
+    const validationError = validateRegistrationPayload(payload);
 
-    if (!email || !password || !firstName || !lastName || !dni) {
+    if (validationError) {
       await safeRecordAuditEvent({
         kind: 'audit',
         domain: 'auth',
         eventName: 'auth.register',
         status: 'warning',
-        summary: 'Intento de registro con datos incompletos',
+        summary: 'Intento de registro con datos invalidos',
         actor: context.actor,
         requestId: context.requestId,
         route: context.route,
@@ -157,23 +282,16 @@ export async function POST(request: NextRequest) {
 
       return observedJson(
         context,
-        fail(
-          'validation_error',
-          'Faltan datos requeridos (email, contrasena, nombre, apellido y DNI son obligatorios)',
-          undefined,
-          metaBase,
-        ),
+        fail('validation_error', validationError, undefined, metaBase),
         { status: 400, headers: rateLimitHeaders(rl) },
       );
     }
 
-    if (!/^\d{7,8}$/.test(dni.trim())) {
-      return observedJson(
-        context,
-        fail('validation_error', 'El DNI debe tener entre 7 y 8 digitos', undefined, metaBase),
-        { status: 400, headers: rateLimitHeaders(rl) },
-      );
-    }
+    const normalizedExperienceYears = normalizeExperienceYears(experienceYears) ?? 0;
+    const normalizedDni = dni?.trim() ?? '';
+    const categorySlugs = Array.from(
+      new Set((services ?? []).map((service) => service.categoryId.trim()).filter(Boolean)),
+    );
 
     const existingUser = await prisma.user.findUnique({
       where: { email },
@@ -202,16 +320,41 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const categories = await prisma.category.findMany({
+      where: {
+        slug: { in: categorySlugs },
+        active: true,
+      },
+      select: { id: true, slug: true },
+    });
+    const categoryBySlug = new Map(categories.map((category) => [category.slug, category]));
+    const missingCategory = categorySlugs.find((slug) => !categoryBySlug.has(slug));
+
+    if (missingCategory) {
+      await safeRecordAuditEvent({
+        kind: 'audit',
+        domain: 'auth',
+        eventName: 'auth.register',
+        status: 'warning',
+        summary: `Intento de registro con categoria inexistente: ${missingCategory}`,
+        actor: context.actor,
+        requestId: context.requestId,
+        route: context.route,
+        method: context.method,
+        metadata: {
+          categorySlug: missingCategory,
+        },
+      });
+
+      return observedJson(
+        context,
+        fail('validation_error', `La categoria ${missingCategory} no existe o no esta disponible`, undefined, metaBase),
+        { status: 400, headers: rateLimitHeaders(rl) },
+      );
+    }
+
     const hashedPassword = await bcrypt.hash(password, 12);
     const skipEmailVerification = process.env.DISABLE_EMAIL_VERIFICATION === 'true';
-    const autoCreatedCategories: Array<{
-      id: string;
-      name: string;
-      slug: string;
-      groupId: string;
-      parentCategoryId: string | null;
-      active: boolean;
-    }> = [];
 
     const result = await prisma.$transaction(async (tx) => {
       const user = await tx.user.create({
@@ -220,7 +363,8 @@ export async function POST(request: NextRequest) {
           password: hashedPassword,
           firstName,
           lastName,
-          dni: dni.trim(),
+          gender: gender || null,
+          dni: normalizedDni,
           phone: phone || null,
           birthDate: birthDate ? new Date(birthDate) : null,
           location: location || null,
@@ -233,7 +377,7 @@ export async function POST(request: NextRequest) {
       if (bio || experienceYears || (services && services.length > 0) || professionalGroup) {
         const groupToUse = professionalGroup || 'oficios';
 
-        const categoryGroupRecord = await tx.categoryGroup.upsert({
+        await tx.categoryGroup.upsert({
           where: { id: groupToUse },
           update: {},
           create: {
@@ -248,51 +392,25 @@ export async function POST(request: NextRequest) {
           | undefined = undefined;
 
         if (services && services.length > 0) {
-          servicesCreateData = await Promise.all(
-            services.map(async (s: ServiceFormInput) => {
-              let category = await tx.category.findUnique({
-                where: { slug: s.categoryId },
-                select: { id: true },
-              });
-              if (!category) {
-                const fallbackName = String(s.categoryId)
-                  .replace(/-/g, ' ')
-                  .replace(/\b\w/g, (m: string) => m.toUpperCase());
-                const created = await tx.category.create({
-                  data: {
-                    name: fallbackName,
-                    description: '',
-                    slug: s.categoryId,
-                    active: true,
-                    groupId: categoryGroupRecord.id,
-                  },
-                  select: {
-                    id: true,
-                    name: true,
-                    slug: true,
-                    groupId: true,
-                    parentCategoryId: true,
-                    active: true,
-                  },
-                });
-                autoCreatedCategories.push(created);
-                category = created;
-              }
-              return {
-                categoryId: category.id,
-                title: s.title,
-                description: s.description,
-                categoryGroup: professionalGroup || undefined,
-              };
-            }),
-          );
+          servicesCreateData = services.map((s: ServiceFormInput) => {
+            const category = categoryBySlug.get(s.categoryId.trim());
+            if (!category) {
+              throw new Error('Categoria no encontrada');
+            }
+            return {
+              categoryId: category.id,
+              title: s.title,
+              description: s.description,
+              categoryGroup: professionalGroup || undefined,
+            };
+          });
         }
 
         professional = await tx.professional.create({
           data: {
             userId: user.id,
             bio: bio || '',
-            experienceYears: typeof experienceYears === 'number' ? experienceYears : 0,
+            experienceYears: normalizedExperienceYears,
             requiresDocumentation: true,
             professionalGroup: professionalGroup || null,
             location: location || null,
@@ -341,6 +459,29 @@ export async function POST(request: NextRequest) {
     const { password: _dbPassword, ...userWithoutPassword } = result.user as PrismaUser;
     void _dbPassword;
 
+    let emailVerificationQueued = false;
+
+    if (!skipEmailVerification && result.token) {
+      try {
+        const emailJob = await enqueueEmailVerify({
+          userId: userWithoutPassword.id,
+          token: result.token,
+          email: userWithoutPassword.email,
+          firstName: userWithoutPassword.firstName || undefined,
+          observability: {
+            requestId: context.requestId,
+            actor: {
+              ...context.actor,
+              id: userWithoutPassword.id,
+            },
+          },
+        });
+        emailVerificationQueued = Boolean(emailJob);
+      } catch (e) {
+        console.error('Error encolando correo de verificacion (v1):', e);
+      }
+    }
+
     await safeRecordAuditEvent({
       kind: 'audit',
       domain: 'auth',
@@ -363,63 +504,13 @@ export async function POST(request: NextRequest) {
           professional: result.professional,
           servicesCount: payload.services?.length || 0,
           skipEmailVerification,
+          emailVerificationQueued,
         }),
       ),
       metadata: {
         hasProfessional: Boolean(result.professional),
       },
     });
-
-    for (const category of autoCreatedCategories.reduce<Array<typeof autoCreatedCategories[number]>>(
-      (acc, current) => {
-        if (acc.some((item) => item.slug === current.slug)) {
-          return acc;
-        }
-        acc.push(current);
-        return acc;
-      },
-      [],
-    )) {
-      await safeRecordAuditEvent({
-        kind: 'audit',
-        domain: 'services.catalog',
-        eventName: 'category.auto_created',
-        status: 'success',
-        summary: `Categoria ${category.slug} creada automaticamente durante registro`,
-        actor: {
-          ...context.actor,
-          id: userWithoutPassword.id,
-        },
-        requestId: context.requestId,
-        route: context.route,
-        method: context.method,
-        entityType: 'category',
-        entityId: category.id,
-        changes: buildChanges(null, category),
-        metadata: {
-          source: 'auth_register',
-          userId: userWithoutPassword.id,
-        },
-      });
-    }
-
-    try {
-      await enqueueEmailVerify({
-        userId: userWithoutPassword.id,
-        token: result.token,
-        email: userWithoutPassword.email,
-        firstName: userWithoutPassword.firstName || undefined,
-        observability: {
-          requestId: context.requestId,
-          actor: {
-            ...context.actor,
-            id: userWithoutPassword.id,
-          },
-        },
-      });
-    } catch (e) {
-      console.error('Error encolando correo de verificacion (v1):', e);
-    }
 
     if (result.professional) {
       enqueueSlackAlert(
@@ -469,7 +560,7 @@ export async function POST(request: NextRequest) {
     }
 
     const devVerifyUrl =
-      !skipEmailVerification && result.token && process.env.NODE_ENV !== 'production'
+      emailVerificationQueued && result.token && process.env.NODE_ENV !== 'production'
         ? (() => {
             const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || process.env.VERCEL_URL || '';
             const origin = baseUrl.startsWith('http') ? baseUrl : `https://${baseUrl}`;
@@ -478,16 +569,22 @@ export async function POST(request: NextRequest) {
             )}`;
           })()
         : undefined;
+    const message = skipEmailVerification
+      ? 'Usuario registrado exitosamente. La verificacion por email esta deshabilitada temporalmente.'
+      : emailVerificationQueued
+        ? 'Usuario registrado. Te enviamos un correo para confirmar la cuenta.'
+        : 'Usuario registrado. No pudimos enviar el correo de verificacion; solicita un nuevo enlace desde la pantalla de verificacion.';
 
     return observedJson(
       context,
       ok(
         {
-          message: skipEmailVerification
-            ? 'Usuario registrado exitosamente.'
-            : 'Usuario registrado. Te enviamos un correo para confirmar la cuenta.',
+          message,
           user: userWithoutPassword,
           professional: result.professional,
+          emailVerificationRequired: !skipEmailVerification,
+          emailVerificationQueued,
+          emailVerificationDisabled: skipEmailVerification,
           ...(devVerifyUrl ? { devVerifyUrl } : {}),
         },
         metaBase,
