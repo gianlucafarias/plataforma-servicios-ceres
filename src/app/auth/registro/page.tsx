@@ -1587,6 +1587,17 @@ export default function RegistroPage() {
           El certificado de antecedentes penales es obligatorio para que tu perfil pueda aparecer en la plataforma.
           Las referencias laborales son opcionales y se mostrarán como señal de confianza en tu perfil.
         </p>
+        <p className="text-sm text-gray-700 mt-3">
+          Para obtener el certificado de antecedentes penales:{' '}
+          <a
+            href="https://www.argentina.gob.ar/justicia/reincidencia/antecedentespenales"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-[#006F4B] underline break-all"
+          >
+            https://www.argentina.gob.ar/justicia/reincidencia/antecedentespenales
+          </a>
+        </p>
       </div>
 
       <ProfessionalDocumentationFields
