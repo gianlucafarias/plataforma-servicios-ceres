@@ -54,8 +54,10 @@ export type Step2Data = {
 export function validateRegisterStep2(data: Step2Data): Record<string, string> {
   const errors: Record<string, string> = {}
   if (!data.bio?.toString().trim()) errors.bio = 'La descripción profesional es requerida'
-  const years = Number(data.experienceYears)
-  if (!Number.isFinite(years) || years < 0) errors.experienceYears = 'Los años de experiencia son requeridos'
+  if (data.experienceYears !== '') {
+    const years = Number(data.experienceYears)
+    if (!Number.isFinite(years) || years < 0) errors.experienceYears = 'Los años de experiencia deben ser 0 o más'
+  }
   if (!data.professionalGroup) errors.professionalGroup = 'Debes elegir si ofreces Oficios o Profesiones'
   return errors
 }

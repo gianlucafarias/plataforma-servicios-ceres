@@ -137,6 +137,7 @@ export interface RegisterFormData {
   password: string;
   confirmPassword?: string;
   dni?: string; // Documento Nacional de Identidad (obligatorio)
+  gender?: string;
   phone?: string; // Se asocia al WhatsApp del paso 2
   birthDate?: string;
   location?: string;
@@ -218,4 +219,3 @@ export interface Training {
   imageUrl?: string;
   tags?: string[];
 }
-

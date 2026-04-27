@@ -407,8 +407,11 @@ export default function RegistroPage() {
     const newErrors: {[key: string]: string} = {};
 
     if (!formData.bio.trim()) newErrors.bio = "La descripción profesional es requerida";
-    if (!formData.experienceYears || parseInt(formData.experienceYears) < 0) {
-      newErrors.experienceYears = "Los años de experiencia son requeridos";
+    if (
+      formData.experienceYears &&
+      (!Number.isFinite(Number(formData.experienceYears)) || Number(formData.experienceYears) < 0)
+    ) {
+      newErrors.experienceYears = "Los años de experiencia deben ser 0 o más";
     }
     if (!formData.professionalGroup) {
       newErrors.professionalGroup = "Debes elegir si ofreces Oficios o Profesiones";
@@ -539,6 +542,7 @@ export default function RegistroPage() {
         password: formData.password,
         firstName: formData.firstName,
         lastName: formData.lastName,
+        gender: formData.gender,
         dni: formData.dni.trim(),
         phone: normalizeWhatsAppNumber(formData.whatsapp) ?? undefined, // Usar WhatsApp como teléfono
         birthDate: formData.birthDate,
@@ -1007,7 +1011,7 @@ export default function RegistroPage() {
 
       <div>
         <Label htmlFor="experience" className="text-sm font-semibold text-gray-700">
-          Años de experiencia *
+          Años de experiencia
         </Label>
         <div className="relative mt-1">
           <Award className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
