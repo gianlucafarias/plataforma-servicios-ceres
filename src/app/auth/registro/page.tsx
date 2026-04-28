@@ -1594,6 +1594,14 @@ export default function RegistroPage() {
             target="_blank"
             rel="noopener noreferrer"
             className="text-[#006F4B] underline break-all"
+            onClick={(event) => {
+              event.preventDefault();
+              window.open(
+                "https://www.argentina.gob.ar/justicia/reincidencia/antecedentespenales",
+                "_blank",
+                "noopener,noreferrer",
+              );
+            }}
           >
             https://www.argentina.gob.ar/justicia/reincidencia/antecedentespenales
           </a>
