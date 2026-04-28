@@ -48,6 +48,7 @@ import { uploadPrivateDocument } from "@/lib/api/private-documents";
 import { resolvePublicUploadUrl } from "@/lib/public-upload-url";
 import { usePublicCategoriesTree } from "@/hooks/usePublicCategoriesTree";
 import { validateProfessionalDocumentation } from "@/lib/validation/professional-documentation";
+import { trackEvent } from "@/lib/analytics/gtag";
 
 const ALLOWED_OAUTH_IMAGE_HOSTS = new Set([
   "graph.facebook.com",
@@ -551,6 +552,7 @@ export default function CompletarPerfilPage() {
           })),
       });
 
+      trackEvent("complete_profile", { step: "professional_profile_submitted" });
       router.push("/dashboard");
     } catch (error) {
       console.error("Error al completar perfil:", error);

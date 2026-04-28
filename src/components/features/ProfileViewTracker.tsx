@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { trackProfessionalView } from "@/lib/api/professionals";
+import { trackEvent } from "@/lib/analytics/gtag";
 
 interface ProfileViewTrackerProps {
   professionalId: string;
@@ -33,12 +34,55 @@ export function ProfileViewTracker({ professionalId }: ProfileViewTrackerProps) 
     trackProfessionalView(professionalId).catch(() => {
       // fallo silencioso; no rompemos la UI
     });
+    trackEvent("view_item", {
+      professional_id: professionalId,
+      category: "unknown",
+    });
 
     try {
       localStorage.setItem(storageKey, String(now));
     } catch {
       // ignorar errores de storage
     }
+  }, [professionalId]);
+
+  useEffect(() => {
+    if (!professionalId) {
+      return;
+    }
+
+    const handleDocumentClick = (event: MouseEvent) => {
+      const target = event.target as HTMLElement | null;
+      const anchor = target?.closest("a[href]") as HTMLAnchorElement | null;
+      if (!anchor) {
+        return;
+      }
+
+      const href = anchor.getAttribute("href") ?? "";
+      if (!href) {
+        return;
+      }
+
+      const isWhatsApp =
+        href.startsWith("https://wa.me/") ||
+        href.includes("api.whatsapp.com") ||
+        href.startsWith("whatsapp://");
+      const isPhone = href.startsWith("tel:");
+
+      if (!isWhatsApp && !isPhone) {
+        return;
+      }
+
+      trackEvent("generate_lead", {
+        professional_id: professionalId,
+        channel: isWhatsApp ? "whatsapp" : "phone",
+      });
+    };
+
+    document.addEventListener("click", handleDocumentClick);
+    return () => {
+      document.removeEventListener("click", handleDocumentClick);
+    };
   }, [professionalId]);
 
   return null;
