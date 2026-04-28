@@ -12,6 +12,7 @@ import { LOCATIONS } from "@/lib/taxonomy";
 import { useProfessionals } from "@/hooks/useProfessionals";
 import { usePublicCategoriesTree } from "@/hooks/usePublicCategoriesTree";
 import { CategorySuggestionModal } from "@/components/features/CategorySuggestionModal";
+import { trackEvent } from "@/lib/analytics/gtag";
 
 export default function ProfesionalesIndexPage() {
   const searchParams = useSearchParams();
@@ -46,6 +47,8 @@ export default function ProfesionalesIndexPage() {
   const chipsRef = useRef<HTMLDivElement>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
+  const searchTrackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hasMountedRef = useRef(false);
 
   const updateScrollButtons = () => {
     const element = chipsRef.current;
@@ -88,6 +91,36 @@ export default function ProfesionalesIndexPage() {
       window.removeEventListener("resize", updateScrollButtons);
     };
   }, [professionCategories.length]);
+
+  useEffect(() => {
+    if (searchTrackTimerRef.current) {
+      clearTimeout(searchTrackTimerRef.current);
+    }
+
+    if (!hasMountedRef.current) {
+      hasMountedRef.current = true;
+      return;
+    }
+
+    searchTrackTimerRef.current = setTimeout(() => {
+      const normalizedSearchTerm = searchTerm.trim();
+      if (!normalizedSearchTerm && selectedCategory === "all" && selectedLocation === "all") {
+        return;
+      }
+
+      trackEvent("search", {
+        search_term: normalizedSearchTerm || "all",
+        category: selectedCategory,
+        location: selectedLocation,
+      });
+    }, 600);
+
+    return () => {
+      if (searchTrackTimerRef.current) {
+        clearTimeout(searchTrackTimerRef.current);
+      }
+    };
+  }, [searchTerm, selectedCategory, selectedLocation]);
 
   const categoriesOptions = useMemo(
     () => [

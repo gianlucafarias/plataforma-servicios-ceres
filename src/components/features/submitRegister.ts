@@ -1,4 +1,5 @@
 import type { CategoryGroup } from '@/types'
+import { trackEvent } from "@/lib/analytics/gtag";
 
 type RegisterFn = (payload: {
   email: string
@@ -28,6 +29,7 @@ export async function submitRegister(
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   try {
     await deps.register(payload)
+    trackEvent("sign_up", { method: "credentials" })
     deps.push('/auth/registro/exito')
     return { ok: true }
   } catch (e) {

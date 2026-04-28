@@ -1,3 +1,5 @@
+import { trackEvent } from "@/lib/analytics/gtag";
+
 type LoginFn = (email: string, password: string) => Promise<void>
 
 export async function submitLogin(
@@ -7,6 +9,7 @@ export async function submitLogin(
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   try {
     await deps.login(email, password)
+    trackEvent("login", { method: "credentials" })
     deps.push('/dashboard')
     return { ok: true }
   } catch (e) {
