@@ -10,6 +10,7 @@ import { Toaster } from "sonner";
 import { getBaseUrl, generateOrganizationStructuredData } from "@/lib/seo";
 import { getPublicCategoryTree } from "@/lib/server/categories";
 import { PublicCategoriesTreeProvider } from "@/hooks/usePublicCategoriesTree";
+import { GoogleAnalytics } from "@/components/analytics/GoogleAnalytics";
 
 const baseUrl = getBaseUrl();
 const inter = Inter({
@@ -81,6 +82,7 @@ export const metadata: Metadata = {
 };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const gaMeasurementId = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID?.trim();
   const [session, publicCategories] = await Promise.all([
     getServerSession(authOptions),
     getPublicCategoryTree().catch((error) => {
@@ -107,6 +109,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationData) }}
         />
+        {gaMeasurementId ? <GoogleAnalytics measurementId={gaMeasurementId} /> : null}
         <AuthProviders session={session}>
           <PublicCategoriesTreeProvider data={publicCategories}>
             <Header />
