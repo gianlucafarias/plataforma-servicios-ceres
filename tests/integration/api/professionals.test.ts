@@ -77,7 +77,6 @@ describe('GET /api/professionals', () => {
     expect(hoisted.prismaMock.professional.count).toHaveBeenCalledWith({
       where: expect.objectContaining({
         status: 'active',
-        verified: true,
         professionalGroup: 'oficios',
       }),
     });
@@ -85,7 +84,6 @@ describe('GET /api/professionals', () => {
       expect.objectContaining({
         where: expect.objectContaining({
           status: 'active',
-          verified: true,
           professionalGroup: 'oficios',
         }),
       })

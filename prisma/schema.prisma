@@ -130,6 +130,9 @@ model ProfessionalDocumentation {
   professionalId          String                       @unique
   criminalRecordObjectKey String?
   criminalRecordFileName  String?
+  criminalRecordStatus    CriminalRecordReviewStatus?
+  criminalRecordReviewedAt DateTime?
+  criminalRecordAdminNotes String?
   createdAt               DateTime                     @default(now())
   updatedAt               DateTime                     @updatedAt
   professional            Professional                 @relation(fields: [professionalId], references: [id], onDelete: Cascade)
@@ -263,6 +266,12 @@ enum BugReportSeverity {
   medium
   high
   critical
+}
+
+enum CriminalRecordReviewStatus {
+  pending
+  approved
+  rejected
 }
 
 model CategorySuggestion {

@@ -5,49 +5,16 @@ import {
 } from '@/lib/server/public-professional-visibility';
 
 describe('public professional visibility', () => {
-  it('expone el filtro publico basado en estado activo, verificacion y documentacion requerida', () => {
+  it('expone el filtro publico basado solo en estado activo', () => {
     expect(getPublicProfessionalWhere()).toEqual({
       status: 'active',
-      verified: true,
-      OR: [
-        { requiresDocumentation: false },
-        {
-          AND: [
-            { requiresDocumentation: true },
-            {
-              documentation: {
-                is: {
-                  criminalRecordObjectKey: {
-                    not: null,
-                  },
-                },
-              },
-            },
-          ],
-        },
-      ],
     });
   });
 
-  it('considera publico solo un perfil activo, profesionalmente verificado y con documentacion obligatoria completa cuando aplica', () => {
+  it('considera publico cualquier perfil activo, aunque no este verificado', () => {
     expect(isProfessionalPubliclyVisible({ status: 'active', verified: true })).toBe(true);
-    expect(
-      isProfessionalPubliclyVisible({
-        status: 'active',
-        verified: true,
-        requiresDocumentation: true,
-        documentation: { criminalRecordObjectKey: 'private/doc.pdf' },
-      })
-    ).toBe(true);
-    expect(
-      isProfessionalPubliclyVisible({
-        status: 'active',
-        verified: true,
-        requiresDocumentation: true,
-        documentation: { criminalRecordObjectKey: null },
-      })
-    ).toBe(false);
-    expect(isProfessionalPubliclyVisible({ status: 'active', verified: false })).toBe(false);
+    expect(isProfessionalPubliclyVisible({ status: 'active', verified: false })).toBe(true);
     expect(isProfessionalPubliclyVisible({ status: 'pending', verified: true })).toBe(false);
+    expect(isProfessionalPubliclyVisible({ status: 'suspended', verified: true })).toBe(false);
   });
 });

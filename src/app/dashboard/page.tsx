@@ -712,6 +712,8 @@ export default function DashboardPage() {
   const isVerified = me.verified;
   const needsCriminalRecordAlert =
     me.documentationRequired === true && me.criminalRecordPresent !== true;
+  const showVerificationPendingBanner =
+    !isVerified && me.status !== 'pending' && !needsCriminalRecordAlert;
  
   return (
     <div className="min-h-screen bg-gray-50">
@@ -772,7 +774,7 @@ export default function DashboardPage() {
           )}
 
             {/* Banner de estado de verificación (solo si no está pendiente) */}
-            {!isVerified && me.status !== 'pending' && (
+            {showVerificationPendingBanner && (
             <Card className="rounded-2xl border-2 border-orange-200 bg-gradient-to-r from-orange-50 to-yellow-50 mb-6">
               <CardContent className="p-6">
                 <div className="flex items-start space-x-4 ">
@@ -784,9 +786,8 @@ export default function DashboardPage() {
                       Tu perfil aún no ha sido verificado
                     </h3>
                     <p className="text-orange-800 text-sm leading-relaxed">
-                      Nuestro equipo está revisando tu información. Mientras tanto, puedes editar tu perfil 
-                      pero no aparecerás en los resultados de búsqueda hasta ser aprobado. 
-                      Te notificaremos por email cuando tu perfil esté verificado.
+                      Tu perfil está activo y visible, pero aún no tiene la insignia de verificación.
+                      La insignia se habilita cuando completes y apruebes la revisión de antecedentes.
                     </p>
                     
                   </div>
@@ -809,8 +810,19 @@ export default function DashboardPage() {
                       Te falta cargar el certificado de antecedentes penales
                     </p>
                     <p className="mt-1 text-sm text-amber-800">
-                      Tu perfil no podrá aparecer en la plataforma hasta que subas este documento.
-                      Puedes hacerlo ahora desde la configuración de tu perfil.
+                      Tu perfil puede seguir visible en la plataforma, pero sin insignia de verificación
+                      hasta que subas y se apruebe este documento.
+                    </p>
+                    <p className="mt-2 text-sm text-amber-900">
+                      Cómo obtenerlo:{' '}
+                      <a
+                        href="https://www.argentina.gob.ar/justicia/reincidencia/antecedentespenales"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="underline underline-offset-2"
+                      >
+                        https://www.argentina.gob.ar/justicia/reincidencia/antecedentespenales
+                      </a>
                     </p>
                   </div>
                 </div>

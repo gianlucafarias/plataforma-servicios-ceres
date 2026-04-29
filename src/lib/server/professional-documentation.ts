@@ -40,6 +40,9 @@ export type SerializedLaborReference = {
 export type SerializedProfessionalDocumentation = {
   required: boolean;
   criminalRecordPresent: boolean;
+  criminalRecordStatus: "pending" | "approved" | "rejected" | null;
+  criminalRecordReviewedAt: string | null;
+  criminalRecordAdminNotes: string | null;
   hasLaborReferences: boolean;
   criminalRecord: SerializedDocumentationFile | null;
   laborReferences: SerializedLaborReference[];
@@ -52,6 +55,9 @@ export const professionalDocumentationArgs =
       professionalId: true,
       criminalRecordObjectKey: true,
       criminalRecordFileName: true,
+      criminalRecordStatus: true,
+      criminalRecordReviewedAt: true,
+      criminalRecordAdminNotes: true,
       laborReferences: {
         orderBy: { createdAt: "asc" },
         select: {
@@ -325,6 +331,9 @@ function serializeDocumentation(
   return {
     required: config.required,
     criminalRecordPresent: !!criminalRecord,
+    criminalRecordStatus: documentation?.criminalRecordStatus ?? null,
+    criminalRecordReviewedAt: documentation?.criminalRecordReviewedAt?.toISOString() ?? null,
+    criminalRecordAdminNotes: documentation?.criminalRecordAdminNotes ?? null,
     hasLaborReferences: laborReferences.length > 0,
     criminalRecord,
     laborReferences,
@@ -378,11 +387,15 @@ export async function upsertProfessionalDocumentation(
     update: {
       criminalRecordObjectKey: criminalRecord?.objectKey || null,
       criminalRecordFileName: criminalRecord?.fileName || null,
+      criminalRecordStatus: criminalRecord ? "pending" : null,
+      criminalRecordReviewedAt: null,
+      criminalRecordAdminNotes: null,
     },
     create: {
       professionalId,
       criminalRecordObjectKey: criminalRecord?.objectKey || null,
       criminalRecordFileName: criminalRecord?.fileName || null,
+      criminalRecordStatus: criminalRecord ? "pending" : null,
     },
     select: { id: true },
   });

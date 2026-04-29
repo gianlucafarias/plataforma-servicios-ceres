@@ -33,7 +33,7 @@ describe('GET /api/services', () => {
     vi.clearAllMocks()
   })
 
-  it('retorna lista, totales y paginacion usando verificacion profesional', async () => {
+  it('retorna lista, totales y paginacion para profesionales activos', async () => {
     hoisted.prismaMock.service.count.mockResolvedValueOnce(2)
     hoisted.prismaMock.service.findMany.mockResolvedValueOnce([
       {
@@ -71,7 +71,6 @@ describe('GET /api/services', () => {
           available: true,
           professional: expect.objectContaining({
             status: 'active',
-            verified: true,
           }),
         }),
       })
@@ -82,7 +81,6 @@ describe('GET /api/services', () => {
           available: true,
           professional: expect.objectContaining({
             status: 'active',
-            verified: true,
           }),
         }),
       })
