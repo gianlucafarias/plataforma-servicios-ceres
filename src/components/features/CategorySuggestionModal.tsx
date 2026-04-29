@@ -125,11 +125,11 @@ export function CategorySuggestionModal({ origin, triggerClassName, triggerLabel
       <DialogContent className="sm:max-w-md max-h-[85vh] overflow-y-auto rounded-2xl">
         <DialogHeader>
           <DialogTitle className="text-xl font-rutan">
-            Sugerir una nueva categorÃ­a
+            Sugerir una nueva categoría
           </DialogTitle>
           <DialogDescription>
-            Contanos quÃ© categorÃ­a te gustarÃ­a que agreguemos a la plataforma. Esto nos
-            ayuda a priorizar los prÃ³ximos servicios.
+            Contanos qué categoría te gustaría que agreguemos a la plataforma. Esto nos
+            ayuda a priorizar los próximos servicios.
           </DialogDescription>
         </DialogHeader>
 
@@ -151,14 +151,14 @@ export function CategorySuggestionModal({ origin, triggerClassName, triggerLabel
               htmlFor="suggestedName"
               className="text-sm font-semibold text-gray-700"
             >
-              Nombre de la categorÃ­a
+              Nombre de la categoría
             </Label>
             <Input
               id="suggestedName"
               value={formData.suggestedName}
               onChange={(e) => handleChange("suggestedName", e.target.value)}
               className="mt-1 rounded-xl border-2 focus:ring-4 focus:ring-green-100 focus:border-[#006F4B] transition-all duration-200"
-              placeholder="Ej: Flete, Fisioterapia, DiseÃ±o grÃ¡fico..."
+              placeholder="Ej: Flete, Transporte, Fisioterapia, Diseño gráfico..."
               required
               maxLength={80}
             />
@@ -173,7 +173,7 @@ export function CategorySuggestionModal({ origin, triggerClassName, triggerLabel
               value={formData.details}
               onChange={(e) => handleChange("details", e.target.value)}
               className="mt-1 block w-full rounded-xl border-2 border-gray-200 px-3 py-2 text-sm focus:ring-4 focus:ring-green-100 focus:border-[#006F4B] transition-all duration-200 resize-y overflow-x-hidden"
-              placeholder="Contanos brevemente para quÃ© usarÃ­as esta categorÃ­a o quÃ© tipo de trabajos incluirÃ­a."
+              placeholder="Contanos brevemente para qué usarías esta categoría o qué tipo de trabajos incluiría."
               rows={4}
               maxLength={1000}
             />
@@ -192,7 +192,7 @@ export function CategorySuggestionModal({ origin, triggerClassName, triggerLabel
               value={formData.email}
               onChange={(e) => handleChange("email", e.target.value)}
               className="mt-1 rounded-xl border-2 focus:ring-4 focus:ring-green-100 focus:border-[#006F4B] transition-all duration-200"
-              placeholder="Para que podamos contactarte si necesitamos mÃ¡s informaciÃ³n"
+              placeholder="Para que podamos contactarte si necesitamos más información"
               required
               maxLength={120}
             />
@@ -206,8 +206,8 @@ export function CategorySuggestionModal({ origin, triggerClassName, triggerLabel
 
           {formState === "success" && (
             <p className="text-sm text-green-700 bg-green-50 border border-green-200 rounded-xl px-3 py-2">
-              Â¡Gracias! Registramos tu sugerencia y la tendremos en cuenta para las
-              prÃ³ximas categorÃ­as.
+              ¡Gracias! Registramos tu sugerencia y la tendremos en cuenta para las
+              próximas categorías.
             </p>
           )}
 
