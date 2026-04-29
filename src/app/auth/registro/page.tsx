@@ -14,9 +14,13 @@ import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { ProfessionalDocumentationFields } from "@/components/features/ProfessionalDocumentationFields";
 import { ServiceSelectionCard } from "@/components/features/ServiceSelectionCard";
-import { GROUPS, getLocations, getGenders } from "@/lib/taxonomy";
+import { CategorySuggestionModal } from "@/components/features/CategorySuggestionModal";
+import { CategoryItem } from "@/components/features/CategoryItem";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { GROUPS, getLocations, getGenders, AREAS_OFICIOS, SUBCATEGORIES_OFICIOS, SUBCATEGORIES_PROFESIONES } from "@/lib/taxonomy";
 import type { CategoryGroup, PrivateDocumentFile, ProfessionalDocumentation } from "@/types";
-import { Eye, EyeOff, User, Mail, Lock, Building2, Award, Send, ArrowLeft, CheckCircle, MapPin, CircleUser, Upload, FileText, Globe, Linkedin, Instagram, Facebook, Store, IdCard } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
+import { Eye, EyeOff, User, Mail, Lock, Building2, Award, Send, ArrowLeft, ArrowRight, CheckCircle, MapPin, CircleUser, Upload, FileText, Globe, Linkedin, Instagram, Facebook, Store, IdCard, Wrench, Snowflake, Bolt, Car, TreePine } from "lucide-react";
 import WhatsAppIcon from "@/components/ui/whatsapp";
 import Link from "next/link";
 import { DateBirthPicker } from "./_components/date-birth-picker";
@@ -26,6 +30,7 @@ import { resolveStoredUploadValue, uploadRegistrationFile } from "@/lib/api/uplo
 import { uploadPrivateRegistrationDocument } from "@/lib/api/private-documents";
 import { usePublicCategoriesTree } from "@/hooks/usePublicCategoriesTree";
 import { validateProfessionalDocumentation } from "@/lib/validation/professional-documentation";
+import { normalizeSocialHandle, validateSocialHandle } from "@/lib/social-handles";
 
 // Iconos de redes sociales
 const GoogleIcon = () => (
@@ -95,6 +100,9 @@ export default function RegistroPage() {
   
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [isOficiosPreviewOpen, setIsOficiosPreviewOpen] = useState(false);
+  const [isProfesionesPreviewOpen, setIsProfesionesPreviewOpen] = useState(false);
+  const [selectedPreviewArea, setSelectedPreviewArea] = useState<string>("all");
   const [errors, setErrors] = useState<{[key: string]: string}>({});
   const [isLoading, setIsLoading] = useState(false);
   const [socialLoading, setSocialLoading] = useState<string | null>(null);
@@ -264,6 +272,16 @@ export default function RegistroPage() {
         const resetServices = [{ areaSlug: '', categoryId: '', title: '', description: '', priceRange: '' }];
         return { ...prev, professionalGroup: newGroup, services: resetServices };
       }
+
+      if (
+        typeof value === "string" &&
+        (field === "instagram" || field === "facebook" || field === "linkedin")
+      ) {
+        return {
+          ...prev,
+          [field]: normalizeSocialHandle(value, field),
+        };
+      }
       
       // Para WhatsApp: NO normalizar mientras escribe, solo guardar lo que el usuario escribe
       // La normalización se hará al enviar el formulario
@@ -431,6 +449,15 @@ export default function RegistroPage() {
         newErrors.whatsapp = error;
       }
     }
+
+    (["instagram", "facebook", "linkedin"] as const).forEach((field) => {
+      const value = formData[field]?.trim();
+      if (!value) return;
+      const error = validateSocialHandle(value);
+      if (error) {
+        newErrors[field] = error;
+      }
+    });
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -1173,9 +1200,10 @@ export default function RegistroPage() {
                 value={formData.instagram}
                 onChange={(e) => handleInputChange('instagram', e.target.value)}
                 className="pl-10 rounded-lg border-2 focus:ring-4 focus:ring-green-100 focus:border-[#006F4B] transition-all duration-200 border-gray-200"
-                placeholder="@tuusuario"
+                placeholder="tuusuario"
               />
             </div>
+            {errors.instagram && <p className="text-red-600 text-sm mt-1">{errors.instagram}</p>}
           </div>
 
           <div>
@@ -1189,9 +1217,10 @@ export default function RegistroPage() {
                 value={formData.facebook}
                 onChange={(e) => handleInputChange('facebook', e.target.value)}
                 className="pl-10 rounded-lg border-2 focus:ring-4 focus:ring-green-100 focus:border-[#006F4B] transition-all duration-200 border-gray-200"
-                placeholder="/tu-pagina"
+                placeholder="tuusuario"
               />
             </div>
+            {errors.facebook && <p className="text-red-600 text-sm mt-1">{errors.facebook}</p>}
           </div>
 
           <div>
@@ -1205,9 +1234,10 @@ export default function RegistroPage() {
                 value={formData.linkedin}
                 onChange={(e) => handleInputChange('linkedin', e.target.value)}
                 className="pl-10 rounded-lg border-2 focus:ring-4 focus:ring-green-100 focus:border-[#006F4B] transition-all duration-200 border-gray-200"
-                placeholder="/in/tuperfil"
+                placeholder="tuusuario"
               />
             </div>
+            {errors.linkedin && <p className="text-red-600 text-sm mt-1">{errors.linkedin}</p>}
           </div>
 
           <div>
@@ -1404,10 +1434,123 @@ export default function RegistroPage() {
                   ? 'Trabajos manuales y técnicos por oficio (ej: plomería, electricidad, mantenimiento).'
                   : 'Profesiones colegiadas o formales (ej: enfermería, arquitectura, abogacía).'}
               </p>
+              <div className="mt-3">
+                {g.id === 'oficios' ? (
+                  <button
+                    type="button"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      setIsOficiosPreviewOpen(true);
+                    }}
+                    className="inline-flex items-center text-sm font-semibold text-[#006F4B] hover:underline"
+                  >
+                    Ver categorías de oficios <ArrowRight className="ml-1 h-4 w-4" />
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      setIsProfesionesPreviewOpen(true);
+                    }}
+                    className="inline-flex items-center text-sm font-semibold text-[#006F4B] hover:underline"
+                  >
+                    Ver categorías de profesiones <ArrowRight className="ml-1 h-4 w-4" />
+                  </button>
+                )}
+              </div>
             </button>
           ))}
         </div>
         {errors.professionalGroup && <p className="text-red-600 text-sm mt-1">{errors.professionalGroup}</p>}
+
+        <Dialog open={isOficiosPreviewOpen} onOpenChange={setIsOficiosPreviewOpen}>
+          <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="text-2xl font-bold text-gray-900">
+                Categorías de Oficios
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-2 mt-4">
+              {AREAS_OFICIOS.map((area) => {
+                const isActive = selectedPreviewArea === area.slug;
+                const subcategories = SUBCATEGORIES_OFICIOS
+                  .filter((s) => s.areaSlug === area.slug)
+                  .map((s) => ({
+                    slug: s.slug,
+                    name: s.name,
+                  }));
+
+                const iconMap: Record<string, LucideIcon | null> = {
+                  "construccion-mantenimiento": Wrench,
+                  climatizacion: Snowflake,
+                  "servicios-electronicos": Bolt,
+                  automotores: Car,
+                  jardineria: TreePine,
+                };
+                const Icon = iconMap[area.slug] || Wrench;
+
+                return (
+                  <CategoryItem
+                    key={area.id}
+                    name={area.name}
+                    slug={area.slug}
+                    icon={Icon}
+                    isActive={isActive}
+                    subcategories={subcategories}
+                    onSelect={() => setSelectedPreviewArea(area.slug)}
+                    onSelectSubcategory={() => {}}
+                  />
+                );
+              })}
+            </div>
+            <div className="mt-6 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-center">
+              <p className="text-sm font-medium text-emerald-900">
+                ¿No encontrás la categoría que se adapta a tu profesión?
+              </p>
+              <div className="mt-3">
+                <CategorySuggestionModal
+                  origin="registro_modal_oficios"
+                  triggerLabel="Sugerir categoría"
+                  triggerClassName="inline-flex items-center rounded-lg bg-[#006F4B] px-4 py-2 text-sm font-semibold text-white hover:bg-[#005a3d]"
+                />
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={isProfesionesPreviewOpen} onOpenChange={setIsProfesionesPreviewOpen}>
+          <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="text-2xl font-bold text-gray-900">
+                Categorías de Profesiones
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-2 mt-4">
+              {SUBCATEGORIES_PROFESIONES.map((profesion) => (
+                <div
+                  key={profesion.id}
+                  className="w-full flex items-center justify-between gap-3 px-4 py-3 text-sm font-medium rounded-lg text-left bg-gray-50 text-gray-700"
+                >
+                  <span className="truncate">{profesion.name}</span>
+                  <ArrowRight className="h-4 w-4 flex-shrink-0" aria-hidden="true" />
+                </div>
+              ))}
+            </div>
+            <div className="mt-6 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-center">
+              <p className="text-sm font-medium text-emerald-900">
+                ¿No encontrás la categoría que se adapta a tu profesión?
+              </p>
+              <div className="mt-3">
+                <CategorySuggestionModal
+                  origin="registro_modal_profesiones"
+                  triggerLabel="Sugerir categoría"
+                  triggerClassName="inline-flex items-center rounded-lg bg-[#006F4B] px-4 py-2 text-sm font-semibold text-white hover:bg-[#005a3d]"
+                />
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );

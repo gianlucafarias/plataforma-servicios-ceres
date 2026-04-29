@@ -156,38 +156,6 @@ export async function PUT(
       ),
     });
 
-    if (status === 'approved') {
-      const approvedCount = await prisma.professionalCertification.count({
-        where: {
-          professionalId: certification.professionalId,
-          status: 'approved',
-        },
-      });
-
-      if (approvedCount > 0 && !certification.professional.verified) {
-        await prisma.professional.update({
-          where: { id: certification.professionalId },
-          data: { verified: true },
-        });
-
-        await safeRecordAuditEvent({
-          kind: 'workflow',
-          domain: 'admin.certifications',
-          eventName: 'professional.verified_by_certification',
-          status: 'success',
-          summary: `Profesional ${certification.professionalId} marcado como verificado por certificacion aprobada`,
-          actor: context.actor,
-          requestId: context.requestId,
-          entityType: 'professional',
-          entityId: certification.professionalId,
-          metadata: {
-            certificationId: updated.id,
-            approvedCertifications: approvedCount,
-          },
-        });
-      }
-    }
-
     return observedJson(context, {
       success: true,
       data: updated,
