@@ -1,11 +1,10 @@
-import Link from "next/link";
 import Image from "next/image";
+import Link from "next/link";
 import { MapPin } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import WhatsAppIcon from "@/components/ui/whatsapp";
 import { LOCATIONS } from "@/lib/taxonomy";
-import { buildWhatsAppLink } from "@/lib/whatsapp";
 import { resolvePublicUploadUrl } from "@/lib/public-upload-url";
+import { VerifiedIcon } from "@/components/ui/verified-icon";
 
 type HomeFeaturedProfessionalCardProps = {
   professional: {
@@ -33,29 +32,30 @@ export function HomeFeaturedProfessionalCard({ professional }: HomeFeaturedProfe
     return raw;
   })();
 
-  const whatsappUrl = buildWhatsAppLink(
-    professional.whatsapp || professional.phone,
-    "Hola, vi tu perfil en Ceres en Red y me interesa contactarte."
-  );
-  const additionalServiceTitles = (professional.serviceTitles ?? []).slice(1, 4);
+  const primaryLabel =
+    professional.primaryCategory?.name || professional.serviceTitles?.[0] || "Profesional";
+  const chipTitles = (professional.serviceTitles ?? []).slice(0, 3);
 
   return (
-    <article className="rounded-2xl border border-[#e9ecef] bg-white p-4 shadow-[0_4px_14px_rgba(0,0,0,0.04)]">
-      <div className="grid grid-cols-[64px_minmax(0,1fr)] gap-x-4 gap-y-2 sm:grid-cols-[64px_minmax(0,1fr)_auto]">
+    <Link
+      href={`/profesionales/${professional.id}`}
+      className="block rounded-2xl border border-[#e9ecef] bg-white p-3 shadow-[0_4px_14px_rgba(0,0,0,0.04)] transition-colors hover:bg-[#fafafa]"
+    >
+      <div className="grid grid-cols-[72px_minmax(0,1fr)] gap-x-3">
         {professional.socialNetworks?.profilePicture ? (
-          <Avatar className="h-16 w-16 shrink-0">
+          <Avatar className="h-[72px] w-[72px] shrink-0 rounded-xl">
             <div className="h-full w-full overflow-hidden rounded-xl">
               <Image
                 src={resolvePublicUploadUrl(professional.socialNetworks.profilePicture)}
                 alt={professional.user.name}
-                width={64}
-                height={64}
+                width={72}
+                height={72}
                 className="h-full w-full object-cover"
               />
             </div>
           </Avatar>
         ) : (
-          <Avatar className="h-16 w-16 shrink-0">
+          <Avatar className="h-[72px] w-[72px] shrink-0 rounded-xl">
             <AvatarFallback className="rounded-xl bg-[#ecfdf3] text-sm font-semibold text-[#127b45]">
               {professional.user.name
                 .split(" ")
@@ -66,37 +66,27 @@ export function HomeFeaturedProfessionalCard({ professional }: HomeFeaturedProfe
           </Avatar>
         )}
 
-        <div className="min-w-0">
-          <div className="mb-1 flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <div className="flex items-center gap-1.5">
-                <h3 className="truncate text-base font-bold text-[#212529]">{professional.user.name}</h3>
-                {professional.verified && (
-                  <Image src="/verificado.png" alt="Verificado" width={14} height={14} />
-                )}
-              </div>
-              {professional.primaryCategory?.name ? (
-                <p className="truncate text-sm text-[#495057]">{professional.primaryCategory.name}</p>
+        <div className="min-w-0 pt-0.5">
+          <div className="min-w-0">
+            <div className="flex items-center gap-1">
+              <h3 className="truncate text-base leading-6 font-semibold tracking-normal text-[#1f2937]">{professional.user.name}</h3>
+              {professional.verified ? (
+                <VerifiedIcon className="h-3.5 w-3.5" />
               ) : null}
             </div>
+            <p className="mt-1 truncate text-xs font-medium text-[#006F4B]">{primaryLabel}</p>
           </div>
-        </div>
-
-        <div className="min-w-0">
-          <div className="mb-1 flex items-center gap-1 text-sm text-[#6c757d]">
-            <MapPin className="h-3.5 w-3.5 shrink-0" />
-            <span className="truncate">{formattedLocation}</span>
+          <div className="mt-1.5 flex items-center gap-1 text-sm text-[#6b7280]">
+            <MapPin className="h-3.5 w-3.5 shrink-0 text-[#9ca3af]" />
+            <span className="truncate">{formattedLocation.replace(", Argentina", "")}</span>
           </div>
-        </div>
-
-        <div className="min-w-0">
-          <div className="min-h-[30px]">
-            {additionalServiceTitles.length ? (
+          <div className="mt-2 min-h-[28px]">
+            {chipTitles.length ? (
               <div className="flex flex-wrap gap-2">
-                {additionalServiceTitles.map((serviceTitle) => (
+                {chipTitles.map((serviceTitle) => (
                   <span
                     key={`${professional.id}-${serviceTitle}`}
-                    className="max-w-[120px] truncate rounded-full border border-[#dee2e6] bg-[#f8f9fa] px-2.5 py-1 text-xs font-medium text-[#495057]"
+                    className="rounded-full border border-[#e5e7eb] bg-[#f3f4f6] px-2.5 py-1 text-xs font-medium text-[#4b5563] leading-none"
                   >
                     {serviceTitle}
                   </span>
@@ -105,27 +95,7 @@ export function HomeFeaturedProfessionalCard({ professional }: HomeFeaturedProfe
             ) : null}
           </div>
         </div>
-
-        <div className="col-start-2 mt-1 flex items-center justify-end gap-2 sm:col-start-3 sm:row-start-3 sm:mt-0 sm:self-end">
-            <Link
-              href={`/profesionales/${professional.id}`}
-              className="rounded-full border border-[#ced4da] px-4 py-2 text-sm font-medium text-[#343a40] transition-colors hover:bg-[#f8f9fa]"
-            >
-              Ver perfil
-            </Link>
-            {whatsappUrl ? (
-              <a
-                href={whatsappUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label={`Contactar a ${professional.user.name} por WhatsApp`}
-                className="inline-flex items-center rounded-full bg-[#25D366] px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#20BD5C]"
-              >
-                <WhatsAppIcon className="h-4 w-4" aria-hidden="true" />
-                </a>
-              ) : null}
-        </div>
       </div>
-    </article>
+    </Link>
   );
 }

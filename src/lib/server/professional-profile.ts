@@ -99,6 +99,7 @@ export type ProfessionalPageProfile = {
   rating: number | null;
   reviewCount: number | null;
   hasLaborReferences: boolean;
+  hasCriminalRecord: boolean;
   specialties: string[];
   professionalGroup: 'oficios' | 'profesiones' | null;
   whatsapp: string | null;
@@ -181,6 +182,7 @@ function serializeProfessional(record: ProfessionalProfileRecord): ProfessionalP
     rating: record.rating,
     reviewCount: record.reviewCount,
     hasLaborReferences: (record.documentation?.laborReferences?.length ?? 0) > 0,
+    hasCriminalRecord: Boolean(record.documentation?.criminalRecordObjectKey),
     specialties: record.specialties,
     professionalGroup: record.professionalGroup,
     whatsapp: record.whatsapp,

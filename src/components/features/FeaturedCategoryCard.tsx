@@ -4,7 +4,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Users } from "lucide-react";
 import Link from "next/link";
-import Image from "next/image";
+import { VerifiedIcon } from "@/components/ui/verified-icon";
 
 interface FeaturedCategoryCardProps {
   category: {
@@ -59,7 +59,7 @@ export function FeaturedCategoryCard({ category }: FeaturedCategoryCardProps) {
                       {professional.user.name}
                     </span>
                     {professional.verified && (
-                      <Image src="/verificado.png" alt="Verificado" width={12} height={12} />
+                      <VerifiedIcon className="h-3 w-3" />
                     )}
                   </div>
                   {professional.rating && (

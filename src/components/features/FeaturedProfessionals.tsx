@@ -63,7 +63,7 @@ export function FeaturedProfessionals({ professionals }: FeaturedProfessionalsPr
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
             {grouped.map((professional) => {
               return (
                 <HomeFeaturedProfessionalCard
