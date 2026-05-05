@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 import Image from "next/image";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -35,6 +36,7 @@ import { resolvePublicUploadUrl } from "@/lib/public-upload-url";
 
 export default function SettingsPage() {
   const router = useRouter();
+  const { status } = useSession();
   const { data: categoryTree, loading: categoriesLoading, error: categoriesError } = usePublicCategoriesTree();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -163,8 +165,15 @@ export default function SettingsPage() {
   };
 
   useEffect(() => {
+    if (status === "unauthenticated") {
+      router.replace("/auth/login?callbackUrl=/dashboard/settings");
+      return;
+    }
+    if (status !== "authenticated") {
+      return;
+    }
     loadProfessionalData();
-  }, []);
+  }, [status, router]);
 
   // Evitar perder cambios al recargar/cerrar pestaña (protección extra)
   useEffect(() => {
@@ -431,6 +440,21 @@ export default function SettingsPage() {
     priceRange: ''
   });
   const [showLeaveDialog, setShowLeaveDialog] = useState(false);
+
+  if (status === "loading") {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="flex items-center gap-2 text-gray-600">
+          <Loader2 className="h-5 w-5 animate-spin" />
+          <span>Cargando...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (status === "unauthenticated") {
+    return null;
+  }
 
   // Funciones para gestión de servicios
   const handleAddService = () => {
