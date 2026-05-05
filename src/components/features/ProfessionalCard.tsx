@@ -7,6 +7,7 @@ import Image from "next/image";
 import { LOCATIONS } from "@/lib/taxonomy";
 import { buildWhatsAppLink } from "@/lib/whatsapp";
 import { resolvePublicUploadUrl } from "@/lib/public-upload-url";
+import { VerifiedIcon } from "../ui/verified-icon";
 
 
 interface ProfessionalCardProps {
@@ -48,8 +49,8 @@ export function ProfessionalCard({ professional }: ProfessionalCardProps) {
           <div className="flex items-start justify-between">
             <div className="flex items-center space-x-3">
               {professional.socialNetworks?.profilePicture ? (
-                <Avatar className="h-12 w-12 sm:h-14 sm:w-14 flex-shrink-0 ring-2 ring-white shadow-sm">
-                  <div className="w-full h-full rounded-full overflow-hidden">
+                <Avatar className="h-12 w-12 sm:h-14 sm:w-14 flex-shrink-0 rounded-xl ring-2 ring-white shadow-sm">
+                  <div className="w-full h-full rounded-xl overflow-hidden">
                     <Image
                       src={resolvePublicUploadUrl(professional.socialNetworks.profilePicture)}
                       alt={professional.user.name}
@@ -60,8 +61,8 @@ export function ProfessionalCard({ professional }: ProfessionalCardProps) {
                   </div>
                 </Avatar>
               ) : (
-                <Avatar className="h-12 w-12 sm:h-14 sm:w-14 flex-shrink-0 ring-2 ring-white shadow-sm">
-                  <AvatarFallback className="bg-gradient-to-br from-green-50 to-green-100 text-[#006F4B] text-sm font-medium">
+                <Avatar className="h-12 w-12 sm:h-14 sm:w-14 flex-shrink-0 rounded-xl ring-2 ring-white shadow-sm">
+                  <AvatarFallback className="rounded-xl bg-gradient-to-br from-green-50 to-green-100 text-[#006F4B] text-sm font-medium">
                     {professional.user.name.split(" ").map((n) => n[0]).join("").toUpperCase()}
                   </AvatarFallback>
                 </Avatar>
@@ -77,7 +78,7 @@ export function ProfessionalCard({ professional }: ProfessionalCardProps) {
                     </Link>
                   </h3>
                   {professional.verified && (
-                    <Image src="/verificado.png" alt="Verified" width={16} height={16} className="ml-1" />
+                    <VerifiedIcon className="ml-1 h-4 w-4" />
                   )}
                 </div>
                 {professional.primaryCategory?.name && (
@@ -135,7 +136,5 @@ export function ProfessionalCard({ professional }: ProfessionalCardProps) {
       </Card>
   );
 }
-
-
 
 

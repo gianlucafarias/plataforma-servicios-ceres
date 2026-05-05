@@ -2,11 +2,11 @@
 import { MapPin } from "lucide-react";
 import Link from "next/link";
 import WhatsAppIcon from "../ui/whatsapp";
-import Image from "next/image";
 import { useMemo, memo } from "react";
 import { AvailabilityBadge } from "./AvailabilityBadge";
 import { LOCATIONS } from "@/lib/taxonomy";
 import { buildWhatsAppLink } from "@/lib/whatsapp";
+import { VerifiedIcon } from "../ui/verified-icon";
 
 interface ServiceCardProps {
   service: {
@@ -98,7 +98,7 @@ function ServiceCardComponent({ service }: ServiceCardProps) {
             <div className="flex items-center gap-1">
               <h4 className="font-bold text-gray-900 dark:text-white">{professional.user.name}</h4>
               {professional.verified && (
-                <Image src="/verificado.png" alt="Verified" width={16} height={16} className="text-blue-500" />
+                <VerifiedIcon className="h-4 w-4" />
               )}
             </div>
             <p className="text-sm text-primary font-medium">{service.category.name}</p>

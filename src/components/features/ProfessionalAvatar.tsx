@@ -64,7 +64,7 @@ function ProfessionalAvatarComponent({ name, profilePicture, className }: Profes
   if (imageSrc && !imageError && isMounted) {
     return (
       <Avatar className={className}>
-        <div className="w-full h-full rounded-full overflow-hidden relative bg-gray-100">
+        <div className="w-full h-full rounded-xl overflow-hidden relative bg-gray-100">
           {isExternalUrl(imageSrc) ? (
             // Para URLs externas (OAuth), usar img nativo
             // eslint-disable-next-line @next/next/no-img-element
@@ -91,7 +91,7 @@ function ProfessionalAvatarComponent({ name, profilePicture, className }: Profes
   // Fallback: mostrar iniciales si no hay imagen, hay error, o no está montado
   return (
     <Avatar className={className}>
-      <AvatarFallback className={`bg-white text-[#006F4B] ${textSize} font-bold border-2 border-gray-100`}>
+      <AvatarFallback className={`rounded-xl bg-white text-[#006F4B] ${textSize} font-bold border-2 border-gray-100`}>
         {initials}
       </AvatarFallback>
     </Avatar>

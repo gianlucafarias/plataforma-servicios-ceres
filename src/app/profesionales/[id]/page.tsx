@@ -33,6 +33,7 @@ import { getBaseUrl, generateProfessionalStructuredData, generateBreadcrumbsStru
 import { buildWhatsAppLink } from "@/lib/whatsapp";
 import { resolvePublicUploadUrl } from "@/lib/public-upload-url";
 import { ProfileViewTracker } from "@/components/features/ProfileViewTracker";
+import { VerifiedIcon } from "@/components/ui/verified-icon";
 import {
   getProfessionalProfileContext,
   toProfessionalPageProfile,
@@ -153,13 +154,29 @@ export default async function ProfessionalDetailPage({ params }: { params: Promi
       locationName = rawLocation;
     }
   }
-  
-  const coverageLocations = data.serviceLocations?.includes('all-region') 
+
+  const normalizeLocationLabel = (value: string) =>
+    value
+      .toLowerCase()
+      .replace(/,\s*argentina/g, "")
+      .replace(/\s+/g, " ")
+      .trim();
+
+  const normalizedPrimaryLocation = normalizeLocationLabel(locationName);
+
+  const coverageLocations = data.serviceLocations?.includes('all-region')
     ? ['Toda la región']
-    : data.serviceLocations?.filter(locId => locId !== rawLocation).map(locId => {
-        const found = locations.find(l => l.id === locId);
-        return found?.name || locId;
-      }).filter(Boolean) || [];
+    : Array.from(
+        new Set(
+          (data.serviceLocations || [])
+            .map((locId) => {
+              const found = locations.find((l) => l.id === locId);
+              return found?.name || locId;
+            })
+            .filter((locName) => normalizeLocationLabel(locName) !== normalizedPrimaryLocation)
+            .filter(Boolean)
+        )
+      );
 
   const p = {
     name: `${data.user.firstName} ${data.user.lastName}`.trim(),
@@ -169,6 +186,7 @@ export default async function ProfessionalDetailPage({ params }: { params: Promi
     rating: data.rating ?? 0,
     reviews: data.reviewCount ?? 0,
     hasLaborReferences: data.hasLaborReferences,
+    hasCriminalRecord: data.hasCriminalRecord,
     category: data.services[0]?.category?.name,
     phone: data.user.phone?.trim() || "",
     whatsapp: data.whatsapp?.trim() || data.user.phone?.trim() || "",
@@ -361,25 +379,22 @@ export default async function ProfessionalDetailPage({ params }: { params: Promi
             <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start lg:gap-8">
             {/* Info principal */}
             <div className="flex flex-col gap-4 sm:flex-row sm:gap-5">
-              <div className="relative inline-flex flex-shrink-0 self-start items-center justify-center">
+              <div className="inline-flex flex-shrink-0 self-start items-center justify-center">
                 <ProfessionalAvatar
                   name={p.name}
                   profilePicture={p.picture || undefined}
-                  className="h-24 w-24 ring-4 ring-white/20 shadow-xl lg:h-28 lg:w-28"
+                  className="h-24 w-24 rounded-xl ring-4 ring-white/20 shadow-xl lg:h-28 lg:w-28"
                 />
-                {p.verified && (
-                  <div
-                    className="absolute -bottom-1 -right-1 rounded-full bg-white p-0.5 shadow-lg"
-                    title="Certificado"
-                    aria-label="Certificado"
-                  >
-                    <Image src="/verificado.png" alt="Certificado" width={24} height={24} className="h-6 w-6" />
-                  </div>
-                )}
               </div>
               
               <div className="min-w-0 flex-1 text-white">
-                <h1 className="text-3xl font-bold tracking-tight lg:text-4xl">{p.name}</h1>
+                <div className="flex items-center gap-2">
+                  <h1 className="text-3xl font-bold tracking-tight lg:text-4xl">{p.name}</h1>
+                  <VerifiedIcon
+                    muted={!p.verified || !p.hasCriminalRecord}
+                    className={(!p.verified || !p.hasCriminalRecord) ? "h-5 w-5 bg-white/45" : "h-5 w-5 bg-white"}
+                  />
+                </div>
                 {p.category && <p className="mt-1 text-base text-white/80 lg:text-lg">{p.category}</p>}
 
                 <div className="mt-4 flex flex-wrap gap-2">
@@ -405,14 +420,6 @@ export default async function ProfessionalDetailPage({ params }: { params: Promi
                       {p.rating.toFixed(1)} · {reviewsLabel}
                     </span>
                   )}
-                  <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm ${
-                    p.availability.isAvailable 
-                      ? 'bg-green-400/25 text-green-50'
-                      : 'bg-white/14 text-white'
-                  }`}>
-                    <span className={`h-2 w-2 rounded-full ${p.availability.isAvailable ? 'bg-green-300 animate-pulse' : 'bg-white/55'}`} />
-                    {availabilityLabel}
-                  </span>
                 </div>
               </div>
             </div>
@@ -853,6 +860,28 @@ export default async function ProfessionalDetailPage({ params }: { params: Promi
                   Consultar horario por WhatsApp
                 </a>
               )}
+
+              <div className="mt-3 rounded-xl border border-gray-100 bg-gray-50 p-4">
+                {p.hasCriminalRecord && p.verified ? (
+                  <div className="flex items-start gap-3">
+                    <VerifiedIcon className="mt-0.5 h-5 w-5" />
+                    <p className="text-sm text-gray-700">Este perfil está verificado por el equipo de Ceres en Red.</p>
+                  </div>
+                ) : p.hasCriminalRecord && !p.verified ? (
+                  <div className="flex items-start gap-3">
+                    <VerifiedIcon muted className="mt-0.5 h-5 w-5" />
+                    <p className="text-sm text-gray-700">Este perfil cargó sus antecedentes penales, pero aún no se encuentra verificado en Ceres en Red.</p>
+                  </div>
+                ) : (
+                  <div className="flex items-start gap-3">
+                    <VerifiedIcon muted className="mt-0.5 h-5 w-5" />
+                    <div className="space-y-1">
+                      <p className="text-sm text-gray-700">Este perfil aún no cargó sus antecedentes penales.</p>
+                      <p className="text-sm text-gray-600">Por eso no se encuentra verificado en Ceres en Red.</p>
+                    </div>
+                  </div>
+                )}
+              </div>
 
               {showDetailedSchedule && (
                 <div className="mt-4 border-t border-gray-100 pt-4">

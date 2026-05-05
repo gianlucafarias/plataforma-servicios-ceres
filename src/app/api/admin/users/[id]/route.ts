@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireAdminApiKey } from '@/lib/auth-helpers';
+import { buildPersonFullName, normalizePersonNamePart } from '@/lib/person-name';
 
 /**
  * GET /api/admin/users/[id]
@@ -148,8 +149,8 @@ export async function PUT(
 
     if (body.role !== undefined) updateData.role = body.role;
     if (body.verified !== undefined) updateData.verified = body.verified;
-    if (body.firstName !== undefined) updateData.firstName = body.firstName;
-    if (body.lastName !== undefined) updateData.lastName = body.lastName;
+    if (body.firstName !== undefined) updateData.firstName = normalizePersonNamePart(body.firstName);
+    if (body.lastName !== undefined) updateData.lastName = normalizePersonNamePart(body.lastName);
     if (body.email !== undefined) updateData.email = body.email;
     if (body.phone !== undefined) updateData.phone = body.phone || null;
     if (body.location !== undefined) updateData.location = body.location || null;
@@ -188,7 +189,7 @@ export async function PUT(
         email: updated.email,
         firstName: updated.firstName,
         lastName: updated.lastName,
-        name: updated.name,
+        name: updated.name ?? buildPersonFullName(updated.firstName, updated.lastName),
         phone: updated.phone,
         role: updated.role,
         verified: updated.verified,

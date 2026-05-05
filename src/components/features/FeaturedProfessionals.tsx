@@ -1,8 +1,9 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { ProfessionalCard } from "@/components/features/ProfessionalCard";
+import Link from "next/link";
 import { CitySelect } from "@/components/features/CitySelect";
+import { HomeFeaturedProfessionalCard } from "@/components/features/HomeFeaturedProfessionalCard";
 import type { FeaturedHomeProfessional } from "@/lib/server/public-professionals";
 
 type FeaturedProfessionalsProps = {
@@ -26,7 +27,13 @@ export function FeaturedProfessionals({ professionals }: FeaturedProfessionalsPr
             );
           });
 
-    return filteredProfessionals.slice(0, 6);
+    const randomized = [...filteredProfessionals];
+    for (let i = randomized.length - 1; i > 0; i -= 1) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [randomized[i], randomized[j]] = [randomized[j], randomized[i]];
+    }
+
+    return randomized.slice(0, 6);
   }, [professionals, selectedLocation]);
 
   return (
@@ -55,30 +62,41 @@ export function FeaturedProfessionals({ professionals }: FeaturedProfessionalsPr
           No hay profesionales destacados para esta ciudad por ahora.
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-          {grouped.map((professional) => {
-            return (
-              <ProfessionalCard
-                key={professional.id}
-                professional={{
-                  id: professional.id,
-                  user: { name: professional.user.name },
-                  bio: professional.bio || "",
-                  verified: professional.verified,
-                  primaryCategory: professional.primaryCategory?.name
-                    ? { name: professional.primaryCategory.name }
-                    : undefined,
-                  location: professional.location || undefined,
-                  socialNetworks: {
-                    profilePicture: professional.ProfilePicture || undefined,
-                  },
-                  whatsapp: professional.whatsapp || undefined,
-                  phone: professional.phone || undefined,
-                }}
-              />
-            );
-          })}
-        </div>
+        <>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {grouped.map((professional) => {
+              return (
+                <HomeFeaturedProfessionalCard
+                  key={professional.id}
+                  professional={{
+                    id: professional.id,
+                    user: { name: professional.user.name },
+                    verified: professional.verified,
+                    primaryCategory: professional.primaryCategory?.name
+                      ? { name: professional.primaryCategory.name }
+                      : undefined,
+                    serviceTitles: professional.serviceTitles,
+                    location: professional.location || undefined,
+                    socialNetworks: {
+                      profilePicture: professional.ProfilePicture || undefined,
+                    },
+                    whatsapp: professional.whatsapp || undefined,
+                    phone: professional.phone || undefined,
+                  }}
+                />
+              );
+            })}
+          </div>
+
+          <div className="mt-8 flex justify-center">
+            <Link
+              href="/servicios"
+              className="rounded-full border border-[#d0d7de] bg-white px-6 py-3 text-sm font-semibold text-[#2f363d] transition-colors hover:bg-[#f6f8fa]"
+            >
+              Ver todos los profesionales
+            </Link>
+          </div>
+        </>
       )}
     </div>
   );

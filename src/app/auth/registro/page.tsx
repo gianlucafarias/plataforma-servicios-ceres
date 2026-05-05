@@ -450,6 +450,10 @@ export default function RegistroPage() {
       }
     }
 
+    if (!formData.picture || !formData.picture.trim()) {
+      newErrors.picture = "La foto de perfil es obligatoria";
+    }
+
     (["instagram", "facebook", "linkedin"] as const).forEach((field) => {
       const value = formData[field]?.trim();
       if (!value) return;
@@ -1322,7 +1326,7 @@ export default function RegistroPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
           <div>
             <Label htmlFor="picture" className="text-sm font-semibold text-gray-700">
-              Foto de Perfil
+              Foto de Perfil *
             </Label>
             <div className="relative mt-1">
               <Upload className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
@@ -1359,7 +1363,7 @@ export default function RegistroPage() {
                 className="pl-10 rounded-lg border-2 focus:ring-4 focus:ring-green-100 focus:border-[#006F4B] transition-all duration-200 border-gray-200"
               />
             </div>
-            <p className="text-xs text-gray-500 mt-1">PNG, JPG, JPEG, WEBP (máx. 10MB)</p>
+            <p className="text-xs text-gray-500 mt-1">Obligatoria. PNG, JPG, JPEG, WEBP (máx. 10MB)</p>
             {errors.picture && <p className="text-xs text-red-600 mt-1">{errors.picture}</p>}
           </div>
 
@@ -1372,7 +1376,7 @@ export default function RegistroPage() {
               <Input
                 id="cv"
                 type="file"
-                accept=".pdf"
+                accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,image/jpeg,image/png"
                 onChange={async (e) => {
                   const file = e.target.files?.[0];
                   if (file) {
