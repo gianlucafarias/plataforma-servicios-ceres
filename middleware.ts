@@ -1,6 +1,23 @@
 import { NextResponse, type NextRequest } from 'next/server';
+import { getToken } from 'next-auth/jwt';
 
-export function middleware(request: NextRequest) {
+export async function middleware(request: NextRequest) {
+  const { pathname, search } = request.nextUrl;
+
+  if (pathname.startsWith('/dashboard')) {
+    const token = await getToken({
+      req: request,
+      secret: process.env.NEXTAUTH_SECRET,
+    });
+
+    if (!token) {
+      const callbackPath = `${pathname}${search || ''}`;
+      const loginUrl = new URL('/auth/login', request.url);
+      loginUrl.searchParams.set('callbackUrl', callbackPath);
+      return NextResponse.redirect(loginUrl);
+    }
+  }
+
   const requestId =
     request.headers.get('x-request-id') ||
     request.headers.get('x-cf-ray') ||
@@ -21,5 +38,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/api/:path*'],
+  matcher: ['/api/:path*', '/dashboard/:path*'],
 };
