@@ -48,6 +48,7 @@ export async function GET(request: NextRequest) {
               firstName: true,
               lastName: true,
               email: true,
+              dni: true,
               phone: true,
               verified: true,
               createdAt: true,
