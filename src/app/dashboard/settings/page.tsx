@@ -327,21 +327,6 @@ export default function SettingsPage() {
     }
   };
 
-  if (status === "loading") {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="flex items-center gap-2 text-gray-600">
-          <Loader2 className="h-5 w-5 animate-spin" />
-          <span>Cargando...</span>
-        </div>
-      </div>
-    );
-  }
-
-  if (status === "unauthenticated") {
-    return null;
-  }
-
   const validateField = (field: string, value: unknown): string => {
     switch (field) {
       case 'firstName':
@@ -455,6 +440,21 @@ export default function SettingsPage() {
     priceRange: ''
   });
   const [showLeaveDialog, setShowLeaveDialog] = useState(false);
+
+  if (status === "loading") {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="flex items-center gap-2 text-gray-600">
+          <Loader2 className="h-5 w-5 animate-spin" />
+          <span>Cargando...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (status === "unauthenticated") {
+    return null;
+  }
 
   // Funciones para gestión de servicios
   const handleAddService = () => {
