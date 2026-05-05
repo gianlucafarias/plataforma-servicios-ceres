@@ -23,6 +23,7 @@ export type PublicProfessionalsListResult = {
     primaryCategory: {
       name: string | undefined;
     };
+    serviceTitles: string[];
     location: string | undefined;
     rating: number;
     reviewCount: number;
@@ -142,7 +143,7 @@ export async function listPublicProfessionals(
           },
         },
         services: {
-          take: 1,
+          take: 8,
           orderBy: { createdAt: 'asc' },
           include: { category: { select: { name: true } } },
         },
@@ -152,6 +153,13 @@ export async function listPublicProfessionals(
 
   return {
     data: rows.map((professional) => ({
+      serviceTitles: Array.from(
+        new Set(
+          professional.services
+            .map((service) => service.title?.trim())
+            .filter((name): name is string => Boolean(name))
+        )
+      ),
       id: professional.id,
       user: {
         name: `${professional.user.firstName} ${professional.user.lastName}`.trim(),
@@ -185,7 +193,7 @@ export async function listPublicProfessionals(
 const listFeaturedHomeProfessionalsCached = unstable_cache(
   async (limit: number): Promise<FeaturedHomeProfessional[]> => {
     const result = await listPublicProfessionals(
-      `https://ceres.local/api/v1/professionals?grupo=oficios&limit=${limit}&sortBy=recent`,
+      `https://ceres.local/api/v1/professionals?limit=${limit}&sortBy=recent`,
       {
         includeServiceLocations: true,
       }
@@ -196,7 +204,7 @@ const listFeaturedHomeProfessionalsCached = unstable_cache(
       serviceLocations: professional.serviceLocations ?? [],
     }));
   },
-  ['home-featured-professionals'],
+  ['home-featured-professionals-v2'],
   {
     revalidate: 300,
   }

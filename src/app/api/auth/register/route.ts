@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma';
 import { generateRandomToken } from '@/lib/utils';
 import { enqueueEmailVerify } from '@/jobs/email.producer';
 import { normalizeWhatsAppNumber } from '@/lib/whatsapp-normalize';
+import { buildPersonFullName, normalizePersonNamePart } from '@/lib/person-name';
 import {
   normalizeProfessionalDocumentationInput,
   ProfessionalDocumentationError,
@@ -122,8 +123,9 @@ export async function POST(request: NextRequest) {
         data: {
           email,
           password: hashedPassword,
-          firstName,
-          lastName,
+          firstName: normalizePersonNamePart(firstName),
+          lastName: normalizePersonNamePart(lastName),
+          name: buildPersonFullName(firstName, lastName),
           dni: dni.trim(),
           phone: phone || null,
           birthDate: birthDate ? new Date(birthDate) : null,

@@ -7,6 +7,7 @@ import { generateRandomToken } from '@/lib/utils';
 import { enqueueEmailVerify } from '@/jobs/email.producer';
 import { enqueueSlackAlert } from '@/jobs/slack.producer';
 import { normalizeWhatsAppNumber, validateWhatsAppNumber } from '@/lib/whatsapp-normalize';
+import { buildPersonFullName, normalizePersonNamePart } from '@/lib/person-name';
 import { ok, fail, requestMeta } from '@/lib/api-response';
 import { rateLimit, rateLimitHeaders } from '@/lib/rate-limit-memory';
 import { buildChanges, observedJson, safeRecordAuditEvent } from '@/lib/observability/audit';
@@ -255,7 +256,7 @@ export async function POST(request: NextRequest) {
 
     context.actor = createEndUserActor({
       email,
-      label: [firstName, lastName].filter(Boolean).join(' ').trim() || email,
+      label: buildPersonFullName(firstName, lastName) || email,
     });
 
     const documentationInput = normalizeProfessionalDocumentationInput(documentation);
@@ -361,8 +362,9 @@ export async function POST(request: NextRequest) {
         data: {
           email,
           password: hashedPassword,
-          firstName,
-          lastName,
+          firstName: normalizePersonNamePart(firstName),
+          lastName: normalizePersonNamePart(lastName),
+          name: buildPersonFullName(firstName, lastName),
           gender: gender || null,
           dni: normalizedDni,
           phone: phone || null,

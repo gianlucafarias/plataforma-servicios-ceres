@@ -1,6 +1,7 @@
 import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { isProfessionalPubliclyVisible } from '@/lib/server/public-professional-visibility';
+import { normalizePersonNamePart } from '@/lib/person-name';
 
 export type ProfessionalTimeSlot = {
   enabled: boolean;
@@ -196,8 +197,8 @@ function serializeProfessional(record: ProfessionalProfileRecord): ProfessionalP
     physicalStoreAddress: record.physicalStoreAddress,
     schedule: normalizeSchedule(record.schedule),
     user: {
-      firstName: record.user.firstName,
-      lastName: record.user.lastName,
+      firstName: normalizePersonNamePart(record.user.firstName),
+      lastName: normalizePersonNamePart(record.user.lastName),
       phone: record.user.phone,
       verified: record.user.verified,
       image: record.user.image,
@@ -273,8 +274,8 @@ export function toProfessionalPublicApiProfile(
   return {
     ...rest,
     user: {
-      firstName: user.firstName,
-      lastName: user.lastName,
+      firstName: normalizePersonNamePart(user.firstName),
+      lastName: normalizePersonNamePart(user.lastName),
       verified: user.verified,
       image: user.image,
       location: user.location,

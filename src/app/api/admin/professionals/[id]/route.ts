@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireAdminApiKey } from '@/lib/auth-helpers';
+import { normalizePersonNamePart } from '@/lib/person-name';
 import { normalizeWhatsAppNumber } from '@/lib/whatsapp-normalize';
 import {
   professionalDocumentationArgs,
@@ -153,8 +154,8 @@ export async function PUT(
       await prisma.user.update({
         where: { id: existing.userId },
         data: {
-          firstName: body.user.firstName,
-          lastName: body.user.lastName,
+          firstName: normalizePersonNamePart(body.user.firstName),
+          lastName: normalizePersonNamePart(body.user.lastName),
           email: body.user.email,
           phone: body.user.phone,
           birthDate: body.user.birthDate ? new Date(body.user.birthDate) : undefined,

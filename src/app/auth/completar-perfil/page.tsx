@@ -1202,7 +1202,7 @@ export default function CompletarPerfilPage() {
                       <Input
                         id="cv"
                         type="file"
-                        accept=".pdf"
+                        accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,image/jpeg,image/png"
                         onChange={async (e) => {
                           const file = e.target.files?.[0];
                           if (file) {

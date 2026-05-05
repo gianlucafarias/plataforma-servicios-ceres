@@ -5,6 +5,7 @@ import bcrypt from 'bcryptjs'
 import { AuthOptions } from 'next-auth'
 import { prisma } from '@/lib/prisma'
 import { downloadAndSaveImage, isExternalOAuthImage } from '@/lib/download-image'
+import { buildPersonFullName, normalizePersonNamePart } from '@/lib/person-name'
 
 // Extend NextAuth types
 declare module "next-auth" {
@@ -102,12 +103,12 @@ export const authOptions: AuthOptions = {
 
                     if (!passwordsMatch) return null
 
-                    return {
+return {
                         id: user.id.toString(),
                         email: user.email,
-                        name: `${user.firstName} ${user.lastName}`,
-                        firstName: user.firstName,
-                        lastName: user.lastName,
+                        name: buildPersonFullName(user.firstName, user.lastName),
+                        firstName: normalizePersonNamePart(user.firstName),
+                        lastName: normalizePersonNamePart(user.lastName),
                     }
                 } catch (error) {
                     console.error('Error en autenticación:', error)
@@ -220,8 +221,8 @@ export const authOptions: AuthOptions = {
                     } else {
                         // Usuario no existe - crear nuevo usuario y cuenta OAuth
                         const nameParts = (user.name || '').split(' ')
-                        const firstName = nameParts[0] || 'Usuario'
-                        const lastName = nameParts.slice(1).join(' ') || ''
+                        const firstName = normalizePersonNamePart(nameParts[0] || 'Usuario')
+                        const lastName = normalizePersonNamePart(nameParts.slice(1).join(' ') || '')
 
                         // Procesar imagen de perfil: si es externa (OAuth), descargarla y guardarla en R2
                         let processedImage = user.image;
@@ -240,7 +241,7 @@ export const authOptions: AuthOptions = {
                                 email,
                                 firstName,
                                 lastName,
-                                name: user.name,
+                                name: buildPersonFullName(firstName, lastName) || user.name,
                                 image: processedImage,
                                 verified: true, // OAuth ya verificó el email
                                 emailVerifiedAt: new Date(),
@@ -281,8 +282,8 @@ export const authOptions: AuthOptions = {
         async jwt({ token, user, account }) {
             if (user) {
                 token.id = user.id
-                token.firstName = user.firstName
-                token.lastName = user.lastName
+                token.firstName = normalizePersonNamePart(user.firstName ?? '')
+                token.lastName = normalizePersonNamePart(user.lastName ?? '')
                 token.picture = user.image
             }
             
@@ -294,8 +295,8 @@ export const authOptions: AuthOptions = {
                     })
                     if (dbUser) {
                         token.id = dbUser.id
-                        token.firstName = dbUser.firstName
-                        token.lastName = dbUser.lastName
+                        token.firstName = normalizePersonNamePart(dbUser.firstName)
+                        token.lastName = normalizePersonNamePart(dbUser.lastName)
                         token.picture = dbUser.image || token.picture
                     }
                 } catch (error) {
@@ -309,6 +310,7 @@ export const authOptions: AuthOptions = {
         async session({ session, token }) {
             if (token && session.user) {
                 session.user.id = token.id
+                session.user.name = buildPersonFullName(token.firstName || '', token.lastName || '') || session.user.name
                 session.user.firstName = token.firstName
                 session.user.lastName = token.lastName
                 session.user.image = token.picture as string | undefined
