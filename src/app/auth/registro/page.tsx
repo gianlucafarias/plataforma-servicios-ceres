@@ -106,6 +106,7 @@ export default function RegistroPage() {
   const [errors, setErrors] = useState<{[key: string]: string}>({});
   const [isLoading, setIsLoading] = useState(false);
   const [socialLoading, setSocialLoading] = useState<string | null>(null);
+  const [isUploadingPicture, setIsUploadingPicture] = useState(false);
 
   const areas = useMemo(
     () =>
@@ -522,6 +523,10 @@ export default function RegistroPage() {
   };
 
   const handleNext = async () => {
+    if (currentStep === 2 && isUploadingPicture) {
+      return;
+    }
+
     let isValid = false;
     
     switch (currentStep) {
@@ -1337,6 +1342,12 @@ export default function RegistroPage() {
                 onChange={async (e) => {
                   const file = e.target.files?.[0];
                   if (file) {
+                    setErrors(prev => {
+                      const newErrors = { ...prev };
+                      delete newErrors.picture;
+                      return newErrors;
+                    });
+                    setIsUploadingPicture(true);
                     try {
                       const result = await uploadPublicFile(file, "image");
                       /*
@@ -1349,14 +1360,11 @@ export default function RegistroPage() {
                       */
                       const pictureValue = resolveStoredUploadValue(result);
                       handleInputChange('picture', pictureValue);
-                      setErrors(prev => {
-                        const newErrors = {...prev};
-                        delete newErrors.picture;
-                        return newErrors;
-                      });
                     } catch (error) {
                       console.error('Error uploading file:', error);
                       setErrors(prev => ({ ...prev, picture: 'Error al subir la imagen' }));
+                    } finally {
+                      setIsUploadingPicture(false);
                     }
                   }
                 }}
@@ -1364,6 +1372,7 @@ export default function RegistroPage() {
               />
             </div>
             <p className="text-xs text-gray-500 mt-1">Obligatoria. PNG, JPG, JPEG, WEBP (máx. 10MB)</p>
+            {isUploadingPicture && <p className="text-xs text-gray-500 mt-1">Subiendo foto...</p>}
             {errors.picture && <p className="text-xs text-red-600 mt-1">{errors.picture}</p>}
           </div>
 
@@ -1841,9 +1850,10 @@ export default function RegistroPage() {
               {currentStep < 4 ? (
                 <button
                   onClick={handleNext}
-                  className="flex-1 bg-[#006F4B] hover:bg-[#005a3d] text-white py-4 px-6 rounded-xl font-semibold transition-all duration-200 shadow-lg shadow-[#006F4B]/20 cursor-pointer"
+                  disabled={currentStep === 2 && isUploadingPicture}
+                  className="flex-1 bg-[#006F4B] hover:bg-[#005a3d] text-white py-4 px-6 rounded-xl font-semibold transition-all duration-200 shadow-lg shadow-[#006F4B]/20 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  Continuar
+                  {currentStep === 2 && isUploadingPicture ? "Subiendo foto..." : "Continuar"}
                 </button>
               ) : (
                 <button
